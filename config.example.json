@@ -1,0 +1,14 @@
+{
+  "databaseUrl": "postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require",
+  "clerk": {
+    "publishableKey": "",
+    "secretKey": ""
+  },
+  "otpSecret": "isi-string-acak-panjang (openssl rand -hex 32)",
+  "pusher": {
+    "appId": "",
+    "key": "",
+    "secret": "",
+    "cluster": "ap1"
+  }
+}
