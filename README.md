@@ -1,5 +1,14 @@
 # Obrolan, web chat ala WhatsApp (Next.js + Clerk + Neon + Pusher)
 
+
+## Fitur kevsoft-chat
+- **Username** wajib dipilih setelah login pertama (tidak bisa diganti).
+- **Komunitas Kevsoft**: chat publik, semua user otomatis masuk.
+- **Chat pribadi & grup** ala WhatsApp, nama pengirim (username) tampil di grup.
+- **Tag `@username`**: ketik `@` untuk memunculkan daftar anggota, yang ditag disorot.
+- **Kev-Ai**: chat paling atas, atau panggil di mana saja dengan `@kev-ai pertanyaanmu` (endpoint `https://kev-ai.vercel.app/ai?text=`).
+- Balas pesan (reply), penanda belum dibaca dan badge `@`, info grup/anggota.
+
 ## 1. Install
 ```bash
 npm install

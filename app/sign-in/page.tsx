@@ -39,8 +39,10 @@ export default function SignInPage() {
   return (
     <main className="auth">
       <div className="auth-card">
-        <h1>Masuk ke Obrolan</h1>
-        <p className="muted">Pesan pribadi, tersimpan aman di akun kamu.</p>
+        <div className="auth-top"><span className="brand-mark">◐</span><strong>kevsoft-chat</strong></div>
+        <span className="eyebrow">Komunitas &amp; chat publik kevsoft</span>
+        <h1>Masuk atau daftar</h1>
+        <p className="muted">Ngobrol di komunitas, grup, chat pribadi, dan tanya <b>@kev-ai</b>.</p>
 
         {step === "email" ? (
           <form onSubmit={sendCode}>
