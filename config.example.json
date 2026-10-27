@@ -1,8 +1,13 @@
 {
   "databaseUrl": "postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require",
-  "clerk": {
-    "publishableKey": "",
-    "secretKey": ""
+  "firebase": {
+    "apiKey": "AIzaSyAKM8_18a6GfuyWK6EwtWh1hsu7X-dmIXs",
+    "authDomain": "kevsoft-apps.firebaseapp.com",
+    "projectId": "kevsoft-apps",
+    "storageBucket": "kevsoft-apps.firebasestorage.app",
+    "messagingSenderId": "52584199215",
+    "appId": "1:52584199215:web:ff6d64b9a61f4857a882da",
+    "measurementId": "G-0K8P631H47"
   },
   "otpSecret": "isi-string-acak-panjang (openssl rand -hex 32)",
   "pusher": {

@@ -21,3 +21,5 @@ export function aiPrompt(body: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+export const LOGO = "https://github.com/kevsoft-dev.png";

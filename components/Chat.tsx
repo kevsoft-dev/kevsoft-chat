@@ -1,10 +1,10 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Pusher from "pusher-js";
-import { UserButton } from "@clerk/nextjs";
+import Account from "./Account";
 import { AI_HANDLE, aiPrompt, parseMentions } from "@/lib/mentions";
 import NewChat from "./NewChat";
-import { Avatar, Icon, Rich, clock, convName, dayLabel, listTime, nameColor, type Conv, type Me, type Msg, type UserLite } from "./ui";
+import { Avatar, Icon, Logo, Rich, clock, convName, dayLabel, listTime, nameColor, type Conv, type Me, type Msg, type UserLite } from "./ui";
 
 type Sug = { username: string; name: string; avatar_url: string | null; ai?: boolean };
 const post = (url: string, body: object) =>
@@ -185,10 +185,10 @@ export default function Chat({ me, pusherKey, pusherCluster }: { me: Me; pusherK
     <div className="app" data-chat={active ? "open" : "list"}>
       <aside className="side">
         <header className="bar">
-          <div className="brand"><span className="brand-mark">◐</span><div><strong>kevsoft-chat</strong><small>@{me.username}</small></div></div>
+          <div className="brand"><Logo /><div><strong>kevsoft-chat</strong><small>@{me.username}</small></div></div>
           <div className="bar-actions">
             <button className="icon-btn" onClick={() => setShowNew(true)} aria-label="Chat baru"><Icon n="edit" /></button>
-            <UserButton />
+            <Account name={me.name} username={me.username} avatar={me.avatarUrl} />
           </div>
         </header>
         <div className="search"><Icon n="search" size={18} /><input placeholder="Cari chat" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari chat" /></div>
@@ -326,7 +326,7 @@ export default function Chat({ me, pusherKey, pusherCluster }: { me: Me; pusherK
           </>
         ) : (
           <div className="blank">
-            <span className="blank-orb"><Icon n="chat" size={34} /></span>
+            <Logo size={96} />
             <h2>kevsoft-chat</h2>
             <p className="muted">Pilih percakapan untuk mulai. Ngobrol di Komunitas Kevsoft, chat pribadi, atau tanya <b>@kev-ai</b>.</p>
           </div>

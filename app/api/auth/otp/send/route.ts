@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         to: email,
-        app: "kevsoft chat",
+        app: "kevsoft-chat",
         otp,
         logo: "https://github.com/kevsoft-dev.png",
       }),

@@ -1,6 +1,6 @@
-import { AI_HANDLE, mentionRegex } from "@/lib/mentions";
+import { AI_HANDLE, LOGO, mentionRegex } from "@/lib/mentions";
 
-export type Me = { id: string; username: string; name: string };
+export type Me = { id: string; username: string; name: string; avatarUrl?: string | null };
 export type Conv = {
   id: string; kind: "dm" | "group" | "community" | "ai"; title: string | null; description: string | null;
   other_id: string | null; other_username: string | null; other_name: string | null; other_avatar: string | null;
@@ -100,4 +100,8 @@ export function listTime(d: string) {
   const y = new Date(now); y.setDate(now.getDate() - 1);
   if (dt.toDateString() === y.toDateString()) return "Kemarin";
   return dt.toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
+export function Logo({ size = 38 }: { size?: number }) {
+  return <img className="brand-logo" src={LOGO} alt="kevsoft" width={size} height={size} style={{ width: size, height: size, borderRadius: size * 0.28 }} />;
 }

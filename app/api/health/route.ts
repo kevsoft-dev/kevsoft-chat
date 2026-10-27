@@ -1,7 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
+import { getUserId } from "@/lib/auth";
 import { cfg } from "@/lib/config";
 import { sql } from "@/lib/db";
-import { clerk } from "@/lib/clerk";
 import { ensureSchema } from "@/lib/migrate";
 
 export const dynamic = "force-dynamic";
@@ -14,15 +13,19 @@ export async function GET() {
     catch (e: any) { out[name] = "ERROR: " + String(e?.message ?? e).slice(0, 240); }
   };
   await step("config", () => ({
-    clerkPublishableKey: !!cfg.clerk.publishableKey,
-    clerkSecretKey: !!cfg.clerk.secretKey,
+    firebaseProjectId: cfg.firebase.projectId,
+    firebaseApiKey: !!cfg.firebase.apiKey,
+    otpSecret: !!cfg.otpSecret,
     pusherAppId: !!cfg.pusher.appId,
     pusherKey: !!cfg.pusher.key,
     pusherSecret: !!cfg.pusher.secret,
   }));
   await step("database", async () => { await sql`select 1`; });
   await step("schema", async () => { await ensureSchema(); });
-  await step("clerkApi", async () => { await clerk.users.getUserList({ limit: 1 }); });
-  await step("auth", async () => ((await auth()).userId ? "signed-in" : "signed-out"));
+  await step("firebaseKeys", async () => {
+    const r = await fetch("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+  });
+  await step("session", async () => ((await getUserId()) ? "signed-in" : "signed-out"));
   return Response.json(out);
 }

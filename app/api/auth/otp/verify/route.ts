@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { z } from "zod";
-import { clerk } from "@/lib/clerk";
+import { startSession } from "@/lib/session";
+import { upsertUserByEmail } from "@/lib/users";
 import { sql } from "@/lib/db";
 import { hashOtp } from "@/lib/otp";
 
@@ -24,10 +25,7 @@ export async function POST(req: Request) {
 
   await sql`delete from otp_codes where email = ${email}`; // sekali pakai
 
-  const found = await clerk.users.getUserList({ emailAddress: [email] });
-  const user =
-    found.data[0] ?? (await clerk.users.createUser({ emailAddress: [email], skipPasswordRequirement: true }));
-
-  const t = await clerk.signInTokens.createSignInToken({ userId: user.id, expiresInSeconds: 60 });
-  return Response.json({ ticket: t.token });
+  const uid = await upsertUserByEmail(email);
+  await startSession(uid);
+  return Response.json({ ok: true });
 }

@@ -1,8 +1,13 @@
 {
   "databaseUrl": "postgresql://neondb_owner:npg_cehIS7odvB5R@ep-dark-frog-b59qql2v-pooler.c-7.us-east-2.aws.neon.tech/kevsoft-chat?sslmode=require&channel_binding=require",
-  "clerk": {
-    "publishableKey": "pk_test_bGVnaWJsZS1jb2JyYS01MjI0LmNsZXJrLmFjY291bnRzLmRldiQ=",
-    "secretKey": "sk_test_J8TQ96rXjIIcaqbZd0iNPKd9XYuVLYV9B4s1FajwHc"
+  "firebase": {
+    "apiKey": "AIzaSyAKM8_18a6GfuyWK6EwtWh1hsu7X-dmIXs",
+    "authDomain": "kevsoft-apps.firebaseapp.com",
+    "projectId": "kevsoft-apps",
+    "storageBucket": "kevsoft-apps.firebasestorage.app",
+    "messagingSenderId": "52584199215",
+    "appId": "1:52584199215:web:ff6d64b9a61f4857a882da",
+    "measurementId": "G-0K8P631H47"
   },
   "otpSecret": "6d2085b2a7adb6f9e3a2d87f54f461f98398e5ad611302ad78b9fcd5f99ff07b",
   "pusher": {

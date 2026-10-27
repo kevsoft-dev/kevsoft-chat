@@ -1,4 +1,4 @@
-# Obrolan, web chat ala WhatsApp (Next.js + Clerk + Neon + Pusher)
+# Obrolan, web chat ala WhatsApp (Next.js + Firebase Auth + Neon + Pusher)
 
 
 ## Fitur kevsoft-chat
@@ -18,11 +18,12 @@ cp config.example.json config.json   # lalu isi semua nilainya (config.json suda
 ## 2. Neon
 Database sudah dikonfigurasi di `config.json`. Jalankan `npm run db:setup` untuk membuat semua tabel (atau tempel `schema.sql` di SQL Editor Neon).
 
-## 3. Clerk
-- Buat aplikasi di clerk.com, salin publishable key dan secret key ke `clerk.publishableKey` dan `clerk.secretKey`.
-- User & Authentication: aktifkan **Email address** dan **Google**.
-- Matikan syarat password (login memakai kode OTP / Google).
-- Email yang sama di OTP dan Google otomatis jadi satu akun.
+## 3. Firebase (login)
+- Konfigurasi web Firebase sudah ada di `config.json` (`firebase`).
+- Firebase Console → Authentication → Sign-in method → aktifkan **Google**.
+- Authentication → Settings → **Authorized domains** → tambahkan domain deploy (mis. `kevsoft-chat.vercel.app`).
+- Login email memakai OTP 6 digit lewat API email; email yang sama di OTP dan Google = satu akun.
+- Sesi disimpan di cookie httpOnly yang ditandatangani server (`otpSecret`).
 
 ## 4. Pusher (realtime)
 Buat app di pusher.com Channels, isi `pusher.appId`, `pusher.secret`, `pusher.key`, `pusher.cluster`.
@@ -37,7 +38,7 @@ npm run dev          # http://localhost:3000
 Deploy ke Vercel: import repo, sertakan `config.json` (file ini di-gitignore, jadi tambahkan lewat deploy langsung/CLI atau hapus dari .gitignore untuk repo privat).
 
 ## Keamanan yang sudah ada
-- Semua route dilindungi middleware Clerk; `userId` selalu dari sesi server.
+- Semua route dilindungi middleware sesi; `userId` selalu dari cookie sesi server.
 - Setiap query pesan memeriksa keanggotaan percakapan.
 - Query Neon parameterized, input divalidasi Zod, pesan dirender sebagai teks (anti-XSS).
 - OTP: di-hash (HMAC), berlaku 5 menit, maks 5 percobaan, sekali pakai, perbandingan constant-time, jeda kirim ulang 60 detik.
@@ -46,6 +47,6 @@ Deploy ke Vercel: import repo, sertakan `config.json` (file ini di-gitignore, ja
 
 ## Langkah lanjutan yang disarankan
 - Rate limit per IP (mis. Upstash Ratelimit) di endpoint OTP dan kirim pesan.
-- Content-Security-Policy (perlu disesuaikan dengan domain Clerk dan Pusher).
+- Content-Security-Policy (perlu disesuaikan dengan domain Firebase dan Pusher).
 - Status dibaca/centang, indikator mengetik, grup, kirim gambar (storage + signed URL).
 - E2EE (Web Crypto / libsodium) jika dibutuhkan; saat ini pesan terenkripsi TLS dan at-rest di Neon, tetapi tidak E2EE.

@@ -8,8 +8,9 @@
     "db:setup": "node scripts/db-setup.mjs"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.9.0",
     "@neondatabase/serverless": "^0.10.4",
+    "firebase": "13.1.0",
+    "jose": "^5.9.0",
     "next": "^15.1.0",
     "pusher": "^5.2.0",
     "pusher-js": "^8.4.0",
