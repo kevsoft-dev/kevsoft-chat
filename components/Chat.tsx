@@ -5,12 +5,13 @@ import { AI_HANDLE, parseMentions } from "@/lib/mentions";
 import { readPref } from "@/lib/prefs";
 import { blip, unlockAudio } from "@/lib/sound";
 import Composer from "./Composer";
+import Console from "./Console";
 import ConvItem from "./ConvItem";
 import MessageRow from "./MessageRow";
 import NewChat from "./NewChat";
 import Profile from "./Profile";
 import { Dialog, Lightbox, Menu, type DialogAction, type MenuItem } from "./overlays";
-import { Avatar, Icon, Logo, convName, type Conv, type Me, type Msg, type UserLite } from "./ui";
+import { Avatar, Icon, Logo, RoleBadge, convName, isStaffRole, type Conv, type Me, type Msg, type UserLite } from "./ui";
 
 type MenuState = { x: number; y: number; items: MenuItem[] };
 type DialogState = { title: string; text?: string; actions: DialogAction[] };
@@ -65,6 +66,8 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
   const [toastText, setToastText] = useState("");
   const [away, setAway] = useState(false);
   const [newBelow, setNewBelow] = useState(0);
+  const [showConsole, setShowConsole] = useState(false);
+  const [memberQ, setMemberQ] = useState("");
 
   const meRef = useRef(me); meRef.current = me;
   const activeRef = useRef<string | null>(null);
@@ -177,6 +180,14 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
 
     ch.bind("conversation", () => scheduleConvs());
 
+    // Moderasi: akun diblokir -> langsung keluar; dibisukan -> pemberitahuan; role berubah -> perbarui menu.
+    ch.bind("banned", async () => {
+      await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+      window.location.assign("/sign-in");
+    });
+    ch.bind("muted", () => toast("Kamu dibisukan oleh moderator"));
+    ch.bind("role", (d: { role?: string }) => { if (d?.role) setMe((x) => ({ ...x, role: d.role })); });
+
     let first = true; // setelah tersambung ulang, ambil pesan yang mungkin terlewat
     pusher.connection.bind("connected", () => {
       if (first) { first = false; return; }
@@ -190,7 +201,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
     window.addEventListener("keydown", unlock, { once: true });
     if (!readPref("motion", true)) document.documentElement.dataset.motion = "off";
     return () => { pusher.disconnect(); window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock); };
-  }, [me0.id, pusherKey, pusherCluster, loadConvs, scheduleConvs, bump, markRead, mutate]);
+  }, [me0.id, pusherKey, pusherCluster, loadConvs, scheduleConvs, bump, markRead, mutate, toast]);
 
   const totalUnread = (convs ?? []).reduce((n, c) => n + c.unread, 0);
   useEffect(() => { document.title = totalUnread ? `(${totalUnread}) kevsoft-chat` : "kevsoft-chat"; }, [totalUnread]);
@@ -286,6 +297,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
     try {
       const r = await post("/api/messages", { id: m.id, conversationId: m.conversation_id, body: m.body, replyTo: m.reply_to ?? undefined });
       if (r.status === 401) { window.location.assign("/sign-in"); return; }
+      if (r.status === 403) { const d = await r.json().catch(() => null); toast(d?.error || "Pesan tidak terkirim"); }
       if (!r.ok) throw new Error(String(r.status));
       const s = await r.json();
       patch({ status: "sent", created_at: s.created_at, mentions: s.mentions });
@@ -293,7 +305,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
       patch({ status: "failed" });
       setAiWait((w) => w.filter((x) => x !== m.conversation_id));
     }
-  }, [mutate]);
+  }, [mutate, toast]);
 
   const retry = useCallback((m: Msg) => {
     mutate(m.conversation_id, (x) => x.map((y) => (y.id === m.id ? { ...y, status: "sending" } : y)));
@@ -358,9 +370,11 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
     }
     const mine = m.sender_id === meRef.current.id && !m.deleted_at;
     const actions: DialogAction[] = [];
+    const mod = isStaffRole(meRef.current.role) && !mine && !m.deleted_at;
     if (mine) actions.push({ label: "Hapus untuk semua orang", danger: true, run: () => deleteMsg(m, "all") });
-    actions.push({ label: "Hapus untuk saya", danger: !mine, run: () => deleteMsg(m, "me") });
-    setDialog({ title: "Hapus pesan?", text: mine ? "Hapus untuk semua orang akan menghilangkan pesan ini dari semua anggota percakapan." : undefined, actions });
+    if (mod) actions.push({ label: "Hapus untuk semua (moderator)", danger: true, run: () => deleteMsg(m, "all") });
+    actions.push({ label: "Hapus untuk saya", danger: !mine && !mod, run: () => deleteMsg(m, "me") });
+    setDialog({ title: "Hapus pesan?", text: mine ? "Hapus untuk semua orang akan menghilangkan pesan ini dari semua anggota percakapan." : mod ? "Sebagai moderator kamu bisa menghapus pesan ini untuk semua anggota. Tindakan ini dicatat di Log." : undefined, actions });
   }, [deleteMsg, mutate]);
 
   const copyMsg = useCallback(async (m: Msg) => {
@@ -425,13 +439,63 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
     setMenu({ ...placeMenu(x, y, items.length), items });
   }, [convItems]);
 
+  const loadMembers = useCallback(async (cid: string) => {
+    try { const r = await fetch(`/api/members?conversationId=${cid}`); if (r.ok && activeRef.current === cid) setMembers(await r.json()); } catch {}
+  }, []);
+
   async function showInfo() {
     if (!active) return;
-    setInfo(true);
-    if (active.kind !== "ai") {
-      try { const r = await fetch(`/api/members?conversationId=${active.id}`); if (r.ok) setMembers(await r.json()); } catch {}
-    }
+    setInfo(true); setMemberQ("");
+    if (active.kind !== "ai") loadMembers(active.id);
   }
+
+  // ---------- moderasi anggota (menu titik tiga di panel Info) ----------
+  const rk = (r?: string | null) => (r === "owner" ? 2 : r === "admin" ? 1 : 0);
+  const myRank = rk(me.role);
+
+  const adminAct = useCallback(async (body: object, okText: string) => {
+    const r = await post("/api/admin/users", body);
+    const d = await r.json().catch(() => ({}));
+    toast(r.ok ? okText : d.error || "Gagal");
+    if (r.ok && activeRef.current) loadMembers(activeRef.current);
+  }, [toast, loadMembers]);
+
+  const kickMember = useCallback(async (cid: string, u: UserLite) => {
+    try {
+      const r = await fetch(`/api/members?conversationId=${cid}&userId=${encodeURIComponent(u.id)}`, { method: "DELETE" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.error || "Gagal mengeluarkan"); return; }
+      toast(`@${u.username} dikeluarkan`);
+      loadMembers(cid); scheduleConvs();
+    } catch { toast("Jaringan bermasalah, coba lagi"); }
+  }, [toast, loadMembers, scheduleConvs]);
+
+  const memberItems = useCallback((u: UserLite, c: Conv, all: UserLite[]): MenuItem[] => {
+    if (u.id === me.id || (c.kind !== "group" && c.kind !== "community")) return [];
+    const tr = rk(u.sys_role);
+    const staffCan = myRank === 2 ? tr < 2 : myRank === 1 ? tr === 0 : false;
+    const groupAdminCan = c.kind === "group" && all.find((x) => x.id === me.id)?.group_role === "admin" && tr === 0 && u.group_role !== "admin";
+    if (!staffCan && !groupAdminCan) return [];
+    const where = c.kind === "group" ? "grup" : "Komunitas";
+    const confirm = (title: string, text: string, label: string, run: () => void, danger = true) =>
+      setDialog({ title, text, actions: [{ label, danger, run }] });
+    const items: MenuItem[] = [
+      { icon: "logout", label: `Keluarkan dari ${where}`, danger: true,
+        run: () => confirm(`Keluarkan @${u.username}?`, `Dikeluarkan dari ${c.kind === "group" ? `“${convName(c)}”` : "Komunitas Kevsoft"}.`, "Kick", () => kickMember(c.id, u)) },
+    ];
+    if (staffCan) {
+      items.push({ icon: "block", label: "Blokir akun (ban)", danger: true,
+        run: () => confirm(`Blokir @${u.username}?`, "Akun langsung keluar dan tidak bisa masuk lagi sampai blokir dibuka di Console.", "Blokir akun", () => adminAct({ action: "ban", userId: u.id, reason: "Melanggar aturan komunitas" }, "Akun diblokir")) });
+      items.push({ icon: "mute", label: "Bisukan 1 jam", run: () => adminAct({ action: "mute", userId: u.id, minutes: 60 }, "Pengguna dibisukan 1 jam") });
+      if (myRank === 2) {
+        if (u.sys_role !== "admin") items.push({ icon: "shield", label: "Jadikan admin", run: () => adminAct({ action: "role", userId: u.id, role: "admin" }, "Dijadikan admin") });
+        if (u.sys_role !== "owner") items.push({ icon: "key", label: "Jadikan owner",
+          run: () => confirm(`Jadikan @${u.username} owner?`, "Owner punya console penuh dan bisa menambah owner lain.", "Jadikan owner", () => adminAct({ action: "role", userId: u.id, role: "owner" }, "Dijadikan owner"), false) });
+        if (u.sys_role !== "user") items.push({ icon: "user", label: "Jadikan user biasa", run: () => adminAct({ action: "role", userId: u.id, role: "user" }, "Role dicabut") });
+      }
+    }
+    return items;
+  }, [me.id, myRank, kickMember, adminAct]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
@@ -459,6 +523,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
         <header className="bar">
           <div className="brand"><Logo /><div><strong>kevsoft-chat</strong><small>@{me.username}</small></div></div>
           <div className="bar-actions">
+            {isStaffRole(me.role) && <button className="icon-btn" onClick={() => setShowConsole(true)} aria-label="Console"><Icon n="shield" /></button>}
             <button className="icon-btn" onClick={() => setShowNew(true)} aria-label="Chat baru"><Icon n="edit" /></button>
             <button className="account-btn" onClick={() => setProfile(true)} aria-label="Profil dan pengaturan"><Avatar name={me.name} src={me.avatarUrl} size={40} /></button>
           </div>
@@ -480,6 +545,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
         </ul>
         {profile && (
           <Profile me={me} onClose={() => setProfile(false)} onToast={toast} onLogout={logout}
+            onConsole={isStaffRole(me.role) ? () => { setProfile(false); setShowConsole(true); } : undefined}
             onUpdate={(p) => setMe((x) => ({ ...x, ...p }))} />
         )}
       </aside>
@@ -544,12 +610,27 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
                 {active.kind !== "ai" && (
                   <>
                     <h4>{active.kind === "dm" ? "Anggota" : `${members.length} anggota`}</h4>
+                    {members.length > 8 && (
+                      <div className="search member-search"><Icon n="search" size={18} /><input placeholder="Cari anggota" value={memberQ} onChange={(e) => setMemberQ(e.target.value)} aria-label="Cari anggota" /></div>
+                    )}
                     <ul className="members">
-                      {members.map((u) => (
-                        <li key={u.id}><Avatar name={u.name || u.username} src={u.avatar_url} size={38} />
-                          <span><b>{u.name || u.username}{u.id === me.id && " (kamu)"}</b><small>{u.bio || `@${u.username}`}</small></span>
-                          {u.role === "admin" && <em className="badge">admin</em>}</li>
-                      ))}
+                      {members.filter((u) => {
+                        const t = memberQ.trim().toLowerCase().replace(/^@/, "");
+                        return !t || u.username.toLowerCase().includes(t) || (u.name ?? "").toLowerCase().includes(t);
+                      }).map((u) => {
+                        const items = memberItems(u, active, members);
+                        return (
+                          <li key={u.id}><Avatar name={u.name || u.username} src={u.avatar_url} size={38} />
+                            <span><b>{u.name || u.username}{u.id === me.id && " (kamu)"}<RoleBadge role={u.role} />{u.banned && <em className="badge warn">diblokir</em>}{u.muted && <em className="badge warn">bisu</em>}</b><small>{u.bio || `@${u.username}`}</small></span>
+                            {items.length > 0 && (
+                              <button className="icon-btn mini" aria-label={`Tindakan untuk @${u.username}`}
+                                onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ ...placeMenu(r.right - 220, r.bottom + 6, items.length), items }); }}>
+                                <Icon n="more" size={18} />
+                              </button>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </>
                 )}
@@ -570,6 +651,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
         )}
       </section>
 
+      {showConsole && <Console me={me} onClose={() => setShowConsole(false)} onToast={toast} onChanged={scheduleConvs} />}
       {showNew && <NewChat onClose={() => setShowNew(false)} onCreated={openById} />}
       {menu && <Menu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
       {dialog && <Dialog title={dialog.title} text={dialog.text} actions={dialog.actions} onClose={() => setDialog(null)} />}

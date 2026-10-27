@@ -15,5 +15,8 @@
     "key": "",
     "secret": "",
     "cluster": "ap1"
-  }
+  },
+  "owners": [
+    "kevsoft.cs@gmail.com"
+  ]
 }

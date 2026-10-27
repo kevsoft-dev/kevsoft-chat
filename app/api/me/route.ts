@@ -2,10 +2,12 @@ import { z } from "zod";
 import { sql } from "@/lib/db";
 import { ensureDefaults, getUserId } from "@/lib/auth";
 import { RESERVED, USERNAME_RE } from "@/lib/mentions";
+import { hashPassword, passwordProblem } from "@/lib/password";
 
 const schema = z.object({
   username: z.string().trim().toLowerCase(),
   name: z.string().trim().min(1).max(40).optional(),
+  password: z.string().max(128),
 });
 
 const noCtl = (s: string) => !/[\u0000-\u001f\u007f]/.test(s);
@@ -17,7 +19,7 @@ const patchSchema = z.object({
 export async function GET() {
   const uid = await getUserId();
   if (!uid) return new Response("Unauthorized", { status: 401 });
-  const [u] = await sql`select id, username, name, avatar_url, bio, email from users where id = ${uid}`;
+  const [u] = await sql`select id, username, name, avatar_url, bio, email, role from users where id = ${uid}`;
   return Response.json(u ?? null);
 }
 
@@ -39,23 +41,28 @@ export async function PATCH(req: Request) {
   return Response.json(u);
 }
 
-// Set username (sekali, setelah login pertama).
+// Set username + password (sekali, setelah verifikasi email/Google pertama).
 export async function POST(req: Request) {
   const uid = await getUserId();
   if (!uid) return new Response("Unauthorized", { status: 401 });
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Data tidak valid" }, { status: 400 });
-  const { username, name } = parsed.data;
+  const { username, name, password } = parsed.data;
 
   if (!USERNAME_RE.test(username))
     return Response.json({ error: "Username 3-20 karakter: huruf kecil, angka, _ . - (tidak diakhiri . atau -)" }, { status: 400 });
   if (RESERVED.includes(username)) return Response.json({ error: "Username ini dicadangkan" }, { status: 400 });
+  const pwErr = passwordProblem(password, username);
+  if (pwErr) return Response.json({ error: pwErr }, { status: 400 });
 
   const [me] = await sql`select username from users where id = ${uid}`;
   if (me?.username) return Response.json({ error: "Username sudah diatur dan tidak bisa diubah" }, { status: 409 });
 
+  const hash = await hashPassword(password);
   try {
-    await sql`update users set username = ${username}, name = coalesce(${name ?? null}, name) where id = ${uid} and username is null`;
+    await sql`
+      update users set username = ${username}, name = coalesce(${name ?? null}, name), password_hash = ${hash}, login_fails = 0, locked_until = null
+      where id = ${uid} and username is null`;
   } catch {
     return Response.json({ error: "Username sudah dipakai" }, { status: 409 });
   }

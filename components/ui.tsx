@@ -2,7 +2,7 @@
 import { useRef } from "react";
 import { AI_HANDLE, LOGO, mentionRegex } from "@/lib/mentions";
 
-export type Me = { id: string; username: string; name: string; avatarUrl?: string | null; bio?: string | null; email?: string | null };
+export type Me = { id: string; username: string; name: string; avatarUrl?: string | null; bio?: string | null; email?: string | null; role?: string };
 export type Conv = {
   id: string; kind: "dm" | "group" | "community" | "ai"; title: string | null; description: string | null;
   other_id: string | null; other_username: string | null; other_name: string | null; other_avatar: string | null; other_bio: string | null;
@@ -15,7 +15,17 @@ export type Msg = {
   reply_body: string | null; reply_username: string | null; deleted_at: string | null;
   status?: "sending" | "sent" | "failed"; // hanya di klien (pesan yang baru dikirim)
 };
-export type UserLite = { id: string; username: string; name: string | null; avatar_url: string | null; bio?: string | null; role?: string };
+export type UserLite = {
+  id: string; username: string; name: string | null; avatar_url: string | null; bio?: string | null;
+  role?: "owner" | "admin" | "member"; sys_role?: string; group_role?: string; banned?: boolean; muted?: boolean;
+};
+
+export const isStaffRole = (r?: string | null) => r === "admin" || r === "owner";
+export function RoleBadge({ role }: { role?: string | null }) {
+  if (role === "owner") return <em className="badge owner">owner</em>;
+  if (role === "admin") return <em className="badge">admin</em>;
+  return null;
+}
 
 export const convName = (c: Conv) => (c.kind === "dm" ? c.other_name || c.other_username || "Pengguna" : c.title || "Grup");
 export const hue = (s: string) => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
@@ -49,6 +59,9 @@ const P: Record<string, string> = {
   user: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
   block: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM5 5l14 14",
   keyboard: "M3 6h18v12H3ZM7 10h.01M11 10h.01M15 10h.01M7 14h10",
+  shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z",
+  key: "M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8Zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3",
+  mute: "M11 5 6 9H2v6h4l5 4ZM22 9l-6 6M16 9l6 6",
 };
 export type IconName = keyof typeof P;
 export function Icon({ n, size = 20 }: { n: IconName; size?: number }) {

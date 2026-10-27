@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { usePref } from "@/lib/prefs";
-import { Avatar, Icon, type Me } from "./ui";
+import { Avatar, Icon, RoleBadge, isStaffRole, type Me } from "./ui";
 import { useTheme } from "./ThemeToggle";
 
 // Foto dipotong persegi dan diperkecil di browser (256px WebP/JPEG, ~10-30 KB) sebelum diunggah.
@@ -75,8 +75,49 @@ function EditField({ label, value, placeholder, max, multiline, onSave, note }: 
   );
 }
 
-export default function Profile({ me, onClose, onUpdate, onLogout, onToast }: {
-  me: Me; onClose: () => void; onUpdate: (p: Partial<Me>) => void; onLogout: () => void; onToast: (t: string) => void;
+// Ganti password: butuh password lama (kecuali baru saja verifikasi email/Google).
+function PasswordCard({ onToast }: { onToast: (t: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [cur, setCur] = useState("");
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const ok = pw.length >= 8 && pw === pw2 && !!cur;
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault(); setErr(""); setBusy(true);
+    try {
+      const r = await fetch("/api/me/password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ current: cur, password: pw }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(d.error || "Gagal menyimpan"); setBusy(false); return; }
+      setCur(""); setPw(""); setPw2(""); setOpen(false); onToast("Password diperbarui");
+    } catch { setErr("Jaringan bermasalah, coba lagi"); }
+    setBusy(false);
+  }
+
+  return (
+    <div className="pf">
+      <button className="pf-view" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <span><Icon n="key" size={16} /> Ganti password</span><Icon n="down" size={16} />
+      </button>
+      {open && (
+        <form className="pw-form" onSubmit={save}>
+          <input type="password" placeholder="Password lama" value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" maxLength={128} />
+          <input type="password" placeholder="Password baru (min. 8 karakter)" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" maxLength={128} />
+          <input type="password" placeholder="Ulangi password baru" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" maxLength={128} />
+          {pw2 && pw !== pw2 && <p className="error">Password tidak sama</p>}
+          {err && <p className="error">{err}</p>}
+          <button className="primary" disabled={busy || !ok}>{busy ? "Menyimpan…" : "Simpan password"}</button>
+          <em>Lupa password lama? Keluar, lalu pilih “Lupa password” di halaman masuk.</em>
+        </form>
+      )}
+    </div>
+  );
+}
+
+export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onConsole }: {
+  me: Me; onClose: () => void; onUpdate: (p: Partial<Me>) => void; onLogout: () => void; onToast: (t: string) => void; onConsole?: () => void;
 }) {
   const [theme, setTheme] = useTheme();
   const [sound, setSound] = usePref("sound", true);
@@ -164,7 +205,20 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast }: {
             <em>Username tidak bisa diganti.</em>
           </div>
           {me.email && <div className="pf ro"><small>Email</small><div className="pf-view static"><span>{me.email}</span></div></div>}
+          {isStaffRole(me.role) && <div className="pf ro"><small>Role</small><div className="pf-view static"><span style={{ textTransform: "capitalize" }}>{me.role}<RoleBadge role={me.role} /></span></div></div>}
         </div>
+
+        {onConsole && (
+          <>
+            <h4>Moderasi</h4>
+            <div className="card">
+              <button className="set set-btn" onClick={onConsole}><Icon n="shield" size={20} /><span>Buka Console<small>Kelola pengguna, grup, dan log moderasi</small></span><Icon n="back" size={18} /></button>
+            </div>
+          </>
+        )}
+
+        <h4>Keamanan</h4>
+        <div className="card"><PasswordCard onToast={onToast} /></div>
 
         <h4>Pengaturan</h4>
         <div className="card">

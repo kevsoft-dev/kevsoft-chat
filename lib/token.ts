@@ -6,15 +6,27 @@ export const COOKIE = "kc_session";
 export const MAX_AGE = 60 * 60 * 24 * 30;
 const key = () => new TextEncoder().encode("session:" + cfg.otpSecret);
 
-export const signToken = (uid: string) =>
-  new SignJWT({}).setProtectedHeader({ alg: "HS256" }).setSubject(uid).setIssuedAt().setExpirationTime(`${MAX_AGE}s`).sign(key());
+// via = cara login ("otp" / "google" = baru diverifikasi email; kosong = login password).
+export const signToken = (uid: string, via?: string) =>
+  new SignJWT(via ? { via } : {}).setProtectedHeader({ alg: "HS256" }).setSubject(uid).setIssuedAt().setExpirationTime(`${MAX_AGE}s`).sign(key());
 
-export async function verifyToken(token?: string | null): Promise<string | null> {
+export type SessionMeta = { uid: string; via?: string; iat?: number };
+
+export async function verifyTokenFull(token?: string | null): Promise<SessionMeta | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, key(), { algorithms: ["HS256"] });
-    return payload.sub ?? null;
+    if (!payload.sub) return null;
+    return { uid: payload.sub, via: typeof payload.via === "string" ? payload.via : undefined, iat: payload.iat };
   } catch {
     return null;
   }
 }
+
+export async function verifyToken(token?: string | null): Promise<string | null> {
+  return (await verifyTokenFull(token))?.uid ?? null;
+}
+
+// Verifikasi email/Google dianggap "segar" 15 menit (dipakai untuk reset password).
+export const isFresh = (m: SessionMeta | null) =>
+  !!m?.via && !!m.iat && Date.now() / 1000 - m.iat < 15 * 60;

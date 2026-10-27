@@ -35,6 +35,11 @@ const googleError = (e: any) => {
 };
 
 export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
+  const [mode, setMode] = useState<"login" | "verify">("login");
+  const [forgot, setForgot] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"email" | "code">("email");
@@ -51,7 +56,10 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
   }
 
   const sendCode = () => run(async () => { await post("/api/auth/otp/send", { email }); setStep("code"); setCode(""); setWait(60); setBusy(false); });
-  const verify = (c: string) => run(async () => { await post("/api/auth/otp/verify", { email, code: c }); window.location.assign("/"); });
+  const dest = () => (forgot ? "/?reset=1" : "/");
+  const verify = (c: string) => run(async () => { await post("/api/auth/otp/verify", { email, code: c }); window.location.assign(dest()); });
+  const loginPw = () => run(async () => { await post("/api/auth/login", { username: username.trim().toLowerCase().replace(/^@/, ""), password }); window.location.assign("/"); });
+  const go = (m: "login" | "verify", f = false) => { setMode(m); setForgot(f); setErr(""); setStep("email"); setCode(""); };
   const google = () => run(async () => {
     const auth = fbAuth(firebase);
     const provider = new GoogleAuthProvider();
@@ -60,11 +68,12 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
       const res = await signInWithPopup(auth, provider);
       await post("/api/auth/google", { idToken: await res.user.getIdToken() });
       await signOut(auth);
-      window.location.assign("/");
+      window.location.assign(dest());
     } catch (e: any) {
       if (e?.code === "auth/popup-closed-by-user" || e?.code === "auth/cancelled-popup-request") { setBusy(false); return; }
       // Popup diblokir (umum di browser HP / in-app browser): pakai redirect.
       if (e?.code === "auth/popup-blocked" || e?.code === "auth/operation-not-supported-in-this-environment") {
+        try { sessionStorage.setItem("kc_forgot", forgot ? "1" : ""); } catch {}
         await signInWithRedirect(auth, provider);
         return;
       }
@@ -82,7 +91,8 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
         setBusy(true);
         await post("/api/auth/google", { idToken: await res.user.getIdToken() });
         await signOut(auth);
-        window.location.assign("/");
+        let f = false; try { f = sessionStorage.getItem("kc_forgot") === "1"; sessionStorage.removeItem("kc_forgot"); } catch {}
+        window.location.assign(f ? "/?reset=1" : "/");
       } catch (e: any) { setErr(googleError(e)); setBusy(false); }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -107,32 +117,62 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
 
       <section className="auth-card login-card">
         <div className="auth-top"><Logo /><strong>kevsoft-chat</strong></div>
-        <h2>{step === "email" ? "Masuk atau daftar" : "Cek email kamu"}</h2>
-        <p className="muted">{step === "email" ? "Masukkan email, kami kirim kode 6 digit." : <>Kode 6 digit dikirim ke <b>{email}</b>.</>}</p>
 
-        {step === "email" && (
+        {mode === "login" ? (
           <>
-            <button className="ghost g google-main" onClick={google} disabled={busy}><Google />Lanjut dengan Google</button>
-            <div className="or"><span>atau pakai email</span></div>
-          </>
-        )}
-
-        {step === "email" ? (
-          <form onSubmit={(e) => { e.preventDefault(); sendCode(); }}>
-            <label htmlFor="email">Email</label>
-            <input id="email" type="email" required autoComplete="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@email.com" />
-            <button disabled={busy}>{busy ? "Mengirim…" : "Kirim kode masuk"}</button>
-          </form>
-        ) : (
-          <form onSubmit={(e) => { e.preventDefault(); verify(code); }}>
-            <label htmlFor="code">Kode masuk</label>
-            <input id="code" className="otp" inputMode="numeric" pattern="\d{6}" maxLength={6} required autoFocus autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="••••••" />
-            <button disabled={busy || code.length !== 6}>{busy ? "Memeriksa…" : "Masuk"}</button>
+            <h2>Masuk</h2>
+            <p className="muted">Pakai username dan password kamu.</p>
+            <form onSubmit={(e) => { e.preventDefault(); loginPw(); }}>
+              <label htmlFor="user">Username</label>
+              <div className="input-prefix"><span>@</span>
+                <input id="user" value={username} onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))} placeholder="username" maxLength={21} required autoFocus autoComplete="username" autoCapitalize="none" />
+              </div>
+              <label htmlFor="pass">Password</label>
+              <input id="pass" type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} maxLength={128} required autoComplete="current-password" />
+              <button type="button" className="ghost pw-toggle" onClick={() => setShowPw((v) => !v)}>{showPw ? "Sembunyikan password" : "Tampilkan password"}</button>
+              <button disabled={busy || !username || !password}>{busy ? "Memeriksa…" : "Masuk"}</button>
+            </form>
+            <div className="or"><span>belum punya akun?</span></div>
             <div className="split">
-              <button type="button" className="ghost" onClick={() => { setStep("email"); setCode(""); setErr(""); }}>Ganti email</button>
-              <button type="button" className="ghost" disabled={busy || wait > 0} onClick={sendCode}>{wait > 0 ? `Kirim ulang (${wait})` : "Kirim ulang"}</button>
+              <button type="button" className="ghost" onClick={() => go("verify")}>Daftar</button>
+              <button type="button" className="ghost" onClick={() => go("verify", true)}>Lupa password</button>
             </div>
-          </form>
+          </>
+        ) : (
+          <>
+            <h2>{step === "code" ? "Cek email kamu" : forgot ? "Verifikasi untuk reset" : "Daftar atau verifikasi"}</h2>
+            <p className="muted">
+              {step === "code" ? <>Kode 6 digit dikirim ke <b>{email}</b>.</>
+                : forgot ? "Verifikasi email atau Google kamu, lalu buat password baru."
+                : "Verifikasi email atau Google. Setelah itu kamu diminta membuat password untuk login berikutnya."}
+            </p>
+
+            {step === "email" && (
+              <>
+                <button className="ghost g google-main" onClick={google} disabled={busy}><Google />Lanjut dengan Google</button>
+                <div className="or"><span>atau pakai email</span></div>
+              </>
+            )}
+
+            {step === "email" ? (
+              <form onSubmit={(e) => { e.preventDefault(); sendCode(); }}>
+                <label htmlFor="email">Email</label>
+                <input id="email" type="email" required autoComplete="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@email.com" />
+                <button disabled={busy}>{busy ? "Mengirim…" : "Kirim kode masuk"}</button>
+              </form>
+            ) : (
+              <form onSubmit={(e) => { e.preventDefault(); verify(code); }}>
+                <label htmlFor="code">Kode masuk</label>
+                <input id="code" className="otp" inputMode="numeric" pattern="\d{6}" maxLength={6} required autoFocus autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="••••••" />
+                <button disabled={busy || code.length !== 6}>{busy ? "Memeriksa…" : "Verifikasi"}</button>
+                <div className="split">
+                  <button type="button" className="ghost" onClick={() => { setStep("email"); setCode(""); setErr(""); }}>Ganti email</button>
+                  <button type="button" className="ghost" disabled={busy || wait > 0} onClick={sendCode}>{wait > 0 ? `Kirim ulang (${wait})` : "Kirim ulang"}</button>
+                </div>
+              </form>
+            )}
+            <button type="button" className="ghost back-login" onClick={() => go("login")}>Sudah punya password? Masuk dengan username</button>
+          </>
         )}
 
         {err && <p className="error" role="alert">{err}</p>}

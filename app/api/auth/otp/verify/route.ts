@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { startSession } from "@/lib/session";
-import { upsertUserByEmail } from "@/lib/users";
+import { banNotice, upsertUserByEmail } from "@/lib/users";
 import { sql } from "@/lib/db";
 import { hashOtp } from "@/lib/otp";
 
@@ -26,6 +26,8 @@ export async function POST(req: Request) {
   await sql`delete from otp_codes where email = ${email}`; // sekali pakai
 
   const uid = await upsertUserByEmail(email);
-  await startSession(uid);
+  const ban = await banNotice(uid);
+  if (ban) return Response.json({ error: ban }, { status: 403 });
+  await startSession(uid, "otp");
   return Response.json({ ok: true });
 }

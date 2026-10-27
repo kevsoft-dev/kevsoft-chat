@@ -5,6 +5,7 @@ import { getUserId } from "@/lib/auth";
 import { aiPrompt, AI_HANDLE, parseMentions } from "@/lib/mentions";
 import { askKevAi } from "@/lib/ai";
 import { broadcast, getMessage } from "@/lib/messages";
+import { logMod } from "@/lib/audit";
 
 export const maxDuration = 60;
 const uuid = z.string().uuid();
@@ -68,13 +69,18 @@ export async function POST(req: Request) {
         || ${wantsAi ? [AI_HANDLE] : []}::text[],
       (select id from messages where id = ${replyTo ?? null}::uuid and conversation_id = ${conversationId}::uuid)
     where exists (select 1 from conversation_members where conversation_id = ${conversationId}::uuid and user_id = ${uid})
+      and not exists (select 1 from users where id = ${uid} and muted_until > now())
     on conflict (id) do nothing
     returning id, created_at, mentions`;
 
   if (rows.length === 0) {
     // Sudah tersimpan (kirim ulang)? Kembalikan hasil yang sama. Selain itu berarti bukan anggota.
     const [ex] = await sql`select id, created_at, mentions from messages where id = ${msgId}::uuid and sender_id = ${uid}`;
-    if (!ex) return new Response("Forbidden", { status: 403 });
+    if (!ex) {
+      const [mu] = await sql`select muted_until from users where id = ${uid} and muted_until > now()`;
+      if (mu) return Response.json({ error: "Kamu sedang dibisukan oleh moderator", muted: true }, { status: 403 });
+      return new Response("Forbidden", { status: 403 });
+    }
     return Response.json(ex);
   }
   const row = rows[0];
@@ -120,11 +126,22 @@ export async function DELETE(req: Request) {
   if (!id.success) return new Response("Bad request", { status: 400 });
 
   if (sp.get("scope") === "all") {
+    // Pengirim boleh menghapus pesannya sendiri. Staf (admin/owner) boleh menghapus pesan milik role di bawahnya.
     const [row] = await sql`
       update messages set body = '', mentions = '{}', deleted_at = now()
-      where id = ${id.data} and sender_id = ${uid} and deleted_at is null
-      returning id, conversation_id`;
+      where id = ${id.data} and deleted_at is null
+        and (sender_id = ${uid} or exists (
+          select 1 from users v left join users s on s.id = messages.sender_id
+          where v.id = ${uid} and v.role in ('admin', 'owner')
+            and exists (select 1 from conversation_members where conversation_id = messages.conversation_id and user_id = v.id)
+            and (case v.role when 'owner' then 2 else 1 end) > (case coalesce(s.role, 'user') when 'owner' then 2 when 'admin' then 1 else 0 end)))
+      returning id, conversation_id, sender_id`;
     if (!row) return new Response("Not found", { status: 404 });
+    if (row.sender_id !== uid) {
+      const [who] = await sql`select coalesce(username, name) as n from users where id = ${uid}`;
+      const [tg] = await sql`select coalesce(username, name) as n from users where id = ${row.sender_id}`;
+      await logMod({ actorId: uid, actorName: String(who?.n ?? "Staf"), action: "delete_message", targetId: row.sender_id, targetName: tg?.n ?? "Kev-Ai" });
+    }
     after(() => broadcast(row.conversation_id, "delete", { id: row.id, conversation_id: row.conversation_id }));
     return Response.json({ ok: true });
   }

@@ -3,6 +3,8 @@ import { ensureDefaults, getUserId } from "@/lib/auth";
 import { ensureSchema } from "@/lib/migrate";
 import { sql } from "@/lib/db";
 import { cfg } from "@/lib/config";
+import { readSessionMeta } from "@/lib/session";
+import { isFresh } from "@/lib/token";
 import Chat from "@/components/Chat";
 import Onboarding from "@/components/Onboarding";
 
@@ -19,7 +21,9 @@ function Problem({ text }: { text: string }) {
   );
 }
 
-export default async function Home() {
+type Row = { id: string; username: string | null; name: string | null; avatar_url: string | null; bio: string | null; email: string | null; role: string; has_password: boolean };
+
+export default async function Home({ searchParams }: { searchParams: Promise<{ reset?: string }> }) {
   let uid: string | null = null;
   let authError = "";
   try { uid = (await getUserId()) ?? null; } catch (e: any) { authError = String(e?.message ?? e); }
@@ -27,19 +31,28 @@ export default async function Home() {
   if (!uid) redirect("/sign-in");
   const userId = uid as string;
 
-  let user: { id: string; username: string | null; name: string | null; avatar_url: string | null; bio: string | null; email: string | null } | undefined;
+  let user: Row | undefined;
   try {
     await ensureSchema();
-    [user] = (await sql`select id, username, name, avatar_url, bio, email from users where id = ${userId}`) as any;
+    [user] = (await sql`
+      select id, username, name, avatar_url, bio, email, role, (password_hash is not null) as has_password
+      from users where id = ${userId}`) as any;
     if (user?.username) await ensureDefaults(userId);
   } catch (e: any) {
     return <Problem text={String(e?.message ?? e)} />;
   }
 
-  if (!user?.username) return <Onboarding suggestedName={user?.name ?? ""} />;
+  // Setelah verifikasi email/Google: wajib pilih username dan buat password (login berikutnya cukup username + password).
+  const needUsername = !user?.username;
+  const needPassword = !user?.has_password;
+  const sp = await searchParams;
+  const reset = !needUsername && !needPassword && sp.reset === "1" && isFresh(await readSessionMeta());
+  if (!user || needUsername || needPassword || reset)
+    return <Onboarding suggestedName={user?.name ?? ""} needUsername={needUsername} reset={reset} username={user?.username ?? ""} />;
+
   return (
     <Chat
-      me={{ id: user.id, username: user.username, name: user.name ?? user.username, avatarUrl: user.avatar_url || null, bio: user.bio, email: user.email }}
+      me={{ id: user.id, username: user.username as string, name: user.name ?? (user.username as string), avatarUrl: user.avatar_url || null, bio: user.bio, email: user.email, role: user.role }}
       pusherKey={cfg.pusher.key}
       pusherCluster={cfg.pusher.cluster}
     />

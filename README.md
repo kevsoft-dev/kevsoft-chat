@@ -71,3 +71,28 @@ Deploy ke Vercel: import repo, sertakan `config.json` (file ini di-gitignore, ja
 - Tema, suara pesan, Enter untuk kirim, hemat animasi.
 
 **Migrasi database**: otomatis saat halaman pertama dibuka setelah deploy (kolom `deleted_at`, `hidden_by`, `cleared_at`, `hidden_at` dan tabel `user_avatars`). `schema.sql` sudah diperbarui kalau mau menempel manual di Neon.
+
+---
+
+## Pembaruan v3: role, console moderasi, login username + password
+
+**Login**
+- Pertama kali: verifikasi lewat **Google** atau **email (OTP)**, lalu wajib memilih **username dan membuat password** (halaman Onboarding).
+- Berikutnya: login cukup **username + password** (tab "Masuk"). Password di-hash scrypt + salt; 5x salah = dikunci 10 menit.
+- **Lupa password**: di halaman masuk pilih "Lupa password", verifikasi email/Google, lalu buat password baru. Ganti password biasa ada di Profil -> Keamanan.
+- Akun lama yang belum punya password otomatis diminta membuatnya saat membuka aplikasi.
+
+**Role**
+- `owner` > `admin` > `user`. Owner utama diatur di `config.json` -> `"owners": ["kevsoft.cs@gmail.com"]`; email itu otomatis menjadi owner saat login dan **tidak bisa diubah, di-kick, atau di-ban siapa pun**.
+- Owner bisa menambah owner/admin lain (Console -> Pengguna -> "Tambah owner / admin lewat email", atau menu titik tiga di panel anggota grup).
+- Owner menindak admin dan user; admin hanya menindak user biasa; owner non-utama tidak bisa menindak owner lain (hanya owner utama).
+- Di info grup / Komunitas, semua anggota tampil dengan badge **owner** / **admin**. Staf melihat tombol titik tiga per anggota.
+
+**Console** (ikon perisai di header daftar chat, atau Profil -> Buka Console)
+- **Pengguna**: cari, filter (staf/diblokir/dibisukan), **ban/unban** (dengan alasan), **mute** (10 menit - 7 hari), **kick** dari Komunitas / izinkan kembali, ubah role, reset password (owner), tambah staf lewat email (owner).
+- **Grup**: lihat semua grup, anggotanya, kick anggota, hapus grup (owner).
+- **Log**: semua tindakan moderasi tercatat.
+- Admin grup biasa (pembuat grup) juga bisa mengeluarkan anggota biasa dari grupnya. Staf bisa menghapus pesan siapa pun yang role-nya di bawahnya (tekan lama pesan -> Hapus).
+- Akun diblokir: sesi langsung dicabut (realtime lewat Pusher), tidak bisa login password/Google/OTP. Status blokir di-cache maksimal 8 detik per instance server.
+
+**Migrasi database**: otomatis saat halaman pertama dibuka (kolom `role`, `password_hash`, `banned_at`, `ban_reason`, `muted_until`, `login_fails`, `locked_until`; tabel `conversation_kicks`, `mod_logs`). `schema.sql` juga sudah diperbarui.

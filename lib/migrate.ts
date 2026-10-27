@@ -16,8 +16,12 @@ async function run() {
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'conversation_members' and column_name = 'last_read_at') as lastread,
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'messages' and column_name = 'deleted_at') as deleted,
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'conversation_members' and column_name = 'cleared_at') as cleared,
-      to_regclass('public.user_avatars') is not null as avatars`;
-  if (r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars) return;
+      to_regclass('public.user_avatars') is not null as avatars,
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'muted_until') as roles,
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'password_hash') as pw,
+      to_regclass('public.mod_logs') is not null as modlogs,
+      to_regclass('public.conversation_kicks') is not null as kicks`;
+  if (r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks) return;
   for (const s of SCHEMA.split(";").map((x) => x.trim()).filter(Boolean)) await runRaw(s);
 }
 
