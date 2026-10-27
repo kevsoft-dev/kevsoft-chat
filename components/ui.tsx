@@ -2,10 +2,10 @@
 import { useRef } from "react";
 import { AI_HANDLE, LOGO, mentionRegex } from "@/lib/mentions";
 
-export type Me = { id: string; username: string; name: string; avatarUrl?: string | null; bio?: string | null; email?: string | null; role?: string; verified?: boolean };
+export type Me = { id: string; username: string; name: string; avatarUrl?: string | null; bannerUrl?: string | null; bio?: string | null; email?: string | null; role?: string; verified?: boolean };
 export type Conv = {
   id: string; kind: "dm" | "group" | "community" | "ai"; title: string | null; description: string | null;
-  other_id: string | null; other_username: string | null; other_name: string | null; other_avatar: string | null; other_bio: string | null; other_verified?: boolean;
+  other_id: string | null; other_username: string | null; other_name: string | null; other_avatar: string | null; other_banner?: string | null; other_bio: string | null; other_verified?: boolean;
   member_count: number; last_body: string | null; last_at: string | null; last_kind: string | null;
   last_username: string | null; last_deleted: boolean; unread: number; unread_mention: boolean;
   disappear_seconds?: number;
@@ -21,7 +21,7 @@ export type Msg = {
   status?: "sending" | "sent" | "failed";
 };
 export type UserLite = {
-  id: string; username: string; name: string | null; avatar_url: string | null; bio?: string | null;
+  id: string; username: string; name: string | null; avatar_url: string | null; banner_url?: string | null; bio?: string | null;
   verified?: boolean; role?: "owner" | "admin" | "member"; sys_role?: string; group_role?: string; banned?: boolean; muted?: boolean;
 };
 
@@ -124,6 +124,18 @@ export function Icon({ n, size = 20 }: { n: IconName; size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d={P[n]} />
     </svg>
+  );
+}
+
+/** Foto sampul (banner) di belakang foto profil. Tanpa foto: gradasi warna dari nama. */
+export function Banner({ name, src, children, className = "" }: { name: string; src?: string | null; children?: React.ReactNode; className?: string }) {
+  const h = hue(name);
+  const bg = src ? undefined : { background: `linear-gradient(120deg, hsl(${h} 55% 34%), hsl(${(h + 55) % 360} 60% 24%))` };
+  return (
+    <div className={`banner${src ? " has" : ""} ${className}`.trim()} style={bg}>
+      {src && <img src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" draggable={false} />}
+      {children}
+    </div>
   );
 }
 

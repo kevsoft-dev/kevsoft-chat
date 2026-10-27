@@ -11,7 +11,7 @@ import MessageRow from "./MessageRow";
 import NewChat from "./NewChat";
 import Profile from "./Profile";
 import { Dialog, Lightbox, Menu, type DialogAction, type MenuItem } from "./overlays";
-import { Avatar, Icon, Logo, RoleBadge, VerifiedBadge, DEFAULT_ROLE_LABELS, convName, isStaffRole, type Conv, type Me, type Msg, type UserLite, type RoleLabels } from "./ui";
+import { Avatar, Banner, Icon, Logo, RoleBadge, VerifiedBadge, DEFAULT_ROLE_LABELS, convName, isStaffRole, type Conv, type Me, type Msg, type UserLite, type RoleLabels } from "./ui";
 
 type MenuState = { x: number; y: number; items: MenuItem[] };
 type DialogState = { title: string; text?: string; actions: DialogAction[] };
@@ -753,7 +753,8 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
             {info && (
               <aside className="info">
                 <header><button className="icon-btn" onClick={() => setInfo(false)} aria-label="Tutup"><Icon n="close" /></button><strong>Info</strong></header>
-                <div className="info-hero">
+                <div className={active.kind === "dm" ? "cover-hero" : "info-hero"}>
+                  {active.kind === "dm" && <Banner name={convName(active)} src={active.other_banner} />}
                   <button className="zoomable" disabled={!active.other_avatar || active.kind !== "dm"} onClick={() => active.other_avatar && setZoom(active.other_avatar)} aria-label="Perbesar foto">
                     <Avatar name={convName(active)} src={active.other_avatar} kind={active.kind === "dm" ? undefined : active.kind} size={96} />
                   </button>
@@ -850,7 +851,8 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
             <button className="icon-btn" onClick={() => setViewUser(null)} aria-label="Tutup"><Icon n="close" /></button>
             <strong>Info kontak</strong>
           </header>
-          <div className="info-hero">
+          <div className="cover-hero">
+            <Banner name={viewUser.name || viewUser.username} src={viewUser.banner_url} />
             <button className="zoomable" disabled={!viewUser.avatar_url} onClick={() => viewUser.avatar_url && setZoom(viewUser.avatar_url)} aria-label="Perbesar foto">
               <Avatar name={viewUser.name || viewUser.username} src={viewUser.avatar_url} size={96} />
             </button>

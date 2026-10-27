@@ -1,13 +1,14 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar, Icon, RoleBadge, VerifiedBadge } from "./ui";
+import { Avatar, Banner, Icon, RoleBadge, VerifiedBadge } from "./ui";
 
 type U = {
   id: string;
   username: string;
   name: string;
   avatar_url: string | null;
+  banner_url?: string | null;
   bio: string | null;
   role: string;
   verified?: boolean;
@@ -110,7 +111,8 @@ export default function PublicProfile({
       </header>
 
       <div className="pub-body">
-        <div className="info-hero">
+        <div className="cover-hero">
+          <Banner name={user.name} src={user.banner_url} />
           <Avatar name={user.name} src={user.avatar_url} size={120} />
           <h1>{user.name}{user.verified && <VerifiedBadge />}</h1>
           <p className="muted">@{user.username}</p>

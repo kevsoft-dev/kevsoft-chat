@@ -616,3 +616,23 @@ a.tag:hover{text-decoration:underline}
 /* Centang biru (verified) */
 .vbadge{display:inline-block;width:1.05em;height:1.05em;min-width:13px;min-height:13px;margin-left:5px;vertical-align:-.18em;flex:none;border-radius:50%;user-select:none;-webkit-user-drag:none;object-fit:contain}
 h1 .vbadge,h2 .vbadge{width:.78em;height:.78em;min-width:18px;min-height:18px;margin-left:8px;vertical-align:-.06em}
+
+/* Foto sampul (banner) */
+.banner{position:relative;width:100%;aspect-ratio:3/1;max-height:190px;min-height:96px;overflow:hidden;background:var(--fill2)}
+.banner img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.banner::after{content:"";position:absolute;inset:auto 0 0 0;height:45%;background:linear-gradient(transparent,rgba(0,0,0,.28));pointer-events:none}
+.cover-hero{display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 20px 26px;text-align:center}
+.cover-hero .banner{width:calc(100% + 40px);max-width:none;margin:0 -20px}
+.cover-hero .avatar,.cover-hero .zoomable{position:relative;z-index:1}
+.cover-hero>.zoomable,.cover-hero>.avatar{margin-top:-48px}
+.cover-hero .avatar{box-shadow:0 0 0 4px var(--bg-soft)}
+.cover-hero h1,.cover-hero h2{margin-top:10px}
+.p-cover{position:relative;margin:-22px -14px 0}
+.p-cover .banner{max-height:200px}
+.p-cover-btn{position:absolute;inset:0;width:100%;border:0;padding:0;background:transparent;color:#fff;cursor:pointer}
+.p-cover-over{position:absolute;right:12px;bottom:12px;z-index:2;display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);color:#fff;font-size:12px}
+.p-cover.busy .banner{animation:shimmer 1.2s linear infinite}
+.p-cover-del{position:absolute;left:12px;bottom:12px;z-index:2;padding:7px 12px;border:0;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;cursor:pointer}
+.p-avatar.over-cover{margin-top:-62px;position:relative;z-index:3}
+.p-avatar.over-cover .p-photo{box-shadow:0 0 0 5px var(--bg)}
+.pub-body .cover-hero{padding-top:0}

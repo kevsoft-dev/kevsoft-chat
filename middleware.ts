@@ -6,6 +6,7 @@ const PUBLIC = [
   /^\/api\/auth\//,
   /^\/api\/health$/,
   /^\/api\/avatar\//, // foto profil publik
+  /^\/api\/banner\//, // foto sampul publik
 ];
 
 const RESERVED_PATH = new Set([

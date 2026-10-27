@@ -16,7 +16,7 @@ export default async function DmPage({ params }: { params: Promise<{ username: s
   await ensureSchema();
 
   const [target] = await sql`
-    select id, username, name, avatar_url, bio, role, created_at, (role = 'owner' or verified) as verified
+    select id, username, name, avatar_url, banner_url, bio, role, created_at, (role = 'owner' or verified) as verified
     from users where lower(username) = ${raw} and banned_at is null limit 1`;
   if (!target) notFound();
 
@@ -31,6 +31,7 @@ export default async function DmPage({ params }: { params: Promise<{ username: s
           username: String(target.username),
           name: (target.name as string | null) ?? String(target.username),
           avatar_url: (target.avatar_url as string | null) ?? null,
+          banner_url: (target.banner_url as string | null) ?? null,
           bio: (target.bio as string | null) ?? null,
           role: String(target.role ?? "user"),
           verified: !!target.verified,
@@ -45,7 +46,7 @@ export default async function DmPage({ params }: { params: Promise<{ username: s
   }
 
   const [user] = (await sql`
-    select id, username, name, avatar_url, bio, email, role, (role = 'owner' or verified) as verified, (password_hash is not null) as has_password
+    select id, username, name, avatar_url, banner_url, bio, email, role, (role = 'owner' or verified) as verified, (password_hash is not null) as has_password
     from users where id = ${uid}`) as any[];
 
   if (!user?.username || !user?.has_password) {
@@ -86,6 +87,7 @@ export default async function DmPage({ params }: { params: Promise<{ username: s
         username: user.username as string,
         name: user.name ?? (user.username as string),
         avatarUrl: user.avatar_url || null,
+        bannerUrl: user.banner_url || null,
         bio: user.bio,
         email: user.email,
         role: user.role,

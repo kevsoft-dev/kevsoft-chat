@@ -27,8 +27,9 @@ async function run() {
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'messages' and column_name = 'media_data') as media,
       to_regclass('public.app_settings') is not null as settings,
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'role_title') as role_title,
-      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'verified') as verified`;
-  if (r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks && r.disappear && r.expires && r.pinned && r.media && r.settings && r.role_title && r.verified) return;
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'verified') as verified,
+      to_regclass('public.user_banners') is not null as banners`;
+  if (r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks && r.disappear && r.expires && r.pinned && r.media && r.settings && r.role_title && r.verified && r.banners) return;
   for (const s of SCHEMA.split(";").map((x) => x.trim()).filter(Boolean)) await runRaw(s);
 }
 

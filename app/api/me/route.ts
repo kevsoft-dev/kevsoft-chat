@@ -19,7 +19,7 @@ const patchSchema = z.object({
 export async function GET() {
   const uid = await getUserId();
   if (!uid) return new Response("Unauthorized", { status: 401 });
-  const [u] = await sql`select id, username, name, avatar_url, bio, email, role, (role = 'owner' or verified) as verified from users where id = ${uid}`;
+  const [u] = await sql`select id, username, name, avatar_url, banner_url, bio, email, role, (role = 'owner' or verified) as verified from users where id = ${uid}`;
   return Response.json(u ?? null);
 }
 
@@ -37,7 +37,7 @@ export async function PATCH(req: Request) {
       name = coalesce(${name ?? null}::text, name),
       bio = case when ${bio ?? null}::text is null then bio else ${bio ?? null}::text end
     where id = ${uid}
-    returning id, username, name, avatar_url, bio`;
+    returning id, username, name, avatar_url, banner_url, bio`;
   return Response.json(u);
 }
 

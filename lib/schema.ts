@@ -19,6 +19,13 @@ create table if not exists user_avatars (
   data text not null,
   updated_at timestamptz not null default now()
 );
+alter table users add column if not exists banner_url text;
+create table if not exists user_banners (
+  user_id text primary key references users(id) on delete cascade,
+  mime text not null,
+  data text not null,
+  updated_at timestamptz not null default now()
+);
 
 create table if not exists conversations (
   id uuid primary key default gen_random_uuid(),

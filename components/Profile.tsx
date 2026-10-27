@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { usePref } from "@/lib/prefs";
-import { Avatar, Icon, RoleBadge, VerifiedBadge, isStaffRole, type Me } from "./ui";
+import { Avatar, Banner, Icon, RoleBadge, VerifiedBadge, isStaffRole, type Me } from "./ui";
 import { useTheme } from "./ThemeToggle";
 
 // Foto dipotong persegi dan diperkecil di browser (256px WebP/JPEG, ~10-30 KB) sebelum diunggah.
@@ -17,6 +17,25 @@ async function toSquare(file: File, size = 256): Promise<Blob> {
   const webp = await new Promise<Blob | null>((r) => cv.toBlob(r, "image/webp", 0.82));
   if (webp && webp.type === "image/webp") return webp;
   const jpg = await new Promise<Blob | null>((r) => cv.toBlob(r, "image/jpeg", 0.85));
+  if (!jpg) throw new Error("Gagal memproses foto");
+  return jpg;
+}
+
+// Banner dipotong rasio 3:1 dan diperkecil di browser (960x320 WebP/JPEG, ~30-80 KB) sebelum diunggah.
+async function toBanner(file: File, w = 960, h = 320): Promise<Blob> {
+  let bmp: ImageBitmap;
+  try { bmp = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+  catch { bmp = await createImageBitmap(file); }
+  const ratio = w / h;
+  let sw = bmp.width, sh = bmp.width / ratio;
+  if (sh > bmp.height) { sh = bmp.height; sw = bmp.height * ratio; }
+  const cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  cv.getContext("2d")!.drawImage(bmp, (bmp.width - sw) / 2, (bmp.height - sh) / 2, sw, sh, 0, 0, w, h);
+  bmp.close?.();
+  const webp = await new Promise<Blob | null>((r) => cv.toBlob(r, "image/webp", 0.8));
+  if (webp && webp.type === "image/webp") return webp;
+  const jpg = await new Promise<Blob | null>((r) => cv.toBlob(r, "image/jpeg", 0.82));
   if (!jpg) throw new Error("Gagal memproses foto");
   return jpg;
 }
@@ -126,6 +145,9 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
+  const coverFile = useRef<HTMLInputElement>(null);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape" && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) onClose(); };
@@ -133,6 +155,7 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  useEffect(() => () => { if (coverPreview) URL.revokeObjectURL(coverPreview); }, [coverPreview]);
 
   async function patch(p: { name?: string; bio?: string }) {
     try {
@@ -175,7 +198,39 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
     setBusy(false);
   }
 
+  async function pickCover(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { onToast("Pilih file gambar"); return; }
+    setCoverBusy(true);
+    try {
+      const blob = await toBanner(f);
+      setCoverPreview(URL.createObjectURL(blob));
+      const r = await fetch("/api/me/banner", { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Gagal mengunggah foto sampul");
+      onUpdate({ bannerUrl: d.banner_url });
+      onToast("Foto sampul diperbarui");
+    } catch (er: any) {
+      setCoverPreview(null);
+      onToast(er?.message || "Gagal mengunggah foto sampul");
+    }
+    setCoverBusy(false);
+  }
+
+  async function removeCover() {
+    setCoverBusy(true);
+    try {
+      const r = await fetch("/api/me/banner", { method: "DELETE" });
+      if (!r.ok) throw new Error();
+      setCoverPreview(null); onUpdate({ bannerUrl: null }); onToast("Foto sampul dihapus");
+    } catch { onToast("Gagal menghapus foto sampul"); }
+    setCoverBusy(false);
+  }
+
   const shown = preview ?? me.avatarUrl;
+  const coverShown = coverPreview ?? me.bannerUrl;
   async function copyUser() {
     try { await navigator.clipboard.writeText("@" + me.username); onToast("Username disalin"); } catch {}
   }
@@ -187,7 +242,15 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
         <strong>Profil</strong>
       </header>
       <div className="profile-body">
-        <div className="p-avatar">
+        <div className={`p-cover${coverBusy ? " busy" : ""}`}>
+          <Banner name={me.name} src={coverShown} />
+          <button className="p-cover-btn" onClick={() => coverFile.current?.click()} disabled={coverBusy} aria-label="Ganti foto sampul">
+            <span className="p-cover-over"><Icon n="camera" size={16} />{coverBusy ? "Memproses…" : coverShown ? "Ganti sampul" : "Tambah sampul"}</span>
+          </button>
+          {coverShown && <button className="p-cover-del" onClick={removeCover} disabled={coverBusy}>Hapus</button>}
+          <input ref={coverFile} type="file" accept="image/*" hidden onChange={pickCover} />
+        </div>
+        <div className="p-avatar over-cover">
           <button className={`p-photo${busy ? " busy" : ""}`} onClick={() => file.current?.click()} disabled={busy} aria-label="Ganti foto profil">
             <Avatar name={me.name} src={shown} size={152} />
             <span className="p-over"><Icon n="camera" size={26} /><small>{busy ? "Memproses…" : "Ganti foto"}</small></span>
