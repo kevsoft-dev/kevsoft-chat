@@ -22,7 +22,7 @@ export default async function DmPage({ params }: { params: Promise<{ username: s
 
   const uid = await getUserId();
 
-  // Belum login → tampilkan profil publik + tombol Chat now
+  // Belum login → profil publik + Chat now
   if (!uid) {
     return (
       <PublicProfile
@@ -52,7 +52,31 @@ export default async function DmPage({ params }: { params: Promise<{ username: s
   }
   await ensureDefaults(uid);
 
-  if (String(user.username).toLowerCase() === raw) redirect(`/${raw}`);
+  if (String(user.username).toLowerCase() === raw) {
+    redirect(`/${raw}`);
+  }
+
+  // Pastikan DM ada di server (jangan andalkan client)
+  let convId: string | null = null;
+  const [existing] = await sql`
+    select c.id from conversations c
+    join conversation_members a on a.conversation_id = c.id and a.user_id = ${uid}
+    join conversation_members b on b.conversation_id = c.id and b.user_id = ${target.id}
+    where c.kind = 'dm' limit 1`;
+  if (existing) {
+    convId = String(existing.id);
+    // unhide jika sebelumnya disembunyikan
+    await sql`
+      update conversation_members set hidden_at = null
+      where conversation_id = ${convId}::uuid and user_id = ${uid}`;
+  } else {
+    const [conv] = await sql`
+      insert into conversations (kind, created_by) values ('dm', ${uid}) returning id`;
+    convId = String(conv.id);
+    await sql`
+      insert into conversation_members (conversation_id, user_id)
+      values (${convId}::uuid, ${uid}), (${convId}::uuid, ${target.id})`;
+  }
 
   return (
     <Chat
@@ -67,7 +91,7 @@ export default async function DmPage({ params }: { params: Promise<{ username: s
       }}
       pusherKey={cfg.pusher.key}
       pusherCluster={cfg.pusher.cluster}
-      openDm={raw}
+      openId={convId}
     />
   );
 }

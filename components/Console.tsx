@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { COMMUNITY_ID } from "@/lib/mentions";
 import { Dialog, type DialogAction } from "./overlays";
-import { Avatar, Icon, RoleBadge, type Me } from "./ui";
+import { Avatar, Icon, RoleBadge, DEFAULT_ROLE_LABELS, type Me, type RoleLabels } from "./ui";
 
 type AUser = {
   id: string; username: string | null; name: string | null; avatar_url: string | null; role: string; email: string | null;
@@ -41,6 +41,10 @@ export default function Console({ me, onClose, onToast, onChanged }: {
   const [dialog, setDialog] = useState<{ title: string; text?: string; actions: DialogAction[] } | null>(null);
   const [resetConfirm, setResetConfirm] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
+  const [roleLabels, setRoleLabels] = useState<RoleLabels>(DEFAULT_ROLE_LABELS);
+  const [labelEdit, setLabelEdit] = useState<RoleLabels>(DEFAULT_ROLE_LABELS);
+  const [titleDraft, setTitleDraft] = useState("");
+
 
   // ---------- pengguna ----------
   const [q, setQ] = useState("");
@@ -131,7 +135,16 @@ export default function Console({ me, onClose, onToast, onChanged }: {
   useEffect(() => { if (tab === "logs") loadLogs(); }, [tab, loadLogs]);
 
   useEffect(() => {
+    fetch("/api/settings").then(r => r.ok ? r.json() : null).then(d => {
+      if (!d) return;
+      const L = { owner: d.owner || "Owner", admin: d.admin || "Admin", user: d.user || "Member" };
+      setRoleLabels(L); setLabelEdit(L);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape" && !dialog && !(e.target instanceof HTMLInputElement)) onClose(); };
+
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, [onClose, dialog]);
@@ -201,7 +214,7 @@ export default function Console({ me, onClose, onToast, onChanged }: {
                     <button className="crow-head" onClick={() => setSel(open ? null : u.id)} aria-expanded={open}>
                       <Avatar name={u.name || u.username || "?"} src={u.avatar_url} size={40} />
                       <span className="meta">
-                        <b>{u.name || u.username || "Tanpa nama"} <RoleBadge role={u.role} />
+                        <b>{u.name || u.username || "Tanpa nama"} <RoleBadge role={u.role} title={(u as any).role_title} labels={roleLabels} />
                           {u.banned && <em className="badge warn">diblokir</em>}
                           {isMuted(u) && <em className="badge warn">bisu</em>}
                           {u.kicked && <em className="badge warn">kick</em>}</b>
@@ -252,9 +265,15 @@ export default function Console({ me, onClose, onToast, onChanged }: {
                             </div>
                             {owner && (
                               <div className="crow-act wrap">
-                                {u.role !== "admin" && <button onClick={() => act({ action: "role", userId: u.id, role: "admin" }, "Dijadikan admin")}>Jadikan admin</button>}
-                                {u.role !== "owner" && <button onClick={() => ask(`Jadikan ${label} owner?`, "Owner punya console penuh: bisa kick, ban, mengubah role, dan menambah owner lain.", "Jadikan owner", () => act({ action: "role", userId: u.id, role: "owner" }, "Dijadikan owner"), false)}>Jadikan owner</button>}
-                                {u.role !== "user" && <button onClick={() => act({ action: "role", userId: u.id, role: "user" }, "Role dicabut")}>Jadikan user biasa</button>}
+                                <input className="field" placeholder="Sebutan kustom (opsional)" maxLength={24} defaultValue={(u as any).role_title || ""}
+                                  onBlur={(e) => {
+                                    const v = e.target.value.trim();
+                                    if (v === ((u as any).role_title || "")) return;
+                                    act({ action: "title", userId: u.id, title: v }, v ? `Sebutan: ${v}` : "Sebutan dihapus");
+                                  }} />
+                                {u.role !== "admin" && <button onClick={() => act({ action: "role", userId: u.id, role: "admin" }, `Dijadikan ${roleLabels.admin}`)}>Jadikan {roleLabels.admin}</button>}
+                                {u.role !== "owner" && <button onClick={() => ask(`Jadikan ${label} owner?`, "Owner punya console penuh: bisa kick, ban, mengubah role, dan menambah owner lain.", "Jadikan owner", () => act({ action: "role", userId: u.id, role: "owner" }, "Dijadikan owner"), false)}>{roleLabels.owner}</button>}
+                                {u.role !== "user" && <button onClick={() => act({ action: "role", userId: u.id, role: "user" }, "Role dicabut")}>Jadikan {roleLabels.user}</button>}
                                 <button className="danger" onClick={() => ask(`Reset password ${label}?`, "Password dihapus. Mereka diminta membuat password baru saat membuka aplikasi lagi.", "Reset password", () => act({ action: "reset_password", userId: u.id }, "Password direset"))}>Reset password</button>
                               </div>
                             )}
@@ -305,7 +324,7 @@ export default function Console({ me, onClose, onToast, onChanged }: {
                       <li key={u.id} className="crow">
                         <div className="crow-head static">
                           <Avatar name={u.name || u.username} src={u.avatar_url} size={40} />
-                          <span className="meta"><b>{u.name || u.username} <RoleBadge role={u.role} />{u.banned && <em className="badge warn">diblokir</em>}</b><small>@{u.username}</small></span>
+                          <span className="meta"><b>{u.name || u.username} <RoleBadge role={u.role} title={(u as any).role_title} labels={roleLabels} />{u.banned && <em className="badge warn">diblokir</em>}</b><small>@{u.username}</small></span>
                           {canKick && <button className="link danger" onClick={() => ask(`Keluarkan @${u.username}?`, `Dikeluarkan dari “${curGroup.title}”.`, "Kick", () => kickFrom(curGroup.id, u))}>Kick</button>}
                         </div>
                       </li>
@@ -333,7 +352,24 @@ export default function Console({ me, onClose, onToast, onChanged }: {
 
         {tab === "system" && owner && (
           <div className="sys-panel">
-            <h4 className="ctitle">Reset data</h4>
+            <h4 className="ctitle">Nama role (sebutan)</h4>
+            <p className="muted small">Ganti sebutan di seluruh app. Hak akses tetap: owner &gt; admin &gt; member.</p>
+            <div className="label-grid">
+              <label>Owner<input className="field" maxLength={24} value={labelEdit.owner} onChange={(e) => setLabelEdit((x) => ({ ...x, owner: e.target.value }))} /></label>
+              <label>Admin<input className="field" maxLength={24} value={labelEdit.admin} onChange={(e) => setLabelEdit((x) => ({ ...x, admin: e.target.value }))} /></label>
+              <label>Member<input className="field" maxLength={24} value={labelEdit.user} onChange={(e) => setLabelEdit((x) => ({ ...x, user: e.target.value }))} /></label>
+            </div>
+            <button className="primary" style={{ marginTop: 10 }}
+              onClick={async () => {
+                const r = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ owner: labelEdit.owner.trim(), admin: labelEdit.admin.trim(), user: labelEdit.user.trim() }) });
+                const d = await r.json().catch(() => ({}));
+                if (r.ok) {
+                  setRoleLabels({ owner: d.owner, admin: d.admin, user: d.user });
+                  onToast("Nama role disimpan");
+                } else onToast(d.error || "Gagal");
+              }}>Simpan nama role</button>
+
+            <h4 className="ctitle" style={{ marginTop: 28 }}>Reset data</h4>
             <p className="muted small">Tindakan permanen. Ketik <b>RESET</b> lalu pilih cakupan. Komunitas Kevsoft tidak dihapus strukturnya.</p>
             <input
               className="field"

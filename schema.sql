@@ -101,3 +101,17 @@ create index if not exists mod_logs_created_idx on mod_logs (created_at desc);
 insert into conversations (id, kind, title, description)
 values ('00000000-0000-4000-8000-000000000001', 'community', 'Komunitas Kevsoft', 'Tempat ngobrol publik semua member kevsoft. Tag teman dengan @username, tanya AI dengan @kev-ai.')
 on conflict (id) do nothing
+
+create table if not exists app_settings (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+insert into app_settings (key, value) values
+  ('role_owner', 'Owner'),
+  ('role_admin', 'Admin'),
+  ('role_user', 'Member')
+on conflict (key) do nothing;
+
+alter table users add column if not exists role_title text;
+

@@ -24,8 +24,10 @@ async function run() {
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'conversations' and column_name = 'disappear_seconds') as disappear,
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'messages' and column_name = 'expires_at') as expires,
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'messages' and column_name = 'pinned_at') as pinned,
-      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'messages' and column_name = 'media_data') as media`;
-  if (r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks && r.disappear && r.expires && r.pinned && r.media) return;
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'messages' and column_name = 'media_data') as media,
+      to_regclass('public.app_settings') is not null as settings,
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'role_title') as role_title`;
+  if (r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks && r.disappear && r.expires && r.pinned && r.media && r.settings && r.role_title) return;
   for (const s of SCHEMA.split(";").map((x) => x.trim()).filter(Boolean)) await runRaw(s);
 }
 

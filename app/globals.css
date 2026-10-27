@@ -465,9 +465,9 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;transition-delay:0s!important}}
 
 /* ===== Role, Console moderasi, password ===== */
-.badge.owner{background:rgba(206,247,120,.22);color:var(--accent-text)}
+.badge.soft{opacity:.85;font-weight:500}.badge.owner{background:rgba(206,247,120,.22);color:var(--accent-text)}
 .badge.warn{background:rgba(255,143,143,.16);color:var(--err)}
-:root[data-theme="light"] .badge.owner{background:rgba(116,92,255,.16)}
+:root[data-theme="light"] .badge.soft{opacity:.85;font-weight:500}.badge.owner{background:rgba(116,92,255,.16)}
 .members li>.icon-btn.mini{width:34px;height:34px;border-radius:10px;margin-left:auto;flex-shrink:0}
 .member-search{margin:0 14px 6px}
 
@@ -595,3 +595,8 @@ a.tag:hover{text-decoration:underline}
 
 .bubble:has(.msg-media){padding:6px 6px 8px}
 .bubble:has(.msg-media) .foot{padding-right:4px}
+
+.label-grid{display:grid;gap:10px;margin-top:8px}
+.label-grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.label-grid .field{width:100%}
+.console .primary{padding:10px 16px;border:0;border-radius:12px;background:var(--violet);color:#fff;font:inherit;font-weight:600;cursor:pointer}

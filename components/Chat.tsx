@@ -11,7 +11,7 @@ import MessageRow from "./MessageRow";
 import NewChat from "./NewChat";
 import Profile from "./Profile";
 import { Dialog, Lightbox, Menu, type DialogAction, type MenuItem } from "./overlays";
-import { Avatar, Icon, Logo, RoleBadge, convName, isStaffRole, type Conv, type Me, type Msg, type UserLite } from "./ui";
+import { Avatar, Icon, Logo, RoleBadge, DEFAULT_ROLE_LABELS, convName, isStaffRole, type Conv, type Me, type Msg, type UserLite, type RoleLabels } from "./ui";
 
 type MenuState = { x: number; y: number; items: MenuItem[] };
 type DialogState = { title: string; text?: string; actions: DialogAction[] };
@@ -43,7 +43,7 @@ async function fetchMsgs(id: string): Promise<Msg[] | null> {
   } catch { return null; }
 }
 
-export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me: Me; pusherKey: string; pusherCluster: string; openDm?: string }) {
+export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId }: { me: Me; pusherKey: string; pusherCluster: string; openDm?: string; openId?: string }) {
   const [me, setMe] = useState<Me>(me0);
   const [convs, setConvs] = useState<Conv[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -69,6 +69,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me
   const [showConsole, setShowConsole] = useState(false);
   const [memberQ, setMemberQ] = useState("");
   const [viewUser, setViewUser] = useState<UserLite | null>(null);
+  const [roleLabels, setRoleLabels] = useState<RoleLabels>(DEFAULT_ROLE_LABELS);
 
   const meRef = useRef(me); meRef.current = me;
   const activeRef = useRef<string | null>(null);
@@ -142,6 +143,12 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me
     const id = activeRef.current;
     if (id) cache.current[id] = msgsRef.current;
     activeRef.current = null; setActiveId(null); setInfo(false); setReplyTo(null);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/settings").then(r => r.ok ? r.json() : null).then(d => {
+      if (d) setRoleLabels({ owner: d.owner || "Owner", admin: d.admin || "Admin", user: d.user || "Member" });
+    }).catch(() => {});
   }, []);
 
   // ---------- realtime ----------
@@ -281,17 +288,22 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me
     } catch { toast("Jaringan bermasalah"); }
   }, [openById, toast]);
 
-  // Deep link /@username atau /dm/username → buka DM sekali saat mount
+  // Deep link: buka chat by id (server sudah siapkan) atau by username
   const dmOpened = useRef(false);
   useEffect(() => {
-    if (!openDm || dmOpened.current) return;
+    if (dmOpened.current) return;
+    if (openId) {
+      dmOpened.current = true;
+      const t = setTimeout(() => { openById(openId); }, 30);
+      return () => clearTimeout(t);
+    }
+    if (!openDm) return;
     const target = openDm.replace(/^@/, "").toLowerCase().trim();
     if (!target || target === me0.username.toLowerCase()) return;
     dmOpened.current = true;
-    // sedikit delay supaya state chat siap
     const t = setTimeout(() => { openDmWith(target); }, 50);
     return () => clearTimeout(t);
-  }, [openDm, openDmWith, me0.username]);
+  }, [openId, openDm, openById, openDmWith, me0.username]);
 
   async function copyText(text: string, okMsg: string) {
     try {
@@ -782,7 +794,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me
                             <button type="button" className="member-main" onClick={() => setViewUser(u)} aria-label={`Info @${u.username}`}>
                               <Avatar name={u.name || u.username} src={u.avatar_url} size={38} />
                               <span>
-                                <b>{u.name || u.username}{u.id === me.id && " (kamu)"}<RoleBadge role={u.role} />{u.banned && <em className="badge warn">diblokir</em>}{u.muted && <em className="badge warn">bisu</em>}</b>
+                                <b>{u.name || u.username}{u.id === me.id && " (kamu)"}<RoleBadge role={u.role} labels={roleLabels} />{u.banned && <em className="badge warn">diblokir</em>}{u.muted && <em className="badge warn">bisu</em>}</b>
                                 <small>{u.bio || `@${u.username}`}</small>
                               </span>
                             </button>
@@ -844,7 +856,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me
             <p className="muted">@{viewUser.username}</p>
             {viewUser.bio && <p className="desc">{viewUser.bio}</p>}
             <div className="contact-badges">
-              <RoleBadge role={viewUser.role || viewUser.sys_role} />
+              <RoleBadge role={viewUser.role || viewUser.sys_role} title={(viewUser as any).role_title} labels={roleLabels} />
               {viewUser.banned && <em className="badge warn">diblokir</em>}
               {viewUser.muted && <em className="badge warn">bisu</em>}
             </div>

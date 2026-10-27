@@ -25,9 +25,20 @@ export type UserLite = {
 };
 
 export const isStaffRole = (r?: string | null) => r === "admin" || r === "owner";
-export function RoleBadge({ role }: { role?: string | null }) {
-  if (role === "owner") return <em className="badge owner">owner</em>;
-  if (role === "admin") return <em className="badge">admin</em>;
+export type RoleLabels = { owner: string; admin: string; user: string };
+export const DEFAULT_ROLE_LABELS: RoleLabels = { owner: "Owner", admin: "Admin", user: "Member" };
+
+export function RoleBadge({ role, title, labels }: {
+  role?: string | null; title?: string | null; labels?: Partial<RoleLabels> | null;
+}) {
+  const L = { ...DEFAULT_ROLE_LABELS, ...labels };
+  // title kustom per-user menang
+  if (title && title.trim()) {
+    const cls = role === "owner" ? "badge owner" : role === "admin" ? "badge" : "badge soft";
+    return <em className={cls}>{title.trim()}</em>;
+  }
+  if (role === "owner") return <em className="badge owner">{L.owner}</em>;
+  if (role === "admin") return <em className="badge">{L.admin}</em>;
   return null;
 }
 
