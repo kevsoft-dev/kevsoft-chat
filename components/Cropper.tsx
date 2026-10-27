@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { Icon } from "./ui";
 
 type Pt = { x: number; y: number };
@@ -121,7 +120,7 @@ export default function Cropper({ file, aspect, outW, outH, round, title, onCanc
     }
   }
 
-  return createPortal(
+  return (
     <div className="modal-bg crop-bg" role="dialog" aria-modal="true" aria-label={title}>
       <div className="modal crop-modal">
         <header><h2>{title}</h2></header>
@@ -151,7 +150,6 @@ export default function Cropper({ file, aspect, outW, outH, round, title, onCanc
           <button type="button" className="primary" onClick={save} disabled={busy || !nat}>{busy ? "Menyimpan…" : "Simpan"}</button>
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   );
 }
