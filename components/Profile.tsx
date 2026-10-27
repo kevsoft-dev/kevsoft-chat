@@ -112,13 +112,14 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
   const file = useRef<HTMLInputElement>(null);
   const coverFile = useRef<HTMLInputElement>(null);
   const [coverBusy, setCoverBusy] = useState(false);
+  const [coverMenu, setCoverMenu] = useState(false);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === "Escape" && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) onClose(); };
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape" && coverMenu) { setCoverMenu(false); return; } if (e.key === "Escape" && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) onClose(); };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
-  }, [onClose]);
+  }, [onClose, coverMenu]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   useEffect(() => () => { if (coverPreview) URL.revokeObjectURL(coverPreview); }, [coverPreview]);
 
@@ -218,10 +219,24 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
       <div className="profile-body">
         <div className={`p-cover${coverBusy ? " busy" : ""}`}>
           <Banner name={me.name} src={coverShown} />
-          <button className="p-cover-btn" onClick={() => coverFile.current?.click()} disabled={coverBusy} aria-label="Ganti foto sampul">
-            <span className="p-cover-over"><Icon n="camera" size={16} />{coverBusy ? "Memproses…" : coverShown ? "Ganti sampul" : "Tambah sampul"}</span>
+          <button type="button" className="p-cover-more" onClick={() => setCoverMenu((o) => !o)} disabled={coverBusy} aria-label="Opsi foto sampul" aria-haspopup="menu" aria-expanded={coverMenu}>
+            {coverBusy ? <span className="p-cover-spin" /> : <Icon n="more" size={20} />}
           </button>
-          {coverShown && <button className="p-cover-del" onClick={removeCover} disabled={coverBusy}>Hapus</button>}
+          {coverMenu && (
+            <>
+              <div className="menu-bg" onClick={() => setCoverMenu(false)} />
+              <div className="p-cover-menu" role="menu">
+                <button type="button" role="menuitem" onClick={() => { setCoverMenu(false); coverFile.current?.click(); }}>
+                  <Icon n="camera" size={18} />{coverShown ? "Ganti foto sampul" : "Tambah foto sampul"}
+                </button>
+                {coverShown && (
+                  <button type="button" role="menuitem" className="danger" onClick={() => { setCoverMenu(false); removeCover(); }}>
+                    <Icon n="trash" size={18} />Hapus foto sampul
+                  </button>
+                )}
+              </div>
+            </>
+          )}
           <input ref={coverFile} type="file" accept="image/*" hidden onChange={pickCover} />
         </div>
         <div className="p-avatar over-cover">
