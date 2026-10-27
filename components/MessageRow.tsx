@@ -44,45 +44,43 @@ export default memo(function MessageRow({ m, mine, first, newDay, showName, show
               : <>
                   {m.has_media && m.media_mime?.startsWith("image/") && (
                     <a className="msg-media" href={`/api/messages/media/${m.id}`} target="_blank" rel="noreferrer">
-                      <img src={`/api/messages/media/${m.id}`} alt={m.media_name || "gambar"} loading="lazy" />
+                      <img src={`/api/messages/media/${m.id}`} alt="" loading="lazy" />
                     </a>
                   )}
                   {m.has_media && !m.media_mime?.startsWith("image/") && (
                     <a className="msg-file" href={`/api/messages/media/${m.id}`} target="_blank" rel="noreferrer">
-                      <Icon n="info" size={16} /> {m.media_name || "File"}
+                      <Icon n="info" size={16} /><span>{m.media_name || "File"}</span>
                     </a>
                   )}
                   {m.poll_data && (
                     <div className="msg-poll">
-                      <b>{m.poll_data.question}</b>
-                      <ul>
-                        {m.poll_data.options.map((opt, i) => {
-                          const votes = Object.values(m.poll_data!.votes || {});
-                          const count = votes.filter((v) => v === i).length;
-                          const total = Math.max(1, votes.length);
-                          const pct = Math.round((count / total) * 100);
-                          return (
-                            <li key={i}>
-                              <button type="button" className="poll-opt"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.dispatchEvent(new CustomEvent("poll-vote", { detail: { id: m.id, option: i } }));
-                                }}>
-                                <span>{opt}</span>
-                                <em>{votes.length ? `${pct}%` : ""}</em>
-                                <i style={{ width: `${votes.length ? pct : 0}%` }} />
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
+                      <p className="poll-q">{m.poll_data.question}</p>
+                      {m.poll_data.options.map((opt, i) => {
+                        const votes = Object.values(m.poll_data!.votes || {});
+                        const count = votes.filter((v) => v === i).length;
+                        const total = votes.length;
+                        const pct = total ? Math.round((count / total) * 100) : 0;
+                        return (
+                          <button key={i} type="button" className="poll-opt"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.dispatchEvent(new CustomEvent("poll-vote", { detail: { id: m.id, option: i } }));
+                            }}>
+                            <i style={{ width: `${pct}%` }} />
+                            <span>{opt}</span>
+                            {total > 0 && <em>{pct}%</em>}
+                          </button>
+                        );
+                      })}
+                      {Object.keys(m.poll_data.votes || {}).length > 0 && (
+                        <small className="poll-n">{Object.keys(m.poll_data.votes).length} suara</small>
+                      )}
                     </div>
                   )}
-                  {!!m.body && !m.poll_data && <Rich body={m.body} mentions={m.mentions} me={meUsername} />}
-                  {!!m.body && m.poll_data && !m.body.startsWith("📊") && <Rich body={m.body} mentions={m.mentions} me={meUsername} />}
+                  {!!m.body && !m.poll_data && <span className="cap"><Rich body={m.body} mentions={m.mentions} me={meUsername} /></span>}
                 </>}
           </span>
-          {!!m.pinned_at && !gone && <span className="pin-badge">📌 Disematkan</span>}
+          {!!m.pinned_at && !gone && <span className="pin-badge">Disematkan</span>}
           <span className="foot">
             <small>{clock(m.created_at)}</small>
             {mine && !gone && (

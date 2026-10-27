@@ -1,4 +1,4 @@
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getUserId } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { ensureSchema } from "@/lib/migrate";
@@ -9,8 +9,6 @@ export const dynamic = "force-dynamic";
 
 export default async function UserProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const uid = await getUserId();
-  if (!uid) redirect("/sign-in");
-
   const raw = (await params).username?.replace(/^@/, "").toLowerCase().trim() ?? "";
   if (!USERNAME_RE.test(raw) || RESERVED.includes(raw)) notFound();
 
@@ -20,7 +18,11 @@ export default async function UserProfilePage({ params }: { params: Promise<{ us
     from users where lower(username) = ${raw} and banned_at is null limit 1`;
   if (!u) notFound();
 
-  const [me] = await sql`select username from users where id = ${uid}`;
+  let meUsername = "";
+  if (uid) {
+    const [me] = await sql`select username from users where id = ${uid}`;
+    meUsername = (me?.username as string) || "";
+  }
 
   return (
     <PublicProfile
@@ -33,8 +35,9 @@ export default async function UserProfilePage({ params }: { params: Promise<{ us
         role: String(u.role ?? "user"),
         created_at: String(u.created_at),
       }}
-      isMe={u.id === uid}
-      meUsername={(me?.username as string) || ""}
+      isMe={!!uid && u.id === uid}
+      meUsername={meUsername}
+      loggedIn={!!uid}
     />
   );
 }

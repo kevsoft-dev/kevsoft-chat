@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE, verifyToken } from "./lib/token";
 
-const PUBLIC = [/^\/sign-in/, /^\/api\/auth\//, /^\/api\/health$/];
+const PUBLIC = [
+  /^\/sign-in/,
+  /^\/api\/auth\//,
+  /^\/api\/health$/,
+  /^\/api\/avatar\//, // foto profil publik
+];
 
 const RESERVED_PATH = new Set([
   "sign-in", "api", "u", "dm", "_next", "favicon.ico", "robots.txt",
@@ -12,36 +17,32 @@ export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const authed = await verifyToken(req.cookies.get(COOKIE)?.value);
 
-  // /@username → buka chat pribadi
-  const at = pathname.match(/^\/@([a-z0-9_][a-z0-9_.-]{1,18}[a-z0-9_])\/?$/i);
+  let path = pathname;
+  try { path = decodeURIComponent(pathname); } catch {}
+
+  // /@user → /dm/user (boleh tanpa login: lihat profil + Chat now)
+  const at = path.match(/^\/@([a-z0-9_][a-z0-9_.-]{1,18}[a-z0-9_])\/?$/i);
   if (at) {
-    if (!authed) {
-      const url = req.nextUrl.clone();
-      url.pathname = "/sign-in";
-      url.search = "";
-      return NextResponse.redirect(url);
-    }
     const url = req.nextUrl.clone();
-    url.pathname = "/";
-    url.searchParams.set("dm", at[1].toLowerCase());
-    return NextResponse.rewrite(url);
+    url.pathname = `/dm/${at[1].toLowerCase()}`;
+    url.search = "";
+    return NextResponse.redirect(url);
   }
 
-  // /{username} → halaman profil
-  const bare = pathname.match(/^\/([a-z0-9_][a-z0-9_.-]{1,18}[a-z0-9_])\/?$/i);
+  // /{username} → /u/{username} (profil publik)
+  const bare = path.match(/^\/([a-z0-9_][a-z0-9_.-]{1,18}[a-z0-9_])\/?$/i);
   if (bare) {
     const name = bare[1].toLowerCase();
     if (!RESERVED_PATH.has(name) && name !== "kev-ai") {
-      if (!authed) {
-        const url = req.nextUrl.clone();
-        url.pathname = "/sign-in";
-        url.search = "";
-        return NextResponse.redirect(url);
-      }
       const url = req.nextUrl.clone();
       url.pathname = `/u/${name}`;
       return NextResponse.rewrite(url);
     }
+  }
+
+  // /u/* dan /dm/* boleh tanpa login
+  if (path.startsWith("/u/") || path.startsWith("/dm/")) {
+    return NextResponse.next();
   }
 
   if (PUBLIC.some((r) => r.test(pathname))) return NextResponse.next();

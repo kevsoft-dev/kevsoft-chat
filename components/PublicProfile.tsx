@@ -13,17 +13,43 @@ type U = {
   created_at: string;
 };
 
-export default function PublicProfile({ user, isMe, meUsername }: { user: U; isMe: boolean; meUsername: string }) {
+export default function PublicProfile({
+  user,
+  isMe,
+  meUsername,
+  loggedIn = false,
+  fromDm = false,
+}: {
+  user: U;
+  isMe: boolean;
+  meUsername: string;
+  loggedIn?: boolean;
+  fromDm?: boolean;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [toast, setToast] = useState("");
 
-  const joined = new Date(user.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  const joined = new Date(user.created_at).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   async function startChat() {
-    if (isMe) { router.push("/"); return; }
-    setBusy(true); setErr("");
+    if (isMe) {
+      router.push("/");
+      return;
+    }
+    // Belum login → ke sign-in, setelah masuk kembali ke /dm/username
+    if (!loggedIn) {
+      const next = `/dm/${encodeURIComponent(user.username)}`;
+      router.push(`/sign-in?next=${encodeURIComponent(next)}`);
+      return;
+    }
+    setBusy(true);
+    setErr("");
     try {
       const r = await fetch("/api/conversations", {
         method: "POST",
@@ -31,9 +57,12 @@ export default function PublicProfile({ user, isMe, meUsername }: { user: U; isM
         body: JSON.stringify({ type: "dm", username: user.username.toLowerCase() }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setErr(d.error || "Gagal membuka chat"); setBusy(false); return; }
-      // Buka chat langsung lewat deep link /@username
-      router.push(`/@${user.username}`);
+      if (!r.ok) {
+        setErr(d.error || "Gagal membuka chat");
+        setBusy(false);
+        return;
+      }
+      router.push(`/dm/${user.username}`);
     } catch {
       setErr("Jaringan bermasalah");
       setBusy(false);
@@ -46,26 +75,6 @@ export default function PublicProfile({ user, isMe, meUsername }: { user: U; isM
       setToast("Username disalin");
       setTimeout(() => setToast(""), 1500);
     } catch {}
-  }
-
-  async function saveContact() {
-    const lines = [
-      "BEGIN:VCARD",
-      "VERSION:3.0",
-      `FN:${user.name || user.username}`,
-      `N:${user.name || user.username};;;;`,
-      `NICKNAME:${user.username}`,
-      user.bio ? `NOTE:${user.bio.replace(/\n/g, "\\n")}` : "",
-      "END:VCARD",
-    ].filter(Boolean).join("\n");
-    try {
-      await navigator.clipboard.writeText(lines);
-      setToast("Kontak disalin (vCard)");
-      setTimeout(() => setToast(""), 1800);
-    } catch {
-      setToast("Gagal menyalin");
-      setTimeout(() => setToast(""), 1500);
-    }
   }
 
   function shareLink() {
@@ -86,10 +95,14 @@ export default function PublicProfile({ user, isMe, meUsername }: { user: U; isM
   return (
     <main className="pub-profile">
       <header className="pub-bar">
-        <button className="icon-btn" onClick={() => router.push("/")} aria-label="Kembali">
+        <button
+          className="icon-btn"
+          onClick={() => router.push(loggedIn ? "/" : "/sign-in")}
+          aria-label="Kembali"
+        >
           <Icon n="back" />
         </button>
-        <strong>Profil</strong>
+        <strong>{fromDm && !loggedIn ? "Chat" : "Profil"}</strong>
         <button className="icon-btn" onClick={shareLink} aria-label="Bagikan">
           <Icon n="copy" />
         </button>
@@ -104,41 +117,60 @@ export default function PublicProfile({ user, isMe, meUsername }: { user: U; isM
           <div className="contact-badges">
             <RoleBadge role={user.role} />
           </div>
-          <p className="muted small" style={{ marginTop: 8 }}>Bergabung {joined}</p>
+          <p className="muted small" style={{ marginTop: 8 }}>
+            Bergabung {joined}
+          </p>
         </div>
 
         <div className="info-contact-actions">
           {!isMe ? (
             <button type="button" className="primary-act" disabled={busy} onClick={startChat}>
-              <Icon n="chat" size={18} />{busy ? "Membuka…" : "Chat pribadi"}
+              <Icon n="chat" size={18} />
+              {busy ? "Membuka…" : loggedIn ? "Chat sekarang" : "Chat now — login dulu"}
             </button>
           ) : (
             <button type="button" onClick={() => router.push("/")}>
-              <Icon n="user" size={18} />Ini kamu · buka pengaturan di beranda
+              <Icon n="user" size={18} />
+              Ini kamu · buka beranda
             </button>
           )}
           <button type="button" onClick={copyUser}>
-            <Icon n="copy" size={18} />Salin username
+            <Icon n="copy" size={18} />
+            Salin username
           </button>
-          {!isMe && (
-            <button type="button" onClick={saveContact}>
-              <Icon n="user" size={18} />Simpan kontak
-            </button>
-          )}
           <button type="button" onClick={shareLink}>
-            <Icon n="copy" size={18} />Salin link profil
+            <Icon n="copy" size={18} />
+            Salin link profil
           </button>
         </div>
 
-        {err && <p className="error" style={{ textAlign: "center", padding: 12 }}>{err}</p>}
-        {meUsername && (
+        {!loggedIn && (
+          <p className="muted small" style={{ textAlign: "center", padding: "8px 20px 24px" }}>
+            Kamu bisa melihat profil ini tanpa akun. Untuk mengirim pesan,{" "}
+            <button type="button" className="link" style={{ display: "inline", padding: 0, border: 0, background: "none", color: "var(--accent-text)", cursor: "pointer" }} onClick={startChat}>
+              login / daftar
+            </button>
+            .
+          </p>
+        )}
+
+        {err && (
+          <p className="error" style={{ textAlign: "center", padding: 12 }}>
+            {err}
+          </p>
+        )}
+        {loggedIn && meUsername && (
           <p className="muted small" style={{ textAlign: "center", padding: "8px 16px 24px" }}>
-            Link chat langsung: <code>/@{user.username}</code>
+            Link chat: <code>/@{user.username}</code>
           </p>
         )}
       </div>
 
-      {toast && <div className="toast" role="status">{toast}</div>}
+      {toast && (
+        <div className="toast" role="status">
+          {toast}
+        </div>
+      )}
     </main>
   );
 }

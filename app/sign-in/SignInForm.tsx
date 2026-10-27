@@ -56,9 +56,17 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
   }
 
   const sendCode = () => run(async () => { await post("/api/auth/otp/send", { email }); setStep("code"); setCode(""); setWait(60); setBusy(false); });
-  const dest = () => (forgot ? "/?reset=1" : "/");
+  const dest = () => {
+    if (forgot) return "/?reset=1";
+    try {
+      const n = new URLSearchParams(window.location.search).get("next") || "";
+      // hanya path internal aman
+      if (n.startsWith("/") && !n.startsWith("//") && !n.includes("://")) return n;
+    } catch {}
+    return "/";
+  };
   const verify = (c: string) => run(async () => { await post("/api/auth/otp/verify", { email, code: c }); window.location.assign(dest()); });
-  const loginPw = () => run(async () => { await post("/api/auth/login", { username: username.trim().toLowerCase().replace(/^@/, ""), password }); window.location.assign("/"); });
+  const loginPw = () => run(async () => { await post("/api/auth/login", { username: username.trim().toLowerCase().replace(/^@/, ""), password }); window.location.assign(dest()); });
   const go = (m: "login" | "verify", f = false) => { setMode(m); setForgot(f); setErr(""); setStep("email"); setCode(""); };
   const google = () => run(async () => {
     const auth = fbAuth(firebase);
@@ -92,7 +100,7 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
         await post("/api/auth/google", { idToken: await res.user.getIdToken() });
         await signOut(auth);
         let f = false; try { f = sessionStorage.getItem("kc_forgot") === "1"; sessionStorage.removeItem("kc_forgot"); } catch {}
-        window.location.assign(f ? "/?reset=1" : "/");
+        window.location.assign(f ? "/?reset=1" : dest());
       } catch (e: any) { setErr(googleError(e)); setBusy(false); }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

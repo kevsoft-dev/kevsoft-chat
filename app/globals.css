@@ -545,22 +545,53 @@ button.sender:disabled{cursor:default}
 a.tag{text-decoration:none;color:inherit}
 a.tag:hover{text-decoration:underline}
 
-/* Media, poll, pin, composer attach */
-.composer .attach{flex:0 0 auto;opacity:.7}
-.composer .attach:hover{opacity:1}
-.poll-form{padding:10px 12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;background:var(--bg-soft)}
-.poll-form .field{font:inherit;height:42px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--fill);outline:none}
-.poll-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.poll-actions .primary{padding:10px 14px;border-radius:10px;border:0;background:var(--violet);color:#fff;font:inherit;font-weight:600}
-.msg-media{display:block;margin:4px 0 6px;border-radius:12px;overflow:hidden;max-width:min(280px,70vw)}
-.msg-media img{display:block;width:100%;height:auto;max-height:320px;object-fit:cover}
-.msg-file{display:inline-flex;align-items:center;gap:8px;margin:4px 0;padding:10px 12px;border-radius:10px;background:var(--fill);border:1px solid var(--line);color:inherit;text-decoration:none;font-size:13px}
-.msg-poll{margin:4px 0 6px;min-width:200px}
-.msg-poll b{display:block;margin-bottom:8px;font-size:14px}
-.msg-poll ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.poll-opt{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--fill);font:inherit;text-align:left;cursor:pointer;overflow:hidden}
-.poll-opt i{position:absolute;left:0;top:0;bottom:0;background:color-mix(in srgb,var(--violet) 22%,transparent);z-index:0;pointer-events:none}
-.poll-opt span,.poll-opt em{position:relative;z-index:1}
-.poll-opt em{color:var(--muted);font-size:12px;font-style:normal}
-.pin-badge{display:block;font-size:11px;color:var(--muted);margin-top:2px}
-.msg.mine .poll-opt{background:color-mix(in srgb,var(--bubble-mine) 40%,var(--fill))}
+/* Media, poll, pin, composer — minimal tajam ala WA */
+.composer .attach{flex:0 0 auto;opacity:.75;transition:opacity .15s,transform .15s}
+.composer .attach:hover,.composer .attach.on{opacity:1}
+.composer .attach.on{transform:rotate(45deg)}
+.attach-menu{display:flex;gap:8px;padding:8px 12px 4px;animation:rise .15s ease both}
+.attach-menu button{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px;border:0;border-radius:14px;background:var(--fill);font:inherit;font-size:12px;font-weight:500;color:var(--ink);cursor:pointer}
+.attach-menu button:active{transform:scale(.97)}
+.am-ico{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:18px}
+.am-ico.img{background:#25d36622}
+.am-ico.doc{background:#53bdeb22}
+.am-ico.poll{background:#a855f722}
+
+.attach-sheet{padding:0!important}
+.attach-preview{display:flex;flex-direction:column;background:var(--bg);border-top:1px solid var(--line);max-height:min(70vh,520px)}
+.attach-x{position:absolute;z-index:2;margin:10px}
+.attach-preview{position:relative}
+.attach-img{display:block;width:100%;max-height:min(52vh,420px);object-fit:contain;background:#000}
+.attach-file{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:160px;padding:24px;color:var(--muted)}
+.attach-file span{color:var(--ink);font-weight:500;font-size:14px;word-break:break-all;text-align:center}
+.attach-cap{display:flex;align-items:center;gap:8px;padding:10px 12px max(12px,env(safe-area-inset-bottom));background:var(--bg-soft);border-top:1px solid var(--line)}
+.attach-input{flex:1;height:44px;padding:0 14px;border:1px solid var(--line);border-radius:22px;background:var(--fill);font:inherit;outline:none;color:var(--ink)}
+.attach-input:focus{border-color:var(--violet)}
+
+.poll-sheet{padding:10px 12px 6px;border-top:1px solid var(--line);background:var(--bg-soft);animation:rise .15s ease both}
+.poll-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.poll-head strong{font-size:14px;font-weight:600}
+.poll-q,.poll-o{display:block;width:100%;height:40px;margin-bottom:6px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--fill);font:inherit;font-size:14px;outline:none;color:var(--ink)}
+.poll-q:focus,.poll-o:focus{border-color:var(--violet)}
+.poll-bar{display:flex;align-items:center;justify-content:flex-end;gap:12px;padding-top:4px}
+.poll-go{padding:8px 16px;border:0;border-radius:20px;background:var(--accent,#25d366);color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.poll-go:disabled{opacity:.4;cursor:default}
+
+.msg-media{display:block;margin:-6px -10px 4px;border-radius:12px 12px 4px 4px;overflow:hidden;max-width:min(260px,72vw);background:#000}
+.msg.mine .msg-media{border-radius:12px 12px 4px 4px}
+.msg-media img{display:block;width:100%;height:auto;max-height:300px;object-fit:cover;vertical-align:top}
+.msg-media+.cap,.msg-media+span.cap{display:block;padding:4px 2px 0;font-size:14.5px;line-height:1.35}
+.msg-file{display:flex;align-items:center;gap:10px;margin:2px 0 4px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--ink) 6%,transparent);color:inherit;text-decoration:none;font-size:13px;font-weight:500}
+.msg-file span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+
+.msg-poll{margin:2px 0 0;min-width:200px;max-width:260px}
+.msg-poll .poll-q{margin:0 0 8px;padding:0;border:0;background:transparent;height:auto;font-weight:600;font-size:14px;line-height:1.3;color:inherit}
+.msg-poll .poll-opt{position:relative;display:flex;align-items:center;gap:8px;width:100%;margin-bottom:5px;padding:9px 11px;border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);border-radius:8px;background:transparent;font:inherit;font-size:13.5px;text-align:left;cursor:pointer;overflow:hidden;color:inherit}
+.msg-poll .poll-opt i{position:absolute;inset:0 auto 0 0;background:color-mix(in srgb,var(--accent,#25d366) 18%,transparent);pointer-events:none}
+.msg-poll .poll-opt span{position:relative;flex:1;z-index:1}
+.msg-poll .poll-opt em{position:relative;z-index:1;font-style:normal;font-size:12px;opacity:.7;font-variant-numeric:tabular-nums}
+.msg-poll .poll-n{display:block;margin-top:4px;font-size:11px;opacity:.55}
+.pin-badge{display:block;font-size:11px;opacity:.55;margin-top:2px}
+
+.bubble:has(.msg-media){padding:6px 6px 8px}
+.bubble:has(.msg-media) .foot{padding-right:4px}

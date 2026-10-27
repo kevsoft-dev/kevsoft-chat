@@ -281,20 +281,16 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me
     } catch { toast("Jaringan bermasalah"); }
   }, [openById, toast]);
 
-  // Deep link /@username → buka DM sekali saat mount
+  // Deep link /@username atau /dm/username → buka DM sekali saat mount
   const dmOpened = useRef(false);
   useEffect(() => {
     if (!openDm || dmOpened.current) return;
-    if (openDm.toLowerCase() === me0.username.toLowerCase()) return;
+    const target = openDm.replace(/^@/, "").toLowerCase().trim();
+    if (!target || target === me0.username.toLowerCase()) return;
     dmOpened.current = true;
-    openDmWith(openDm);
-    // bersihkan query di URL tanpa reload
-    try {
-      const u = new URL(window.location.href);
-      if (u.searchParams.has("dm") || u.pathname.startsWith("/@")) {
-        window.history.replaceState({}, "", "/");
-      }
-    } catch {}
+    // sedikit delay supaya state chat siap
+    const t = setTimeout(() => { openDmWith(target); }, 50);
+    return () => clearTimeout(t);
   }, [openDm, openDmWith, me0.username]);
 
   async function copyText(text: string, okMsg: string) {
