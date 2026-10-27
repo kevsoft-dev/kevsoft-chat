@@ -7,9 +7,12 @@ import { Avatar, Icon, type Msg, type UserLite } from "./ui";
 type Sug = { username: string; name: string; avatar_url: string | null; ai?: boolean };
 
 // Teks pesan disimpan di sini (bukan di Chat), jadi mengetik tidak me-render ulang seluruh daftar pesan.
-export default function Composer({ convId, kind, me, replyTo, onCancelReply, onSend, taRef }: {
+export default function Composer({ convId, kind, me, replyTo, onCancelReply, onSend, onSendMedia, onSendPoll, taRef }: {
   convId: string; kind: string; me: string; replyTo: Msg | null;
-  onCancelReply: () => void; onSend: (body: string) => void; taRef: RefObject<HTMLTextAreaElement | null>;
+  onCancelReply: () => void; onSend: (body: string) => void;
+  onSendMedia?: (file: File, caption: string) => void;
+  onSendPoll?: (question: string, options: string[]) => void;
+  taRef: RefObject<HTMLTextAreaElement | null>;
 }) {
   const [text, setText] = useState("");
   const textRef = useRef(""); textRef.current = text;
@@ -17,6 +20,10 @@ export default function Composer({ convId, kind, me, replyTo, onCancelReply, onS
   const [sugs, setSugs] = useState<Sug[]>([]);
   const [sugIdx, setSugIdx] = useState(0);
   const [mentionQ, setMentionQ] = useState<string | null>(null);
+  const [pollOpen, setPollOpen] = useState(false);
+  const [pq, setPq] = useState("");
+  const [popts, setPopts] = useState(["", ""]);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Draf tersimpan per chat (pindah chat tidak menghapus ketikan).
   useEffect(() => {
@@ -104,8 +111,25 @@ export default function Composer({ convId, kind, me, replyTo, onCancelReply, onS
       )}
       {aiHint && <div className="ai-hint"><Icon n="sparkle" size={16} /><span>Kev-Ai akan menjawab: <b>{aiPrompt(text) || "tulis pertanyaanmu…"}</b></span></div>}
       <form className="composer" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        {kind !== "ai" && (
+          <>
+            <button type="button" className="icon-btn attach" aria-label="Lampirkan" onClick={() => fileRef.current?.click()}>
+              <Icon n="plus" size={22} />
+            </button>
+            <input ref={fileRef} type="file" hidden accept="image/*,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,application/pdf,text/plain"
+              onChange={(e) => {
+                const f = e.target.files?.[0]; e.target.value = "";
+                if (f && onSendMedia) onSendMedia(f, text.trim());
+                setText(""); drafts.current[convId] = "";
+              }} />
+            <button type="button" className="icon-btn attach" aria-label="Buat polling" title="Polling"
+              onClick={() => setPollOpen((o) => !o)}>
+              <Icon n="info" size={20} />
+            </button>
+          </>
+        )}
         <textarea ref={taRef} rows={1} value={text} maxLength={4000} aria-label="Pesan"
-          placeholder={kind === "ai" ? "Tanya Kev-Ai apa saja…" : "Ketik pesan, @ untuk tag, @kev-ai untuk AI"}
+          placeholder={kind === "ai" ? "Tanya Kev-Ai apa saja…" : "Ketik Pesan"}
           onChange={(e) => { setText(e.target.value); detect(e.target.value, e.target.selectionStart ?? e.target.value.length); }}
           onKeyDown={onKey}
           onClick={(e) => detect(text, e.currentTarget.selectionStart ?? 0)} />
@@ -114,6 +138,27 @@ export default function Composer({ convId, kind, me, replyTo, onCancelReply, onS
           <Icon n="send" size={20} />
         </button>
       </form>
+      {pollOpen && (
+        <div className="poll-form">
+          <input className="field" placeholder="Pertanyaan polling" value={pq} maxLength={200} onChange={(e) => setPq(e.target.value)} />
+          {popts.map((o, i) => (
+            <input key={i} className="field" placeholder={`Opsi ${i + 1}`} value={o} maxLength={80}
+              onChange={(e) => setPopts((arr) => arr.map((x, j) => j === i ? e.target.value : x))} />
+          ))}
+          <div className="poll-actions">
+            {popts.length < 6 && <button type="button" className="link" onClick={() => setPopts((a) => [...a, ""])}>+ Opsi</button>}
+            <button type="button" className="primary" disabled={!pq.trim() || popts.filter((x) => x.trim()).length < 2}
+              onClick={() => {
+                const opts = popts.map((x) => x.trim()).filter(Boolean);
+                if (pq.trim() && opts.length >= 2 && onSendPoll) {
+                  onSendPoll(pq.trim(), opts);
+                  setPq(""); setPopts(["", ""]); setPollOpen(false);
+                }
+              }}>Kirim polling</button>
+            <button type="button" className="link" onClick={() => setPollOpen(false)}>Batal</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

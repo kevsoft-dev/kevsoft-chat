@@ -544,3 +544,23 @@ button.sender{display:block;width:100%;border:0;background:transparent;padding:0
 button.sender:disabled{cursor:default}
 a.tag{text-decoration:none;color:inherit}
 a.tag:hover{text-decoration:underline}
+
+/* Media, poll, pin, composer attach */
+.composer .attach{flex:0 0 auto;opacity:.7}
+.composer .attach:hover{opacity:1}
+.poll-form{padding:10px 12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;background:var(--bg-soft)}
+.poll-form .field{font:inherit;height:42px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--fill);outline:none}
+.poll-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.poll-actions .primary{padding:10px 14px;border-radius:10px;border:0;background:var(--violet);color:#fff;font:inherit;font-weight:600}
+.msg-media{display:block;margin:4px 0 6px;border-radius:12px;overflow:hidden;max-width:min(280px,70vw)}
+.msg-media img{display:block;width:100%;height:auto;max-height:320px;object-fit:cover}
+.msg-file{display:inline-flex;align-items:center;gap:8px;margin:4px 0;padding:10px 12px;border-radius:10px;background:var(--fill);border:1px solid var(--line);color:inherit;text-decoration:none;font-size:13px}
+.msg-poll{margin:4px 0 6px;min-width:200px}
+.msg-poll b{display:block;margin-bottom:8px;font-size:14px}
+.msg-poll ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.poll-opt{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--fill);font:inherit;text-align:left;cursor:pointer;overflow:hidden}
+.poll-opt i{position:absolute;left:0;top:0;bottom:0;background:color-mix(in srgb,var(--violet) 22%,transparent);z-index:0;pointer-events:none}
+.poll-opt span,.poll-opt em{position:relative;z-index:1}
+.poll-opt em{color:var(--muted);font-size:12px;font-style:normal}
+.pin-badge{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.msg.mine .poll-opt{background:color-mix(in srgb,var(--bubble-mine) 40%,var(--fill))}

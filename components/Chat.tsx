@@ -178,6 +178,13 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me
         y.id === d.id ? { ...y, body: "", mentions: [], deleted_at: new Date().toISOString() } : y.reply_to === d.id ? { ...y, reply_body: "" } : y));
       scheduleConvs();
     });
+    ch.bind("remove", (d: { id: string; conversation_id: string }) => {
+      mutate(d.conversation_id, (x) => x.filter((y) => y.id !== d.id));
+      scheduleConvs();
+    });
+    ch.bind("pin", (d: { id: string; conversation_id: string; pinned?: boolean }) => {
+      mutate(d.conversation_id, (x) => x.map((y) => y.id === d.id ? { ...y, pinned_at: d.pinned ? new Date().toISOString() : null } : y));
+    });
 
     ch.bind("conversation", () => scheduleConvs());
     ch.bind("disappear", (d: { conversationId?: string; seconds?: number }) => {
@@ -207,6 +214,23 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me
     if (!readPref("motion", true)) document.documentElement.dataset.motion = "off";
     return () => { pusher.disconnect(); window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock); };
   }, [me0.id, pusherKey, pusherCluster, loadConvs, scheduleConvs, bump, markRead, mutate, toast]);
+
+  useEffect(() => {
+    const onVote = async (e: Event) => {
+      const { id, option } = (e as CustomEvent).detail || {};
+      if (!id || option == null) return;
+      try {
+        const r = await fetch("/api/messages", {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, action: "vote", option }),
+        });
+        if (!r.ok) toast("Gagal vote");
+      } catch { toast("Gagal vote"); }
+    };
+    window.addEventListener("poll-vote", onVote);
+    return () => window.removeEventListener("poll-vote", onVote);
+  }, [toast]);
+
 
   const totalUnread = (convs ?? []).reduce((n, c) => n + c.unread, 0);
   useEffect(() => { document.title = totalUnread ? `(${totalUnread}) kevsoft-chat` : "kevsoft-chat"; }, [totalUnread]);
@@ -400,7 +424,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me
   }, [bump, deliver]);
 
   // ---------- hapus pesan ----------
-  const deleteMsg = useCallback(async (m: Msg, scope: "me" | "all") => {
+  const deleteMsg = useCallback(async (m: Msg, scope: "me" | "all" | "silent") => {
     const cid = m.conversation_id;
     if (scope === "all") {
       mutate(cid, (x) => x.map((y) =>
@@ -431,6 +455,13 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me
     const mod = isStaffRole(meRef.current.role) && !mine && !m.deleted_at;
     if (mine) actions.push({ label: "Hapus untuk semua orang", danger: true, run: () => deleteMsg(m, "all") });
     if (mod) actions.push({ label: "Hapus untuk semua (moderator)", danger: true, run: () => deleteMsg(m, "all") });
+    actions.push({ label: m.pinned_at ? "Lepas sematan" : "Sematkan pesan", run: async () => {
+      try {
+        await fetch("/api/messages", { method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: m.id, action: m.pinned_at ? "unpin" : "pin" }) });
+      } catch {}
+    } });
+    if (isStaffRole(me.role)) actions.push({ label: "Hapus diam-diam (staf)", danger: true, run: () => deleteMsg(m, "silent") });
     actions.push({ label: "Hapus untuk saya", danger: !mine && !mod, run: () => deleteMsg(m, "me") });
     setDialog({ title: "Hapus pesan?", text: mine ? "Hapus untuk semua orang akan menghilangkan pesan ini dari semua anggota percakapan." : mod ? "Sebagai moderator kamu bisa menghapus pesan ini untuk semua anggota. Tindakan ini dicatat di Log." : undefined, actions });
   }, [deleteMsg, mutate]);
@@ -669,7 +700,45 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me
             )}
 
             <Composer convId={active.id} kind={active.kind} me={me.username} replyTo={replyTo}
-              onCancelReply={() => setReplyTo(null)} onSend={send} taRef={taRef} />
+              onCancelReply={() => setReplyTo(null)} onSend={send} taRef={taRef}
+              onSendMedia={async (file, caption) => {
+                if (file.size > 400_000) { toast("File terlalu besar (maks ~400KB)"); return; }
+                if (/zip/i.test(file.name) || /zip|compressed/.test(file.type)) { toast("ZIP tidak diizinkan"); return; }
+                const buf = await file.arrayBuffer();
+                const bytes = new Uint8Array(buf);
+                let binary = "";
+                const chunk = 0x8000;
+                for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+                const b64 = btoa(binary);
+                const id = crypto.randomUUID();
+                const optimistic: Msg = {
+                  id, conversation_id: active.id, sender_id: me.id, kind: "user", body: caption || "",
+                  created_at: new Date().toISOString(), reply_to: null, mentions: [], username: me.username,
+                  name: me.name, avatar_url: me.avatarUrl ?? null, reply_body: null, reply_username: null,
+                  deleted_at: null, has_media: true, media_mime: file.type, media_name: file.name, status: "sending",
+                };
+                setMsgs((x) => [...x, optimistic]);
+                try {
+                  const r = await fetch("/api/messages/media", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id, conversationId: active.id, body: caption, mime: file.type, name: file.name, data: b64 }),
+                  });
+                  if (!r.ok) throw new Error();
+                  setMsgs((x) => x.map((y) => y.id === id ? { ...y, status: "sent" } : y));
+                } catch {
+                  setMsgs((x) => x.map((y) => y.id === id ? { ...y, status: "failed" } : y));
+                  toast("Gagal mengirim file");
+                }
+              }}
+              onSendPoll={async (question, options) => {
+                try {
+                  const r = await fetch("/api/messages/poll", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ conversationId: active.id, question, options }),
+                  });
+                  if (!r.ok) { const d = await r.json().catch(() => ({})); toast(d.error || "Gagal buat polling"); }
+                } catch { toast("Gagal buat polling"); }
+              }} />
 
             {info && (
               <aside className="info">

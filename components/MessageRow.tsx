@@ -41,8 +41,48 @@ export default memo(function MessageRow({ m, mine, first, newDay, showName, show
           <span className="text">
             {gone
               ? <><Icon n="block" size={14} /> {mine ? "Kamu menghapus pesan ini" : "Pesan ini telah dihapus"}</>
-              : <Rich body={m.body} mentions={m.mentions} me={meUsername} />}
+              : <>
+                  {m.has_media && m.media_mime?.startsWith("image/") && (
+                    <a className="msg-media" href={`/api/messages/media/${m.id}`} target="_blank" rel="noreferrer">
+                      <img src={`/api/messages/media/${m.id}`} alt={m.media_name || "gambar"} loading="lazy" />
+                    </a>
+                  )}
+                  {m.has_media && !m.media_mime?.startsWith("image/") && (
+                    <a className="msg-file" href={`/api/messages/media/${m.id}`} target="_blank" rel="noreferrer">
+                      <Icon n="info" size={16} /> {m.media_name || "File"}
+                    </a>
+                  )}
+                  {m.poll_data && (
+                    <div className="msg-poll">
+                      <b>{m.poll_data.question}</b>
+                      <ul>
+                        {m.poll_data.options.map((opt, i) => {
+                          const votes = Object.values(m.poll_data!.votes || {});
+                          const count = votes.filter((v) => v === i).length;
+                          const total = Math.max(1, votes.length);
+                          const pct = Math.round((count / total) * 100);
+                          return (
+                            <li key={i}>
+                              <button type="button" className="poll-opt"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.dispatchEvent(new CustomEvent("poll-vote", { detail: { id: m.id, option: i } }));
+                                }}>
+                                <span>{opt}</span>
+                                <em>{votes.length ? `${pct}%` : ""}</em>
+                                <i style={{ width: `${votes.length ? pct : 0}%` }} />
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+                  {!!m.body && !m.poll_data && <Rich body={m.body} mentions={m.mentions} me={meUsername} />}
+                  {!!m.body && m.poll_data && !m.body.startsWith("📊") && <Rich body={m.body} mentions={m.mentions} me={meUsername} />}
+                </>}
           </span>
+          {!!m.pinned_at && !gone && <span className="pin-badge">📌 Disematkan</span>}
           <span className="foot">
             <small>{clock(m.created_at)}</small>
             {mine && !gone && (

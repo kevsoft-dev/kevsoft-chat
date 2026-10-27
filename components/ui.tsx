@@ -14,7 +14,10 @@ export type Msg = {
   id: string; conversation_id: string; sender_id: string | null; kind: "user" | "ai"; body: string; created_at: string;
   reply_to: string | null; mentions: string[]; username: string | null; name: string | null; avatar_url: string | null;
   reply_body: string | null; reply_username: string | null; deleted_at: string | null;
-  status?: "sending" | "sent" | "failed"; // hanya di klien (pesan yang baru dikirim)
+  pinned_at?: string | null;
+  has_media?: boolean; media_mime?: string | null; media_name?: string | null;
+  poll_data?: { question: string; options: string[]; votes: Record<string, number> } | null;
+  status?: "sending" | "sent" | "failed";
 };
 export type UserLite = {
   id: string; username: string; name: string | null; avatar_url: string | null; bio?: string | null;
@@ -36,6 +39,7 @@ const P: Record<string, string> = {
   search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm10 2-4.3-4.3",
   edit: "M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z",
   send: "m22 2-7 20-4-9-9-4Zm0 0L11 13",
+  plus: "M12 5v14M5 12h14",
   back: "m15 18-6-6 6-6",
   close: "M18 6 6 18M6 6l12 12",
   sparkle: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9ZM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z",

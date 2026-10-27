@@ -54,6 +54,11 @@ alter table messages add column if not exists mentions text[] not null default '
 alter table messages add column if not exists deleted_at timestamptz;
 alter table messages add column if not exists hidden_by text[] not null default '{}';
 alter table messages add column if not exists expires_at timestamptz;
+alter table messages add column if not exists pinned_at timestamptz;
+alter table messages add column if not exists media_mime text;
+alter table messages add column if not exists media_data text;
+alter table messages add column if not exists media_name text;
+alter table messages add column if not exists poll_data jsonb;
 create index if not exists messages_conv_idx on messages (conversation_id, created_at desc);
 create index if not exists messages_expires_idx on messages (expires_at) where expires_at is not null;
 

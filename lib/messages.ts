@@ -1,12 +1,15 @@
 import { sql } from "./db";
 import { pusher } from "./pusher";
 
-// Pesan lengkap dengan username pengirim dan kutipan balasan.
+// Pesan lengkap dengan username pengirim, media, pin, poll, dan kutipan balasan.
 export async function getMessage(id: string) {
   const [m] = await sql`
     select m.id, m.conversation_id, m.sender_id, m.kind,
       case when m.deleted_at is null then m.body else '' end as body,
       m.created_at, m.deleted_at, m.reply_to, m.mentions,
+      m.pinned_at, m.media_mime, m.media_name,
+      case when m.media_data is not null and m.deleted_at is null then true else false end as has_media,
+      m.poll_data,
       case when m.kind = 'ai' then 'kev-ai' else u.username end as username,
       case when m.kind = 'ai' then 'Kev-Ai' else coalesce(u.name, u.username) end as name,
       u.avatar_url,
@@ -20,7 +23,6 @@ export async function getMessage(id: string) {
   return m;
 }
 
-// Kirim event realtime ke semua anggota percakapan (Pusher maks 100 channel per panggilan).
 export async function broadcast(conversationId: string, event: string, payload: unknown) {
   try {
     const members = await sql`select user_id from conversation_members where conversation_id = ${conversationId}`;
@@ -30,7 +32,6 @@ export async function broadcast(conversationId: string, event: string, payload: 
   } catch {}
 }
 
-// Event hanya ke satu user (mis. sinkron perangkat lain milik user yang sama).
 export async function pushTo(userId: string, event: string, payload: unknown) {
   try { await pusher.trigger(`private-user-${userId}`, event, payload); } catch {}
 }

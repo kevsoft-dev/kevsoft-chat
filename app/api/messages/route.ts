@@ -28,6 +28,9 @@ export async function GET(req: Request) {
       select m.id, m.conversation_id, m.sender_id, m.kind,
         case when m.deleted_at is null then m.body else '' end as body,
         m.created_at, m.deleted_at, m.reply_to, m.mentions,
+        m.pinned_at, m.media_mime, m.media_name,
+        case when m.media_data is not null and m.deleted_at is null then true else false end as has_media,
+        case when m.deleted_at is null then m.poll_data else null end as poll_data,
         case when m.kind = 'ai' then 'kev-ai' else u.username end as username,
         case when m.kind = 'ai' then 'Kev-Ai' else coalesce(u.name, u.username) end as name,
         u.avatar_url,
@@ -70,7 +73,8 @@ export async function POST(req: Request) {
       array(select lower(username) from users where lower(username) = any(${wanted}::text[]))
         || ${wantsAi ? [AI_HANDLE] : []}::text[],
       (select id from messages where id = ${replyTo ?? null}::uuid and conversation_id = ${conversationId}::uuid),
-      case when c.disappear_seconds > 0 then now() + make_interval(secs => c.disappear_seconds) else null end
+      case when c.disappear_seconds > 0 then now() + make_interval(secs => c.disappear_seconds)
+           else now() + interval '1 day' end
     from conversations c
     where c.id = ${conversationId}::uuid
       and exists (select 1 from conversation_members where conversation_id = ${conversationId}::uuid and user_id = ${uid})
@@ -114,8 +118,8 @@ export async function POST(req: Request) {
     else answer = await askKevAi(prompt);
 
     const [r] = await sql`
-      insert into messages (conversation_id, sender_id, kind, body, reply_to)
-      values (${conversationId}, null, 'ai', ${answer}, ${row.id}) returning id`;
+      insert into messages (conversation_id, sender_id, kind, body, reply_to, expires_at)
+      values (${conversationId}, null, 'ai', ${answer}, ${row.id}, now() + interval '1 day') returning id`;
     await broadcast(conversationId, "message", await getMessage(r.id));
   });
 
@@ -130,10 +134,30 @@ export async function DELETE(req: Request) {
   const id = uuid.safeParse(sp.get("id"));
   if (!id.success) return new Response("Bad request", { status: 400 });
 
+  // Owner/admin: hapus diam-diam (pesan hilang total, tanpa "telah dihapus")
+  if (sp.get("scope") === "silent") {
+    const [row] = await sql`
+      delete from messages m
+      where m.id = ${id.data}
+        and exists (
+          select 1 from users v left join users s on s.id = m.sender_id
+          where v.id = ${uid} and v.role in ('admin', 'owner')
+            and exists (select 1 from conversation_members where conversation_id = m.conversation_id and user_id = v.id)
+            and (case v.role when 'owner' then 2 else 1 end) >= (case coalesce(s.role, 'user') when 'owner' then 2 when 'admin' then 1 else 0 end)
+            and (v.role = 'owner' or coalesce(s.role, 'user') <> 'owner'))
+      returning m.id, m.conversation_id, m.sender_id`;
+    if (!row) return new Response("Not found", { status: 404 });
+    const [who] = await sql`select coalesce(username, name) as n from users where id = ${uid}`;
+    const [tg] = await sql`select coalesce(username, name) as n from users where id = ${row.sender_id}`;
+    await logMod({ actorId: uid, actorName: String(who?.n ?? "Staf"), action: "delete_message", targetId: row.sender_id, targetName: String(tg?.n ?? "user"), detail: "silent" });
+    after(() => broadcast(row.conversation_id, "remove", { id: row.id, conversation_id: row.conversation_id }));
+    return Response.json({ ok: true, silent: true });
+  }
+
   if (sp.get("scope") === "all") {
     // Pengirim boleh menghapus pesannya sendiri. Staf (admin/owner) boleh menghapus pesan milik role di bawahnya.
     const [row] = await sql`
-      update messages set body = '', mentions = '{}', deleted_at = now()
+      update messages set body = '', mentions = '{}', deleted_at = now(), media_data = null, media_mime = null, media_name = null, poll_data = null
       where id = ${id.data} and deleted_at is null
         and (sender_id = ${uid} or exists (
           select 1 from users v left join users s on s.id = messages.sender_id
@@ -156,4 +180,41 @@ export async function DELETE(req: Request) {
     where m.id = ${id.data} and not (${uid} = any(m.hidden_by))
       and exists (select 1 from conversation_members where conversation_id = m.conversation_id and user_id = ${uid})`;
   return Response.json({ ok: true });
+}
+
+// Pin/unpin pesan, atau vote poll.
+export async function PATCH(req: Request) {
+  const uid = await getUserId();
+  if (!uid) return new Response("Unauthorized", { status: 401 });
+  const body = await req.json().catch(() => null);
+  const parsed = z.object({
+    id: uuid,
+    action: z.enum(["pin", "unpin", "vote"]),
+    option: z.number().int().min(0).max(9).optional(),
+  }).safeParse(body);
+  if (!parsed.success) return new Response("Bad request", { status: 400 });
+  const { id, action, option } = parsed.data;
+
+  const [m] = await sql`
+    select m.id, m.conversation_id, m.poll_data, m.pinned_at
+    from messages m
+    where m.id = ${id} and m.deleted_at is null
+      and exists (select 1 from conversation_members where conversation_id = m.conversation_id and user_id = ${uid})`;
+  if (!m) return new Response("Not found", { status: 404 });
+
+  if (action === "pin" || action === "unpin") {
+    await sql`update messages set pinned_at = ${action === "pin" ? new Date().toISOString() : null} where id = ${id}`;
+    after(() => broadcast(m.conversation_id, "pin", { id, conversation_id: m.conversation_id, pinned: action === "pin" }));
+    return Response.json({ ok: true, pinned: action === "pin" });
+  }
+
+  // vote
+  if (option == null || !m.poll_data) return Response.json({ error: "Poll tidak valid" }, { status: 400 });
+  const poll = m.poll_data as { question: string; options: string[]; votes: Record<string, number> };
+  if (!poll.options || option >= poll.options.length) return Response.json({ error: "Opsi tidak ada" }, { status: 400 });
+  poll.votes = poll.votes || {};
+  poll.votes[uid] = option;
+  await sql`update messages set poll_data = ${JSON.stringify(poll)}::jsonb where id = ${id}`;
+  after(async () => broadcast(m.conversation_id, "message", await getMessage(id)));
+  return Response.json({ ok: true, poll });
 }

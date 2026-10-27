@@ -2,7 +2,7 @@ import { sql } from "./db";
 import { readSession } from "./session";
 import { COMMUNITY_ID } from "./mentions";
 import { ensureSchema } from "./migrate";
-import { rank } from "./roles";
+import { isRootEmail, rank } from "./roles";
 
 // Status blokir di-cache singkat per instance supaya tidak ada query tambahan di tiap request.
 const BAN_TTL = 8_000;
@@ -46,6 +46,11 @@ export async function getStaff() {
 
 // Setiap user otomatis masuk Komunitas Kevsoft (kecuali sedang di-kick) dan punya chat Kev-Ai sendiri.
 export async function ensureDefaults(userId: string) {
+  // Email di config owners selalu role owner (console penuh).
+  const [u] = await sql`select email from users where id = ${userId}`;
+  if (u?.email && isRootEmail(String(u.email))) {
+    await sql`update users set role = 'owner' where id = ${userId} and role is distinct from 'owner'`;
+  }
   await sql`
     insert into conversation_members (conversation_id, user_id)
     select ${COMMUNITY_ID}::uuid, ${userId}
