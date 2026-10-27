@@ -102,8 +102,7 @@ create index if not exists mod_logs_created_idx on mod_logs (created_at desc);
 
 insert into conversations (id, kind, title, description)
 values ('00000000-0000-4000-8000-000000000001', 'community', 'Komunitas Kevsoft', 'Tempat ngobrol publik semua member kevsoft. Tag teman dengan @username, tanya AI dengan @kev-ai.')
-on conflict (id) do nothing
-
+on conflict (id) do nothing;
 
 create table if not exists app_settings (
   key text primary key,
