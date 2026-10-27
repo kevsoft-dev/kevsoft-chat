@@ -1,168 +1,446 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Pusher from "pusher-js";
-import Account from "./Account";
-import { AI_HANDLE, aiPrompt, parseMentions } from "@/lib/mentions";
+import { AI_HANDLE, parseMentions } from "@/lib/mentions";
+import { readPref } from "@/lib/prefs";
+import { blip, unlockAudio } from "@/lib/sound";
+import Composer from "./Composer";
+import ConvItem from "./ConvItem";
+import MessageRow from "./MessageRow";
 import NewChat from "./NewChat";
-import { Avatar, Icon, Logo, Rich, clock, convName, dayLabel, listTime, nameColor, type Conv, type Me, type Msg, type UserLite } from "./ui";
+import Profile from "./Profile";
+import { Dialog, Lightbox, Menu, type DialogAction, type MenuItem } from "./overlays";
+import { Avatar, Icon, Logo, convName, type Conv, type Me, type Msg, type UserLite } from "./ui";
 
-type Sug = { username: string; name: string; avatar_url: string | null; ai?: boolean };
+type MenuState = { x: number; y: number; items: MenuItem[] };
+type DialogState = { title: string; text?: string; actions: DialogAction[] };
+
 const post = (url: string, body: object) =>
   fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
-export default function Chat({ me, pusherKey, pusherCluster }: { me: Me; pusherKey: string; pusherCluster: string }) {
-  const [convs, setConvs] = useState<Conv[]>([]);
-  const [active, setActive] = useState<Conv | null>(null);
+const newId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === "x" ? r : (r & 3) | 8).toString(16); });
+
+const placeMenu = (x: number, y: number, n: number) => ({
+  x: Math.max(8, Math.min(x, window.innerWidth - 228)),
+  y: Math.max(8, Math.min(y, window.innerHeight - (n * 46 + 20))),
+});
+
+// Pesan yang belum terkonfirmasi server (mengirim / gagal) dipertahankan saat daftar dimuat ulang.
+const mergePending = (list: Msg[], cur: Msg[]) => {
+  const pend = cur.filter((m) => (m.status === "sending" || m.status === "failed") && !list.some((x) => x.id === m.id));
+  return pend.length ? [...list, ...pend] : list;
+};
+
+async function fetchMsgs(id: string): Promise<Msg[] | null> {
+  try {
+    const r = await fetch(`/api/messages?conversationId=${id}`);
+    if (r.status === 401) { window.location.assign("/sign-in"); return null; }
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+
+export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pusherKey: string; pusherCluster: string }) {
+  const [me, setMe] = useState<Me>(me0);
+  const [convs, setConvs] = useState<Conv[] | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
-  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [noMore, setNoMore] = useState(false);
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
   const [q, setQ] = useState("");
   const [tab, setTab] = useState<"all" | "dm" | "group">("all");
   const [showNew, setShowNew] = useState(false);
+  const [profile, setProfile] = useState(false);
   const [info, setInfo] = useState(false);
   const [members, setMembers] = useState<UserLite[]>([]);
-  const [sugs, setSugs] = useState<Sug[]>([]);
-  const [sugIdx, setSugIdx] = useState(0);
-  const [mentionQ, setMentionQ] = useState<string | null>(null);
   const [aiWait, setAiWait] = useState<string[]>([]);
-  const [err, setErr] = useState("");
+  const [leaving, setLeaving] = useState<string[]>([]);
+  const [leavingMsgs, setLeavingMsgs] = useState<string[]>([]);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [zoom, setZoom] = useState<string | null>(null);
+  const [toastText, setToastText] = useState("");
+  const [away, setAway] = useState(false);
+  const [newBelow, setNewBelow] = useState(0);
 
-  const activeId = useRef<string | null>(null);
-  const bottom = useRef<HTMLDivElement>(null);
-  const ta = useRef<HTMLTextAreaElement>(null);
-  const skipScroll = useRef(false);
-  const convsRef = useRef<Conv[]>([]);
-  convsRef.current = convs;
+  const meRef = useRef(me); meRef.current = me;
+  const activeRef = useRef<string | null>(null);
+  const convsRef = useRef<Conv[] | null>(null); convsRef.current = convs;
+  const msgsRef = useRef<Msg[]>([]); msgsRef.current = msgs;
+  const replyRef = useRef<Msg | null>(null); replyRef.current = replyTo;
+  const cache = useRef<Record<string, Msg[]>>({});
+  const fresh = useRef(new Set<string>());
+  const thread = useRef<HTMLDivElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const stick = useRef(true);
+  const positioned = useRef<string | null>(null);
+  const prevLast = useRef<string | undefined>(undefined);
+  const pendingPrepend = useRef<number | null>(null);
+  const loadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const loadConvs = useCallback(async () => {
-    const r = await fetch("/api/conversations");
-    if (r.ok) setConvs(await r.json());
+  const active = useMemo(() => convs?.find((c) => c.id === activeId) ?? null, [convs, activeId]);
+
+  const toast = useCallback((t: string) => {
+    setToastText(t);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastText(""), 2200);
   }, []);
 
-  const markRead = useCallback((id: string) => { post("/api/read", { conversationId: id }).then(loadConvs); }, [loadConvs]);
+  // ---------- daftar chat ----------
+  const loadConvs = useCallback(async () => {
+    try {
+      const r = await fetch("/api/conversations");
+      if (r.status === 401) { window.location.assign("/sign-in"); return; }
+      if (r.ok) setConvs(await r.json());
+    } catch {}
+  }, []);
+  // Muat ulang daftar dengan jeda singkat supaya beberapa event beruntun hanya memicu satu query.
+  const scheduleConvs = useCallback(() => {
+    clearTimeout(loadTimer.current);
+    loadTimer.current = setTimeout(loadConvs, 250);
+  }, [loadConvs]);
 
+  // Perbarui satu baris daftar secara lokal (tanpa query ke server).
+  const bump = useCallback((m: Msg, incoming: boolean, isActive: boolean) => {
+    if (!convsRef.current?.some((c) => c.id === m.conversation_id)) { scheduleConvs(); return; }
+    setConvs((list) => {
+      if (!list) return list;
+      const i = list.findIndex((c) => c.id === m.conversation_id);
+      if (i < 0) return list;
+      const c = list[i];
+      const hot = incoming && !isActive;
+      const next: Conv = {
+        ...c, last_body: m.body, last_at: m.created_at, last_kind: m.kind, last_username: m.username, last_deleted: false,
+        unread: hot ? c.unread + 1 : c.unread,
+        unread_mention: c.unread_mention || (hot && m.mentions.includes(meRef.current.username.toLowerCase())),
+      };
+      const rest = list.filter((_, j) => j !== i);
+      const k = next.kind === "ai" ? 0 : rest[0]?.kind === "ai" ? 1 : 0;
+      return [...rest.slice(0, k), next, ...rest.slice(k)];
+    });
+  }, [scheduleConvs]);
+
+  const markRead = useCallback((cid: string) => {
+    setConvs((l) => l && l.map((c) => (c.id === cid && (c.unread || c.unread_mention) ? { ...c, unread: 0, unread_mention: false } : c)));
+    post("/api/read", { conversationId: cid }).catch(() => {});
+  }, []);
+
+  const mutate = useCallback((cid: string, fn: (x: Msg[]) => Msg[]) => {
+    if (cid === activeRef.current) setMsgs(fn);
+    if (cache.current[cid]) cache.current[cid] = fn(cache.current[cid]);
+  }, []);
+
+  const closeChat = useCallback(() => {
+    const id = activeRef.current;
+    if (id) cache.current[id] = msgsRef.current;
+    activeRef.current = null; setActiveId(null); setInfo(false); setReplyTo(null);
+  }, []);
+
+  // ---------- realtime ----------
   useEffect(() => {
     loadConvs();
     const pusher = new Pusher(pusherKey, {
       cluster: pusherCluster,
       channelAuthorization: { endpoint: "/api/pusher/auth", transport: "ajax" },
     });
-    const ch = pusher.subscribe(`private-user-${me.id}`);
-    ch.bind("message", (m: Msg) => {
-      if (m.kind === "ai") setAiWait((w) => w.filter((x) => x !== m.conversation_id));
-      if (m.conversation_id === activeId.current) {
-        setMsgs((x) => (x.some((y) => y.id === m.id) ? x : [...x, m]));
-        if (m.sender_id !== me.id) markRead(m.conversation_id);
-      }
-      loadConvs();
-    });
-    ch.bind("conversation", () => loadConvs());
-    return () => { pusher.disconnect(); };
-  }, [me.id, pusherKey, pusherCluster, loadConvs, markRead]);
+    const ch = pusher.subscribe(`private-user-${me0.id}`);
 
-  const totalUnread = convs.reduce((n, c) => n + c.unread, 0);
+    ch.bind("message", (m: Msg) => {
+      const cid = m.conversation_id;
+      const mineMsg = m.sender_id === meRef.current.id;
+      const isActive = cid === activeRef.current;
+      if (m.kind === "ai") setAiWait((w) => w.filter((x) => x !== cid));
+      const cached = cache.current[cid];
+      if (cached && !cached.some((y) => y.id === m.id)) cache.current[cid] = [...cached, m];
+      if (isActive) {
+        setMsgs((x) => {
+          const i = x.findIndex((y) => y.id === m.id);
+          if (i >= 0) { const c = x.slice(); c[i] = { ...m, status: mineMsg ? "sent" : undefined }; return c; }
+          fresh.current.add(m.id);
+          return [...x, m];
+        });
+        if (!mineMsg) markRead(cid);
+      }
+      bump(m, !mineMsg, isActive);
+      if (!mineMsg && readPref("sound", true) && (document.hidden || !isActive)) blip("in");
+    });
+
+    ch.bind("delete", (d: { id: string; conversation_id: string }) => {
+      mutate(d.conversation_id, (x) => x.map((y) =>
+        y.id === d.id ? { ...y, body: "", mentions: [], deleted_at: new Date().toISOString() } : y.reply_to === d.id ? { ...y, reply_body: "" } : y));
+      scheduleConvs();
+    });
+
+    ch.bind("conversation", () => scheduleConvs());
+
+    let first = true; // setelah tersambung ulang, ambil pesan yang mungkin terlewat
+    pusher.connection.bind("connected", () => {
+      if (first) { first = false; return; }
+      scheduleConvs();
+      const id = activeRef.current;
+      if (id) fetchMsgs(id).then((l) => { if (l && activeRef.current === id) setMsgs((p) => mergePending(l, p)); });
+    });
+
+    const unlock = () => unlockAudio();
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    if (!readPref("motion", true)) document.documentElement.dataset.motion = "off";
+    return () => { pusher.disconnect(); window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock); };
+  }, [me0.id, pusherKey, pusherCluster, loadConvs, scheduleConvs, bump, markRead, mutate]);
+
+  const totalUnread = (convs ?? []).reduce((n, c) => n + c.unread, 0);
   useEffect(() => { document.title = totalUnread ? `(${totalUnread}) kevsoft-chat` : "kevsoft-chat"; }, [totalUnread]);
 
-  useEffect(() => {
-    if (skipScroll.current) { skipScroll.current = false; return; }
-    bottom.current?.scrollIntoView({ block: "end" });
-  }, [msgs, aiWait]);
+  // Chat yang dibuka hilang dari daftar (mis. dihapus dari perangkat lain) -> kembali ke daftar.
+  useEffect(() => { if (activeId && convs && !active) closeChat(); }, [activeId, convs, active, closeChat]);
 
-  async function open(c: Conv) {
-    setActive(c); activeId.current = c.id; setMsgs([]); setReplyTo(null); setInfo(false); setText(""); setMentionQ(null); setErr("");
-    const r = await fetch(`/api/messages?conversationId=${c.id}`);
-    if (r.ok) setMsgs(await r.json());
-    loadConvs();
-  }
-  async function openById(id: string) {
+  // ---------- buka chat ----------
+  const open = useCallback(async (id: string) => {
+    const prev = activeRef.current;
+    if (prev) cache.current[prev] = msgsRef.current;
+    const keys = Object.keys(cache.current);
+    if (keys.length > 12) delete cache.current[keys[0]];
+    activeRef.current = id; setActiveId(id); fresh.current.clear();
+    positioned.current = null; stick.current = true; setAway(false); setNewBelow(0); setNoMore(false);
+    setReplyTo(null); setInfo(false); setMembers([]); setMenu(null);
+    const cached = cache.current[id];
+    setMsgs(cached ?? []); setLoading(!cached);
+    setConvs((l) => l && l.map((c) => (c.id === id ? { ...c, unread: 0, unread_mention: false } : c)));
+    const list = await fetchMsgs(id); // GET sekaligus menandai sudah dibaca di server
+    if (activeRef.current !== id) return;
+    setLoading(false);
+    if (list) setMsgs((p) => mergePending(list, p));
+  }, []);
+
+  const openById = useCallback(async (id: string) => {
     setShowNew(false);
-    const r = await fetch("/api/conversations");
-    if (!r.ok) return;
-    const list: Conv[] = await r.json();
-    setConvs(list);
-    const c = list.find((x) => x.id === id);
-    if (c) open(c);
-  }
+    try {
+      const r = await fetch("/api/conversations");
+      if (!r.ok) return;
+      setConvs(await r.json());
+      open(id);
+    } catch {}
+  }, [open]);
+
   async function older() {
-    if (!active || msgs.length === 0) return;
-    const r = await fetch(`/api/messages?conversationId=${active.id}&before=${encodeURIComponent(msgs[0].created_at)}`);
-    if (r.ok) { skipScroll.current = true; const more: Msg[] = await r.json(); setMsgs((x) => [...more, ...x]); }
+    const id = activeRef.current;
+    if (!id || msgs.length === 0) return;
+    try {
+      const r = await fetch(`/api/messages?conversationId=${id}&before=${encodeURIComponent(msgs[0].created_at)}`);
+      if (!r.ok || activeRef.current !== id) return;
+      const more: Msg[] = await r.json();
+      if (more.length < 50) setNoMore(true);
+      if (more.length) { pendingPrepend.current = thread.current?.scrollHeight ?? null; setMsgs((x) => [...more, ...x]); }
+    } catch {}
   }
 
-  // ---- @tag autocomplete ----
-  function detectMention(value: string, caret: number) {
-    const m = /(^|[^a-z0-9_.@-])@([a-z0-9_.-]{0,20})$/i.exec(value.slice(0, caret));
-    setMentionQ(m ? m[2].toLowerCase() : null);
-    setSugIdx(0);
-  }
-  useEffect(() => {
-    if (mentionQ === null || !active) { setSugs([]); return; }
-    const showAi = active.kind !== "ai" && AI_HANDLE.startsWith(mentionQ);
-    const ai: Sug[] = showAi ? [{ username: AI_HANDLE, name: "Kev-Ai", avatar_url: null, ai: true }] : [];
-    let dead = false;
-    const t = setTimeout(async () => {
-      let users: Sug[] = [];
-      if (active.kind !== "ai") {
-        const r = await fetch(`/api/users?q=${encodeURIComponent(mentionQ)}&cid=${active.id}`);
-        if (r.ok) users = (await r.json()).map((u: UserLite) => ({ username: u.username, name: u.name || u.username, avatar_url: u.avatar_url }));
-      }
-      if (!dead) setSugs([...ai, ...users]);
-    }, 120);
-    if (ai.length) setSugs(ai);
-    return () => { dead = true; clearTimeout(t); };
-  }, [mentionQ, active]);
+  // ---------- scroll ----------
+  const onScroll = useCallback(() => {
+    const el = thread.current; if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 140;
+    stick.current = near;
+    setAway(!near);
+    if (near) setNewBelow(0);
+  }, []);
+  const toBottom = useCallback(() => {
+    const el = thread.current; if (!el) return;
+    stick.current = true; setNewBelow(0);
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, []);
 
-  function pick(s: Sug) {
-    const el = ta.current; if (!el) return;
-    const caret = el.selectionStart ?? text.length;
-    const before = text.slice(0, caret).replace(/@[a-z0-9_.-]*$/i, `@${s.username} `);
-    const next = before + text.slice(caret);
-    setText(next); setMentionQ(null);
-    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(before.length, before.length); });
-  }
-
-  function onKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (mentionQ !== null && sugs.length) {
-      if (e.key === "ArrowDown") { e.preventDefault(); setSugIdx((i) => (i + 1) % sugs.length); return; }
-      if (e.key === "ArrowUp") { e.preventDefault(); setSugIdx((i) => (i - 1 + sugs.length) % sugs.length); return; }
-      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pick(sugs[sugIdx]); return; }
-      if (e.key === "Escape") { setMentionQ(null); return; }
+  const waiting = !!activeId && aiWait.includes(activeId);
+  const lastId = msgs[msgs.length - 1]?.id;
+  const firstId = msgs[0]?.id;
+  useLayoutEffect(() => {
+    const el = thread.current;
+    if (el && pendingPrepend.current != null) { el.scrollTop += el.scrollHeight - pendingPrepend.current; pendingPrepend.current = null; }
+  }, [firstId]);
+  useLayoutEffect(() => {
+    const el = thread.current; if (!el || !activeId) return;
+    if (positioned.current !== activeId) {
+      if (!loading) { el.scrollTop = el.scrollHeight; positioned.current = activeId; prevLast.current = lastId; }
+      return;
     }
-    if (e.key === "Enter" && !e.shiftKey && !("ontouchstart" in window)) { e.preventDefault(); send(); }
-  }
+    const last = msgs[msgs.length - 1];
+    const changed = prevLast.current !== lastId; prevLast.current = lastId;
+    const mineLast = !!last && last.sender_id === meRef.current.id;
+    if (stick.current || (changed && mineLast)) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    else if (changed && last) setNewBelow((n) => n + 1);
+  }, [lastId, loading, waiting, activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const mentioned = useMemo(() => parseMentions(text), [text]);
-  const aiHint = active && active.kind !== "ai" && mentioned.includes(AI_HANDLE);
+  // Papan ketik HP muncul / ukuran berubah: tetap di bawah kalau sedang di bawah.
+  useEffect(() => {
+    const el = thread.current; if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => { if (stick.current) el.scrollTop = el.scrollHeight; });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [activeId]);
 
-  async function send() {
-    const body = text.trim();
-    if (!body || !active) return;
-    const cid = active.id;
-    const callsAi = active.kind === "ai" || parseMentions(body).includes(AI_HANDLE);
-    setText(""); setMentionQ(null); setErr("");
-    const rt = replyTo; setReplyTo(null);
-    if (callsAi) {
+  // ---------- kirim pesan (optimistik: langsung tampil, server menyusul) ----------
+  const deliver = useCallback(async (m: Msg) => {
+    const patch = (p: Partial<Msg>) => mutate(m.conversation_id, (x) => x.map((y) => (y.id === m.id ? { ...y, ...p } : y)));
+    try {
+      const r = await post("/api/messages", { id: m.id, conversationId: m.conversation_id, body: m.body, replyTo: m.reply_to ?? undefined });
+      if (r.status === 401) { window.location.assign("/sign-in"); return; }
+      if (!r.ok) throw new Error(String(r.status));
+      const s = await r.json();
+      patch({ status: "sent", created_at: s.created_at, mentions: s.mentions });
+    } catch {
+      patch({ status: "failed" });
+      setAiWait((w) => w.filter((x) => x !== m.conversation_id));
+    }
+  }, [mutate]);
+
+  const retry = useCallback((m: Msg) => {
+    mutate(m.conversation_id, (x) => x.map((y) => (y.id === m.id ? { ...y, status: "sending" } : y)));
+    deliver({ ...m, status: "sending" });
+  }, [deliver, mutate]);
+
+  useEffect(() => {
+    const back = () => msgsRef.current.filter((m) => m.status === "failed").forEach(retry);
+    window.addEventListener("online", back);
+    return () => window.removeEventListener("online", back);
+  }, [retry]);
+
+  const send = useCallback((body: string) => {
+    const cid = activeRef.current; if (!cid) return;
+    const kind = convsRef.current?.find((c) => c.id === cid)?.kind;
+    const rt = replyRef.current;
+    const mm = meRef.current;
+    const m: Msg = {
+      id: newId(), conversation_id: cid, sender_id: mm.id, kind: "user", body, created_at: new Date().toISOString(),
+      reply_to: rt?.id ?? null, mentions: parseMentions(body), username: mm.username, name: mm.name, avatar_url: mm.avatarUrl ?? null,
+      reply_body: rt ? (rt.deleted_at ? "" : rt.body.slice(0, 140)) : null, reply_username: rt ? rt.username : null,
+      deleted_at: null, status: "sending",
+    };
+    fresh.current.add(m.id); stick.current = true;
+    setMsgs((x) => [...x, m]);
+    setReplyTo(null);
+    bump(m, false, true);
+    if (kind === "ai" || m.mentions.includes(AI_HANDLE)) {
       setAiWait((w) => [...w, cid]);
       setTimeout(() => setAiWait((w) => w.filter((x) => x !== cid)), 60_000);
     }
-    const r = await post("/api/messages", { conversationId: cid, body, replyTo: rt?.id });
-    if (r.ok) { const m: Msg = await r.json(); if (cid === activeId.current) setMsgs((x) => (x.some((y) => y.id === m.id) ? x : [...x, m])); loadConvs(); }
-    else { setErr("Pesan gagal terkirim"); setText(body); setAiWait((w) => w.filter((x) => x !== cid)); }
-    requestAnimationFrame(() => { if (ta.current) ta.current.style.height = "auto"; });
-  }
+    if (readPref("sound", true)) blip("out");
+    deliver(m);
+  }, [bump, deliver]);
+
+  // ---------- hapus pesan ----------
+  const deleteMsg = useCallback(async (m: Msg, scope: "me" | "all") => {
+    const cid = m.conversation_id;
+    if (scope === "all") {
+      mutate(cid, (x) => x.map((y) =>
+        y.id === m.id ? { ...y, body: "", mentions: [], deleted_at: new Date().toISOString() } : y.reply_to === m.id ? { ...y, reply_body: "" } : y));
+    } else {
+      setLeavingMsgs((l) => [...l, m.id]);
+      setTimeout(() => { mutate(cid, (x) => x.filter((y) => y.id !== m.id)); setLeavingMsgs((l) => l.filter((i) => i !== m.id)); }, 200);
+    }
+    try {
+      const r = await fetch(`/api/messages?id=${m.id}&scope=${scope}`, { method: "DELETE" });
+      if (!r.ok) throw new Error();
+      scheduleConvs();
+    } catch {
+      toast("Gagal menghapus pesan");
+      const list = await fetchMsgs(cid);
+      if (list && activeRef.current === cid) setMsgs((p) => mergePending(list, p));
+    }
+  }, [mutate, scheduleConvs, toast]);
+
+  const askDelete = useCallback((m: Msg) => {
+    if (m.status === "failed") { // belum sampai ke server: cukup buang dari layar
+      setLeavingMsgs((l) => [...l, m.id]);
+      setTimeout(() => { mutate(m.conversation_id, (x) => x.filter((y) => y.id !== m.id)); setLeavingMsgs((l) => l.filter((i) => i !== m.id)); }, 200);
+      return;
+    }
+    const mine = m.sender_id === meRef.current.id && !m.deleted_at;
+    const actions: DialogAction[] = [];
+    if (mine) actions.push({ label: "Hapus untuk semua orang", danger: true, run: () => deleteMsg(m, "all") });
+    actions.push({ label: "Hapus untuk saya", danger: !mine, run: () => deleteMsg(m, "me") });
+    setDialog({ title: "Hapus pesan?", text: mine ? "Hapus untuk semua orang akan menghilangkan pesan ini dari semua anggota percakapan." : undefined, actions });
+  }, [deleteMsg, mutate]);
+
+  const copyMsg = useCallback(async (m: Msg) => {
+    try { await navigator.clipboard.writeText(m.body); toast("Pesan disalin"); } catch { toast("Gagal menyalin"); }
+  }, [toast]);
+
+  const openMsgMenu = useCallback((m: Msg, x: number, y: number) => {
+    const items: MenuItem[] = [];
+    const ok = !m.deleted_at && m.status !== "failed";
+    if (m.status === "failed") items.push({ icon: "send", label: "Kirim ulang", run: () => retry(m) });
+    if (ok) items.push({ icon: "reply", label: "Balas", run: () => { setReplyTo(m); taRef.current?.focus(); } });
+    if (!m.deleted_at) items.push({ icon: "copy", label: "Salin", run: () => copyMsg(m) });
+    items.push({ icon: "trash", label: "Hapus", danger: true, run: () => askDelete(m) });
+    setMenu({ ...placeMenu(x, y, items.length), items });
+  }, [retry, copyMsg, askDelete]);
+
+  // ---------- hapus / bersihkan chat ----------
+  const runConvDelete = useCallback(async (c: Conv, mode: "clear" | "delete") => {
+    try {
+      const r = await fetch(`/api/conversations?id=${c.id}&mode=${mode}`, { method: "DELETE" });
+      if (!r.ok) throw new Error();
+    } catch { toast("Gagal menghapus chat"); return; }
+    delete cache.current[c.id];
+    if (mode === "delete" && (c.kind === "dm" || c.kind === "group")) {
+      setLeaving((l) => [...l, c.id]);
+      setTimeout(() => {
+        setConvs((l) => l && l.filter((x) => x.id !== c.id));
+        setLeaving((l) => l.filter((x) => x !== c.id));
+        if (activeRef.current === c.id) closeChat();
+      }, 230);
+      toast(c.kind === "group" ? "Kamu keluar dari grup" : "Chat dihapus");
+    } else {
+      setConvs((l) => l && l.map((x) => (x.id === c.id
+        ? { ...x, last_body: null, last_at: null, last_kind: null, last_username: null, last_deleted: false, unread: 0, unread_mention: false } : x)));
+      if (activeRef.current === c.id) setMsgs([]);
+      toast("Chat dibersihkan");
+    }
+  }, [closeChat, toast]);
+
+  const askConv = useCallback((c: Conv, mode: "clear" | "delete") => {
+    const name = convName(c);
+    if (mode === "clear")
+      setDialog({ title: "Bersihkan chat?", text: "Semua pesan di chat ini dihapus dari akunmu. Orang lain tetap melihat pesannya.",
+        actions: [{ label: "Bersihkan chat", danger: true, run: () => runConvDelete(c, "clear") }] });
+    else if (c.kind === "group")
+      setDialog({ title: `Keluar dari “${name}”?`, text: "Kamu tidak akan menerima pesan grup ini lagi.",
+        actions: [{ label: "Keluar grup", danger: true, run: () => runConvDelete(c, "delete") }] });
+    else
+      setDialog({ title: `Hapus chat dengan ${name}?`, text: "Riwayat pesan dihapus dari akunmu. Chat muncul lagi kalau ada pesan baru.",
+        actions: [{ label: "Hapus chat", danger: true, run: () => runConvDelete(c, "delete") }] });
+  }, [runConvDelete]);
+
+  const convItems = useCallback((c: Conv): MenuItem[] => {
+    const items: MenuItem[] = [{ icon: "trash", label: "Bersihkan chat", run: () => askConv(c, "clear") }];
+    if (c.kind === "dm") items.push({ icon: "trash", label: "Hapus chat", danger: true, run: () => askConv(c, "delete") });
+    if (c.kind === "group") items.push({ icon: "logout", label: "Keluar grup", danger: true, run: () => askConv(c, "delete") });
+    return items;
+  }, [askConv]);
+
+  const openConvMenu = useCallback((c: Conv, x: number, y: number) => {
+    const items = convItems(c);
+    setMenu({ ...placeMenu(x, y, items.length), items });
+  }, [convItems]);
 
   async function showInfo() {
     if (!active) return;
     setInfo(true);
     if (active.kind !== "ai") {
-      const r = await fetch(`/api/members?conversationId=${active.id}`);
-      if (r.ok) setMembers(await r.json());
+      try { const r = await fetch(`/api/members?conversationId=${active.id}`); if (r.ok) setMembers(await r.json()); } catch {}
     }
+  }
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    window.location.assign("/sign-in");
   }
 
   const list = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return convs.filter((c) => {
+    return (convs ?? []).filter((c) => {
       if (c.kind !== "ai" && tab === "dm" && c.kind !== "dm") return false;
       if (c.kind !== "ai" && tab === "group" && c.kind === "dm") return false;
       if (c.kind === "ai" && tab !== "all") return false;
@@ -173,13 +451,7 @@ export default function Chat({ me, pusherKey, pusherCluster }: { me: Me; pusherK
 
   const subtitle = (c: Conv) =>
     c.kind === "dm" ? `@${c.other_username}` : c.kind === "ai" ? "Asisten AI · selalu online" : `${c.member_count} anggota`;
-  const preview = (c: Conv) => {
-    if (!c.last_body) return c.kind === "ai" ? "Tanya apa saja ke Kev-Ai" : "Belum ada pesan";
-    const who = c.last_kind === "ai" ? "Kev-Ai" : c.last_username === me.username ? "Kamu" : c.last_username;
-    return c.kind === "dm" || c.kind === "ai" ? (c.last_username === me.username ? `Kamu: ${c.last_body}` : c.last_body) : `${who}: ${c.last_body}`;
-  };
-
-  const waiting = active && aiWait.includes(active.id);
+  const groupLike = !!active && active.kind !== "dm" && active.kind !== "ai";
 
   return (
     <div className="app" data-chat={active ? "open" : "list"}>
@@ -188,7 +460,7 @@ export default function Chat({ me, pusherKey, pusherCluster }: { me: Me; pusherK
           <div className="brand"><Logo /><div><strong>kevsoft-chat</strong><small>@{me.username}</small></div></div>
           <div className="bar-actions">
             <button className="icon-btn" onClick={() => setShowNew(true)} aria-label="Chat baru"><Icon n="edit" /></button>
-            <Account name={me.name} username={me.username} avatar={me.avatarUrl} />
+            <button className="account-btn" onClick={() => setProfile(true)} aria-label="Profil dan pengaturan"><Avatar name={me.name} src={me.avatarUrl} size={40} /></button>
           </div>
         </header>
         <div className="search"><Icon n="search" size={18} /><input placeholder="Cari chat" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari chat" /></div>
@@ -198,114 +470,74 @@ export default function Chat({ me, pusherKey, pusherCluster }: { me: Me; pusherK
           ))}
         </div>
         <ul className="convs">
-          {list.length === 0 && <li className="empty">Tidak ada chat. Tekan ✎ untuk mulai chat atau buat grup.</li>}
+          {convs === null && Array.from({ length: 6 }, (_, i) => (
+            <li key={i} className="skel-row"><span className="skel av" /><span className="skel-lines"><i className="skel" /><i className="skel" /></span></li>
+          ))}
+          {convs !== null && list.length === 0 && <li className="empty">Tidak ada chat. Tekan ✎ untuk mulai chat atau buat grup.</li>}
           {list.map((c) => (
-            <li key={c.id}>
-              <button className={`conv${active?.id === c.id ? " on" : ""}${c.kind === "ai" ? " ai" : ""}`} onClick={() => open(c)}>
-                <Avatar name={convName(c)} src={c.other_avatar} kind={c.kind === "dm" ? undefined : c.kind} />
-                <span className="meta">
-                  <span className="row">
-                    <b>{convName(c)}{c.kind === "ai" && <em className="badge">AI</em>}</b>
-                    {c.last_at && <small className={c.unread ? "hot" : ""}>{listTime(c.last_at)}</small>}
-                  </span>
-                  <span className="row">
-                    <span className="preview">{preview(c)}</span>
-                    {c.unread > 0 && <span className="count">{c.unread_mention && <i>@</i>}{c.unread > 99 ? "99+" : c.unread}</span>}
-                  </span>
-                </span>
-              </button>
-            </li>
+            <ConvItem key={c.id} c={c} on={activeId === c.id} leaving={leaving.includes(c.id)} meUsername={me.username} onOpen={open} onMenu={openConvMenu} />
           ))}
         </ul>
+        {profile && (
+          <Profile me={me} onClose={() => setProfile(false)} onToast={toast} onLogout={logout}
+            onUpdate={(p) => setMe((x) => ({ ...x, ...p }))} />
+        )}
       </aside>
 
       <section className="main">
         {active ? (
           <>
             <header className="bar">
-              <button className="icon-btn back" onClick={() => { setActive(null); activeId.current = null; }} aria-label="Kembali"><Icon n="back" /></button>
+              <button className="icon-btn back" onClick={closeChat} aria-label="Kembali"><Icon n="back" /></button>
               <button className="who" onClick={showInfo}>
                 <Avatar name={convName(active)} src={active.other_avatar} kind={active.kind === "dm" ? undefined : active.kind} size={42} />
                 <div><strong>{convName(active)}</strong><small>{waiting ? "sedang mengetik…" : subtitle(active)}</small></div>
               </button>
-              <button className="icon-btn" onClick={showInfo} aria-label="Info"><Icon n="info" /></button>
+              <button className="icon-btn" aria-label="Menu chat"
+                onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); const items: MenuItem[] = [{ icon: "info", label: "Info", run: showInfo }, ...convItems(active)]; setMenu({ ...placeMenu(r.right - 220, r.bottom + 6, items.length), items }); }}>
+                <Icon n="more" />
+              </button>
             </header>
 
-            <div className="thread">
-              {msgs.length >= 50 && <button className="older" onClick={older}>Muat pesan sebelumnya</button>}
-              {active.kind === "ai" && msgs.length === 0 && (
+            <div className="thread" ref={thread} onScroll={onScroll}>
+              {loading && <div className="thread-skel" aria-hidden>{[0, 1, 0, 1, 0].map((r, i) => <i key={i} className={`skel ${r ? "r" : ""}`} style={{ width: `${38 + ((i * 17) % 30)}%` }} />)}</div>}
+              {!loading && msgs.length >= 50 && !noMore && <button className="older" onClick={older}>Muat pesan sebelumnya</button>}
+              {active.kind === "ai" && !loading && msgs.length === 0 && (
                 <div className="hero-note"><Icon n="sparkle" size={28} /><h3>Halo, aku Kev-Ai</h3><p>Tulis pertanyaan apa saja. Di grup atau komunitas, panggil aku dengan <b>@kev-ai</b> diikuti pertanyaanmu.</p></div>
               )}
               {msgs.map((m, i) => {
                 const prev = msgs[i - 1];
                 const newDay = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
-                const mine = m.sender_id === me.id;
                 const first = newDay || !prev || prev.sender_id !== m.sender_id || prev.kind !== m.kind;
-                const showName = !mine && first && active.kind !== "dm" && active.kind !== "ai";
+                const mine = m.sender_id === me.id;
                 return (
-                  <div key={m.id}>
-                    {newDay && <div className="day"><span>{dayLabel(m.created_at)}</span></div>}
-                    <div className={`msg ${mine ? "mine" : ""} ${m.kind === "ai" ? "ai" : ""} ${first ? "first" : ""}`}>
-                      {!mine && active.kind !== "dm" && active.kind !== "ai" && (
-                        <span className="msg-av">{first && <Avatar name={m.name || m.username || "?"} src={m.avatar_url} kind={m.kind === "ai" ? "ai" : undefined} size={30} />}</span>
-                      )}
-                      <div className="bubble">
-                        {showName && <span className="sender" style={{ color: m.kind === "ai" ? "var(--violet)" : nameColor(m.username || "") }}>
-                          {m.kind === "ai" ? "Kev-Ai" : m.name}<small> @{m.username}</small>{m.kind === "ai" && <em className="badge">AI</em>}
-                        </span>}
-                        {m.reply_to && (m.reply_body != null) && (
-                          <div className="quote"><b>{m.reply_username === me.username ? "Kamu" : m.reply_username === AI_HANDLE ? "Kev-Ai" : `@${m.reply_username}`}</b><span>{m.reply_body}</span></div>
-                        )}
-                        <span className="text"><Rich body={m.body} mentions={m.mentions} me={me.username} /></span>
-                        <span className="foot"><small>{clock(m.created_at)}</small>
-                          <button className="reply-btn" onClick={() => { setReplyTo(m); ta.current?.focus(); }} aria-label="Balas"><Icon n="reply" size={14} /></button>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  <MessageRow key={m.id} m={m} mine={mine} first={first} newDay={newDay}
+                    showName={!mine && first && groupLike} showAv={!mine && groupLike} meUsername={me.username}
+                    fresh={fresh.current.has(m.id)} leaving={leavingMsgs.includes(m.id)} onMenu={openMsgMenu} onRetry={retry} />
                 );
               })}
               {waiting && <div className="msg ai first"><div className="bubble typing"><i /><i /><i /></div></div>}
-              <div ref={bottom} />
             </div>
 
-            <div className="composer-wrap">
-              {mentionQ !== null && sugs.length > 0 && (
-                <ul className="sugs" role="listbox">
-                  {sugs.map((s, i) => (
-                    <li key={s.username}>
-                      <button role="option" aria-selected={i === sugIdx} className={i === sugIdx ? "on" : ""} onMouseDown={(e) => { e.preventDefault(); pick(s); }}>
-                        <Avatar name={s.name} src={s.avatar_url} kind={s.ai ? "ai" : undefined} size={32} />
-                        <span><b>@{s.username}</b><small>{s.ai ? "Panggil AI. Tulis pertanyaan setelah tag" : s.name}</small></span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {replyTo && (
-                <div className="replying"><div><b>Membalas {replyTo.sender_id === me.id ? "kamu" : replyTo.kind === "ai" ? "Kev-Ai" : `@${replyTo.username}`}</b><span>{replyTo.body.slice(0, 100)}</span></div>
-                  <button className="icon-btn" onClick={() => setReplyTo(null)} aria-label="Batal balas"><Icon n="close" size={18} /></button></div>
-              )}
-              {aiHint && <div className="ai-hint"><Icon n="sparkle" size={16} /><span>Kev-Ai akan menjawab: <b>{aiPrompt(text) || "tulis pertanyaanmu…"}</b></span></div>}
-              {err && <p className="error" role="alert">{err}</p>}
-              <form className="composer" onSubmit={(e) => { e.preventDefault(); send(); }}>
-                <textarea ref={ta} rows={1} value={text} maxLength={4000} aria-label="Pesan"
-                  placeholder={active.kind === "ai" ? "Tanya Kev-Ai apa saja…" : "Ketik pesan, @ untuk tag, @kev-ai untuk AI"}
-                  onChange={(e) => { setText(e.target.value); detectMention(e.target.value, e.target.selectionStart ?? e.target.value.length);
-                    e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px"; }}
-                  onKeyDown={onKey}
-                  onClick={(e) => detectMention(text, e.currentTarget.selectionStart ?? 0)} />
-                <button className="send" disabled={!text.trim()} aria-label="Kirim"><Icon n="send" size={20} /></button>
-              </form>
-            </div>
+            {away && (
+              <button className="jump" onClick={toBottom} aria-label="Ke pesan terbaru">
+                <Icon n="down" size={22} />{newBelow > 0 && <b>{newBelow > 99 ? "99+" : newBelow}</b>}
+              </button>
+            )}
+
+            <Composer convId={active.id} kind={active.kind} me={me.username} replyTo={replyTo}
+              onCancelReply={() => setReplyTo(null)} onSend={send} taRef={taRef} />
 
             {info && (
               <aside className="info">
                 <header><button className="icon-btn" onClick={() => setInfo(false)} aria-label="Tutup"><Icon n="close" /></button><strong>Info</strong></header>
                 <div className="info-hero">
-                  <Avatar name={convName(active)} src={active.other_avatar} kind={active.kind === "dm" ? undefined : active.kind} size={96} />
+                  <button className="zoomable" disabled={!active.other_avatar || active.kind !== "dm"} onClick={() => active.other_avatar && setZoom(active.other_avatar)} aria-label="Perbesar foto">
+                    <Avatar name={convName(active)} src={active.other_avatar} kind={active.kind === "dm" ? undefined : active.kind} size={96} />
+                  </button>
                   <h2>{convName(active)}</h2>
                   <p className="muted">{active.kind === "dm" ? `@${active.other_username}` : subtitle(active)}</p>
+                  {active.kind === "dm" && active.other_bio && <p className="desc">{active.other_bio}</p>}
                   {active.description && <p className="desc">{active.description}</p>}
                   {active.kind === "ai" && <p className="desc">Kev-Ai menjawab lewat kev-ai.vercel.app. Di grup, panggil dengan @kev-ai lalu tulis pertanyaannya.</p>}
                 </div>
@@ -315,12 +547,17 @@ export default function Chat({ me, pusherKey, pusherCluster }: { me: Me; pusherK
                     <ul className="members">
                       {members.map((u) => (
                         <li key={u.id}><Avatar name={u.name || u.username} src={u.avatar_url} size={38} />
-                          <span><b>{u.name || u.username}{u.id === me.id && " (kamu)"}</b><small>@{u.username}</small></span>
+                          <span><b>{u.name || u.username}{u.id === me.id && " (kamu)"}</b><small>{u.bio || `@${u.username}`}</small></span>
                           {u.role === "admin" && <em className="badge">admin</em>}</li>
                       ))}
                     </ul>
                   </>
                 )}
+                <div className="info-actions">
+                  <button onClick={() => askConv(active, "clear")}><Icon n="trash" size={18} />Bersihkan chat</button>
+                  {active.kind === "dm" && <button className="danger" onClick={() => askConv(active, "delete")}><Icon n="trash" size={18} />Hapus chat</button>}
+                  {active.kind === "group" && <button className="danger" onClick={() => askConv(active, "delete")}><Icon n="logout" size={18} />Keluar grup</button>}
+                </div>
               </aside>
             )}
           </>
@@ -334,6 +571,10 @@ export default function Chat({ me, pusherKey, pusherCluster }: { me: Me; pusherK
       </section>
 
       {showNew && <NewChat onClose={() => setShowNew(false)} onCreated={openById} />}
+      {menu && <Menu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
+      {dialog && <Dialog title={dialog.title} text={dialog.text} actions={dialog.actions} onClose={() => setDialog(null)} />}
+      {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
+      {toastText && <div className="toast" role="status">{toastText}</div>}
     </div>
   );
 }

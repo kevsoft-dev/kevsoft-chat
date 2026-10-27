@@ -50,3 +50,24 @@ Deploy ke Vercel: import repo, sertakan `config.json` (file ini di-gitignore, ja
 - Content-Security-Policy (perlu disesuaikan dengan domain Firebase dan Pusher).
 - Status dibaca/centang, indikator mengetik, grup, kirim gambar (storage + signed URL).
 - E2EE (Web Crypto / libsodium) jika dibutuhkan; saat ini pesan terenkripsi TLS dan at-rest di Neon, tetapi tidak E2EE.
+
+---
+
+## Pembaruan v2: ringan, hapus chat, profil lengkap
+
+**Cepat dan ringan**
+- Kirim pesan **optimistik**: pesan langsung muncul (ikon jam), lalu menjadi centang saat server menjawab. Kalau gagal tampil "Gagal, ulangi" (tekan untuk kirim ulang, otomatis dicoba lagi saat online). Kirim ulang aman karena ID dibuat di klien (idempoten).
+- Server membalas setelah **1 query** (cek anggota + validasi tag + simpan). Siaran realtime dan Kev-Ai dikerjakan setelah respons terkirim.
+- Mengetik tidak me-render ulang daftar pesan (komposer terpisah, baris pesan `memo`). Daftar chat diperbarui lokal dari event Pusher, tidak refetch tiap pesan. Pesan chat yang pernah dibuka di-cache jadi pindah chat langsung tampil.
+- Dibuang: lapisan noise layar penuh dan semua `backdrop-filter` (blur) yang berat di HP. Animasi hanya `transform`/`opacity`. Ada saklar **Animasi** di Profil dan otomatis patuh `prefers-reduced-motion`.
+- Saran: pastikan region fungsi Vercel sama dengan region database Neon (Project Settings -> Functions -> Region) supaya tiap query tidak menyeberang benua.
+
+**Hapus**
+- Pesan: tekan lama (HP) / klik kanan atau panah (desktop) -> *Hapus untuk saya* atau *Hapus untuk semua orang* (hanya pesan sendiri; yang lain melihat "Pesan ini telah dihapus").
+- Chat: menu titik tiga di header, tekan lama / klik kanan di daftar chat, atau panel Info -> *Bersihkan chat*, *Hapus chat* (DM; muncul lagi kalau ada pesan baru), *Keluar grup*. Chat Kev-Ai dan Komunitas hanya bisa dibersihkan.
+
+**Profil dan pengaturan** (ketuk foto kamu di kiri atas)
+- Ganti/hapus foto profil (dipotong persegi dan dikecilkan di browser, disimpan di Neon dan disajikan lewat `/api/avatar/<id>` dengan cache panjang), edit nama, edit info/bio, salin username, lihat email.
+- Tema, suara pesan, Enter untuk kirim, hemat animasi.
+
+**Migrasi database**: otomatis saat halaman pertama dibuka setelah deploy (kolom `deleted_at`, `hidden_by`, `cleared_at`, `hidden_at` dan tabel `user_avatars`). `schema.sql` sudah diperbarui kalau mau menempel manual di Neon.

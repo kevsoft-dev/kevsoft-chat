@@ -8,11 +8,35 @@ const schema = z.object({
   name: z.string().trim().min(1).max(40).optional(),
 });
 
+const noCtl = (s: string) => !/[\u0000-\u001f\u007f]/.test(s);
+const patchSchema = z.object({
+  name: z.string().trim().min(1, "Nama tidak boleh kosong").max(40, "Maksimal 40 karakter").refine(noCtl, "Karakter tidak valid").optional(),
+  bio: z.string().trim().max(140, "Maksimal 140 karakter").refine((s) => !/[\u0000-\u0008\u000b-\u001f\u007f]/.test(s), "Karakter tidak valid").optional(),
+});
+
 export async function GET() {
   const uid = await getUserId();
   if (!uid) return new Response("Unauthorized", { status: 401 });
-  const [u] = await sql`select id, username, name, avatar_url from users where id = ${uid}`;
+  const [u] = await sql`select id, username, name, avatar_url, bio, email from users where id = ${uid}`;
   return Response.json(u ?? null);
+}
+
+// Edit profil: nama tampilan dan info/bio. Username tidak bisa diganti.
+export async function PATCH(req: Request) {
+  const uid = await getUserId();
+  if (!uid) return new Response("Unauthorized", { status: 401 });
+  const parsed = patchSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: parsed.error.issues[0]?.message || "Data tidak valid" }, { status: 400 });
+  const { name, bio } = parsed.data;
+  if (name === undefined && bio === undefined) return Response.json({ error: "Tidak ada perubahan" }, { status: 400 });
+
+  const [u] = await sql`
+    update users set
+      name = coalesce(${name ?? null}::text, name),
+      bio = case when ${bio ?? null}::text is null then bio else ${bio ?? null}::text end
+    where id = ${uid}
+    returning id, username, name, avatar_url, bio`;
+  return Response.json(u);
 }
 
 // Set username (sekali, setelah login pertama).

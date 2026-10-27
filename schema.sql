@@ -11,6 +11,13 @@ alter table users add column if not exists username text;
 alter table users add column if not exists bio text;
 create unique index if not exists users_username_key on users (lower(username));
 
+create table if not exists user_avatars (
+  user_id text primary key references users(id) on delete cascade,
+  mime text not null,
+  data text not null,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists conversations (
   id uuid primary key default gen_random_uuid(),
   title text,
@@ -29,6 +36,8 @@ create table if not exists conversation_members (
 alter table conversation_members add column if not exists role text not null default 'member';
 alter table conversation_members add column if not exists last_read_at timestamptz not null default now();
 alter table conversation_members add column if not exists joined_at timestamptz not null default now();
+alter table conversation_members add column if not exists cleared_at timestamptz;
+alter table conversation_members add column if not exists hidden_at timestamptz;
 create index if not exists members_user_idx on conversation_members (user_id);
 
 create table if not exists messages (
@@ -41,6 +50,8 @@ create table if not exists messages (
 alter table messages add column if not exists kind text not null default 'user';
 alter table messages add column if not exists reply_to uuid references messages(id) on delete set null;
 alter table messages add column if not exists mentions text[] not null default '{}';
+alter table messages add column if not exists deleted_at timestamptz;
+alter table messages add column if not exists hidden_by text[] not null default '{}';
 create index if not exists messages_conv_idx on messages (conversation_id, created_at desc);
 
 create table if not exists otp_codes (

@@ -27,10 +27,10 @@ export default async function Home() {
   if (!uid) redirect("/sign-in");
   const userId = uid as string;
 
-  let user: { id: string; username: string | null; name: string | null; avatar_url: string | null } | undefined;
+  let user: { id: string; username: string | null; name: string | null; avatar_url: string | null; bio: string | null; email: string | null } | undefined;
   try {
     await ensureSchema();
-    [user] = (await sql`select id, username, name, avatar_url from users where id = ${userId}`) as any;
+    [user] = (await sql`select id, username, name, avatar_url, bio, email from users where id = ${userId}`) as any;
     if (user?.username) await ensureDefaults(userId);
   } catch (e: any) {
     return <Problem text={String(e?.message ?? e)} />;
@@ -39,7 +39,7 @@ export default async function Home() {
   if (!user?.username) return <Onboarding suggestedName={user?.name ?? ""} />;
   return (
     <Chat
-      me={{ id: user.id, username: user.username, name: user.name ?? user.username, avatarUrl: user.avatar_url }}
+      me={{ id: user.id, username: user.username, name: user.name ?? user.username, avatarUrl: user.avatar_url || null, bio: user.bio, email: user.email }}
       pusherKey={cfg.pusher.key}
       pusherCluster={cfg.pusher.cluster}
     />

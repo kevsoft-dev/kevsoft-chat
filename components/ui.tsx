@@ -1,18 +1,21 @@
+"use client";
+import { useRef } from "react";
 import { AI_HANDLE, LOGO, mentionRegex } from "@/lib/mentions";
 
-export type Me = { id: string; username: string; name: string; avatarUrl?: string | null };
+export type Me = { id: string; username: string; name: string; avatarUrl?: string | null; bio?: string | null; email?: string | null };
 export type Conv = {
   id: string; kind: "dm" | "group" | "community" | "ai"; title: string | null; description: string | null;
-  other_id: string | null; other_username: string | null; other_name: string | null; other_avatar: string | null;
+  other_id: string | null; other_username: string | null; other_name: string | null; other_avatar: string | null; other_bio: string | null;
   member_count: number; last_body: string | null; last_at: string | null; last_kind: string | null;
-  last_username: string | null; unread: number; unread_mention: boolean;
+  last_username: string | null; last_deleted: boolean; unread: number; unread_mention: boolean;
 };
 export type Msg = {
   id: string; conversation_id: string; sender_id: string | null; kind: "user" | "ai"; body: string; created_at: string;
   reply_to: string | null; mentions: string[]; username: string | null; name: string | null; avatar_url: string | null;
-  reply_body: string | null; reply_username: string | null;
+  reply_body: string | null; reply_username: string | null; deleted_at: string | null;
+  status?: "sending" | "sent" | "failed"; // hanya di klien (pesan yang baru dikirim)
 };
-export type UserLite = { id: string; username: string; name: string | null; avatar_url: string | null; role?: string };
+export type UserLite = { id: string; username: string; name: string | null; avatar_url: string | null; bio?: string | null; role?: string };
 
 export const convName = (c: Conv) => (c.kind === "dm" ? c.other_name || c.other_username || "Pengguna" : c.title || "Grup");
 export const hue = (s: string) => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
@@ -34,8 +37,21 @@ const P: Record<string, string> = {
   down: "m6 9 6 6 6-6",
   sun: "M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4",
   moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z",
+  more: "M12 5h.01M12 12h.01M12 19h.01",
+  trash: "M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5",
+  copy: "M9 9h11v11H9ZM5 15V4h11",
+  camera: "M3 8h4l2-3h6l2 3h4v12H3ZM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
+  logout: "M9 21H5V3h4M16 17l5-5-5-5M21 12H9",
+  bell: "M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0",
+  clock: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 6v6l4 2",
+  alert: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 8v5M12 16h.01",
+  bolt: "M13 2 3 14h9l-1 8 10-12h-9Z",
+  user: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
+  block: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM5 5l14 14",
+  keyboard: "M3 6h18v12H3ZM7 10h.01M11 10h.01M15 10h.01M7 14h10",
 };
-export function Icon({ n, size = 20 }: { n: keyof typeof P; size?: number }) {
+export type IconName = keyof typeof P;
+export function Icon({ n, size = 20 }: { n: IconName; size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d={P[n]} />
@@ -48,7 +64,7 @@ export function Avatar({ name, src, kind, size = 48 }: { name: string; src?: str
   if (kind === "ai") return <span className="avatar ai" style={style}><Icon n="sparkle" size={size * 0.5} /></span>;
   if (kind === "community" || kind === "group")
     return <span className={`avatar ${kind}`} style={style}><Icon n="users" size={size * 0.48} /></span>;
-  if (src) return <img className="avatar" style={style} src={src} alt="" referrerPolicy="no-referrer" />;
+  if (src) return <img className="avatar" style={style} src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />;
   const h = hue(name);
   return (
     <span className="avatar" style={{ ...style, background: `linear-gradient(135deg, hsl(${h} 55% 38%), hsl(${(h + 40) % 360} 60% 28%))` }}>
@@ -106,4 +122,34 @@ export function listTime(d: string) {
 
 export function Logo({ size = 38 }: { size?: number }) {
   return <img className="brand-logo" src={LOGO} alt="kevsoft" width={size} height={size} style={{ width: size, height: size, borderRadius: size * 0.28 }} />;
+}
+
+// Tekan lama (HP) atau klik kanan (desktop) untuk membuka menu. wasLong() mencegah klik ikutan setelah tekan lama.
+export function useLongPress(cb: (x: number, y: number) => void, ms = 450) {
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const fired = useRef(false);
+  const lastFire = useRef(0);
+  const start = useRef({ x: 0, y: 0 });
+  const stop = () => clearTimeout(timer.current);
+  const fire = (x: number, y: number) => { fired.current = true; lastFire.current = performance.now(); cb(x, y); };
+  const bind = {
+    onTouchStart: (e: React.TouchEvent) => {
+      fired.current = false;
+      const p = e.touches[0];
+      start.current = { x: p.clientX, y: p.clientY };
+      timer.current = setTimeout(() => { navigator.vibrate?.(8); fire(start.current.x, start.current.y); }, ms);
+    },
+    onTouchMove: (e: React.TouchEvent) => {
+      const p = e.touches[0];
+      if (Math.abs(p.clientX - start.current.x) + Math.abs(p.clientY - start.current.y) > 10) stop();
+    },
+    onTouchEnd: stop,
+    onTouchCancel: stop,
+    onContextMenu: (e: React.MouseEvent) => {
+      e.preventDefault(); stop();
+      if (performance.now() - lastFire.current < 900) return; // Android memicu contextmenu setelah tekan lama
+      fire(e.clientX, e.clientY);
+    },
+  };
+  return { bind, wasLong: () => { const f = fired.current; fired.current = false; return f; } };
 }

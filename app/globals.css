@@ -6,7 +6,7 @@
   --glass:rgba(13,14,19,.9);--glass2:rgba(21,22,29,.97);--main-a:rgba(9,10,14,.9);--main-b:rgba(9,10,14,.94);
   --scrim:rgba(5,6,9,.7);--code:rgba(0,0,0,.35);--name-l:72%;
   --hero-soft:#b9bbc3;--hero-p:#b0b2bb;--grad-a:#ffffff;--grad-b:#d8d0ff;--grad-c:#a793ff;
-  --tag:#89e5ee;--tag-bg:rgba(137,229,238,.14);--shadow:var(--shadow);
+  --tag:#89e5ee;--tag-bg:rgba(137,229,238,.14);--shadow:rgba(0,0,0,.5);
   --font-body:"DM Sans",system-ui,sans-serif;--font-display:"Space Grotesk","DM Sans",sans-serif;
 }
 :root[data-theme="light"]{
@@ -24,8 +24,6 @@
 html,body{min-height:100%;margin:0}
 html{-webkit-text-size-adjust:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-body::before{content:"";position:fixed;inset:0;z-index:500;pointer-events:none;opacity:.025;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E")}
 ::selection{background:var(--acid);color:#11150c}
 h1,h2,h3,h4,.brand strong{font-family:var(--font-display);margin:0}
 button,input,textarea{font:inherit;color:inherit}
@@ -40,7 +38,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 /* Auth */
 .auth{min-height:100dvh;display:grid;place-items:center;padding:24px;
   background:radial-gradient(circle at 79% 30%,rgba(111,78,217,.22),transparent 36%),radial-gradient(circle at 12% 10%,rgba(109,219,230,.08),transparent 30%),var(--bg)}
-.auth-card{width:min(440px,100%);padding:34px;border:1px solid var(--line);border-radius:28px;background:var(--glass2);backdrop-filter:blur(18px);box-shadow:0 30px 80px var(--shadow)}
+.auth-card{width:min(440px,100%);padding:34px;border:1px solid var(--line);border-radius:28px;background:var(--glass2);box-shadow:0 30px 80px var(--shadow)}
 .auth-top{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-bottom:26px}
 .auth-top strong{font-family:var(--font-display);font-size:20px;letter-spacing:-.03em;margin-right:auto}
 .auth-card h1{font-size:34px;font-weight:500;letter-spacing:-.05em;line-height:1.05;margin-bottom:10px}
@@ -65,7 +63,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .main{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;
   background:linear-gradient(var(--main-a),var(--main-b)),
   linear-gradient(var(--fill) 1px,transparent 1px) 0 0/64px 64px,linear-gradient(90deg,var(--fill) 1px,transparent 1px) 0 0/64px 64px}
-.bar{display:flex;align-items:center;gap:12px;min-height:68px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass);backdrop-filter:blur(16px)}
+.bar{display:flex;align-items:center;gap:12px;min-height:68px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass);}
 .bar .brand{display:flex;align-items:center;gap:11px;margin-right:auto}
 .brand strong{display:block;font-size:19px;font-weight:600;letter-spacing:-.04em;line-height:1.1}
 .brand small,.who small{display:block;color:var(--muted);font-size:12px}
@@ -147,7 +145,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .composer textarea:focus{border-color:rgba(170,152,255,.6)}
 .send{display:grid;place-items:center;width:48px;height:48px;border:0;border-radius:50%;background:var(--acid);color:#11150c;flex-shrink:0;transition:transform .2s,opacity .2s}
 .send:hover:not(:disabled){transform:scale(1.07)}.send:disabled{opacity:.35;cursor:default}
-.sugs{position:absolute;left:clamp(10px,3vw,40px);bottom:calc(100% - 4px);z-index:20;list-style:none;margin:0;padding:6px;width:min(340px,calc(100% - 20px));border:1px solid var(--line);border-radius:18px;background:var(--glass2);backdrop-filter:blur(16px);box-shadow:0 20px 50px var(--shadow)}
+.sugs{position:absolute;left:clamp(10px,3vw,40px);bottom:calc(100% - 4px);z-index:20;list-style:none;margin:0;padding:6px;width:min(340px,calc(100% - 20px));border:1px solid var(--line);border-radius:18px;background:var(--glass2);box-shadow:0 20px 50px var(--shadow)}
 .sugs button{display:flex;align-items:center;gap:11px;width:100%;padding:8px 10px;border:0;border-radius:12px;background:transparent;text-align:left}
 .sugs button.on,.sugs button:hover{background:rgba(170,152,255,.16)}
 .sugs span{display:flex;flex-direction:column;min-width:0}.sugs b{font-family:var(--font-display);font-weight:500}
@@ -172,7 +170,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .members{list-style:none;margin:0;padding:4px 10px 20px}
 .members li{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:12px}
 .members li>span{display:flex;flex-direction:column;flex:1;min-width:0}.members small{color:var(--muted);font-size:12px}
-.modal-bg{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:16px;background:var(--scrim);backdrop-filter:blur(6px)}
+.modal-bg{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:16px;background:var(--scrim);}
 .modal{display:flex;flex-direction:column;gap:10px;width:min(460px,100%);max-height:86dvh;padding:20px;border:1px solid var(--line);border-radius:26px;background:var(--bg-soft);box-shadow:0 40px 100px var(--shadow)}
 .modal header{display:flex;align-items:center;justify-content:space-between}.modal h2{font-size:24px;font-weight:500;letter-spacing:-.04em}
 .modal .search{margin:0}.seg{display:flex;gap:8px}
@@ -186,8 +184,6 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 /* Mobile: daftar chat <-> percakapan */
 @media (max-width:760px){
   .app{grid-template-columns:1fr}
-  .app[data-chat="list"] .main{display:none}
-  .app[data-chat="open"] .side{display:none}
   .back{display:grid}
   .bubble{max-width:86%}
   .info{width:100%}
@@ -291,3 +287,157 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .google-main{margin-top:20px!important;min-height:52px;background:var(--fill)!important;border:1px solid var(--line)!important;font-weight:600}
 .google-main:hover:not(:disabled){background:var(--fill2)!important}
 .login-card .or{margin:16px 0 0}
+
+/* ===================== v2: ringan + animasi ===================== */
+:root{--ease:cubic-bezier(.22,.8,.22,1)}
+@keyframes fade{from{opacity:0}}
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.97)}}
+@keyframes sheet{from{transform:translateY(100%)}}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.96)}}
+@keyframes menu{from{opacity:0;transform:scale(.92)}}
+@keyframes slideL{from{transform:translateX(-24px);opacity:0}}
+@keyframes out{0%{max-height:90px;opacity:1}100%{max-height:0;opacity:0;transform:translateX(-26px)}}
+@keyframes shimmer{to{background-position:-200% 0}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes toast{from{opacity:0;transform:translate(-50%,12px)}}
+@keyframes zoomIn{from{opacity:0;transform:scale(.88)}}
+
+/* Geser antar daftar chat dan percakapan di HP (hanya transform, ringan) */
+@media (max-width:760px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+  .side,.main{grid-area:1/1}
+  .main{transform:translateX(100%);visibility:hidden;transition:transform .3s var(--ease),visibility 0s .3s}
+  .app[data-chat="open"] .main{transform:none;visibility:visible;transition-delay:0s}
+  .side{transition:transform .3s var(--ease),visibility 0s}
+  .app[data-chat="open"] .side{transform:translateX(-22%);visibility:hidden;transition:transform .3s var(--ease),visibility 0s .3s}
+}
+.side{position:relative;overflow:hidden}
+
+/* Pesan baru muncul halus; animasi hanya untuk pesan yang baru ditambahkan */
+.row-wrap{flex-shrink:0}
+.row-wrap.leaving{overflow:hidden;animation:out .2s ease forwards}
+.msg.fresh .bubble{animation:pop .18s ease-out both;transform-origin:bottom left}
+.msg.mine.fresh .bubble{transform-origin:bottom right}
+@media (hover:hover){.bubble{padding-right:30px}}
+.bubble.gone{opacity:.8}
+.bubble.gone .text{display:inline-flex;align-items:center;gap:6px;font-style:italic;font-size:14px;opacity:.75}
+.bubble.failed{border-color:var(--err)}
+.foot{align-items:center}
+.st{display:inline-flex;align-items:center;gap:3px;opacity:.7}
+.st.sending svg{animation:spin 2.4s linear infinite;opacity:.6}
+.st.failed{padding:0;border:0;background:transparent;color:var(--err);opacity:1;font-size:11px;font-weight:600}
+.msg.mine .st.failed{color:#9b1c1c}
+.chev{position:absolute;top:3px;right:4px;display:none;place-items:center;width:24px;height:24px;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;opacity:.7}
+.chev:hover{background:rgba(0,0,0,.12);opacity:1}
+@media (hover:hover){.bubble:hover .chev{display:grid}}
+@media (hover:none){.bubble{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}}
+.preview.gone{font-style:italic;opacity:.8}
+
+/* Tombol kirim & lompat ke bawah */
+.send{transform:scale(.88);transition:transform .18s var(--ease),opacity .18s}
+.send.ready{transform:scale(1)}
+.send.ready:active{transform:scale(.92)}
+.jump{position:absolute;right:16px;bottom:92px;z-index:15;display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--line);border-radius:50%;background:var(--glass2);color:var(--ink);box-shadow:0 8px 24px var(--shadow);animation:pop .18s ease-out both}
+.jump b{position:absolute;top:-8px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--acid);color:#11150c;font-size:11px;line-height:20px;text-align:center}
+
+/* Menu, dialog, modal */
+.menu-bg{position:fixed;inset:0;z-index:119}
+.menu{position:fixed;left:var(--x);top:var(--y);z-index:120;min-width:210px;padding:6px;border:1px solid var(--line);border-radius:16px;background:var(--glass2);box-shadow:0 18px 48px var(--shadow);transform-origin:top left;animation:menu .14s ease-out both}
+.menu button{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:0;border-radius:10px;background:transparent;text-align:left;font-size:14.5px}
+.menu button:hover{background:var(--fill2)}
+.menu button.danger,.info-actions button.danger{color:var(--err)}
+.modal-bg{animation:fade .16s ease both}
+.modal{animation:rise .2s var(--ease) both}
+.modal-bg.center{align-items:center;padding:16px}
+.dialog{width:min(380px,100%);padding:22px;border:1px solid var(--line);border-radius:22px;background:var(--bg-soft);box-shadow:0 30px 80px var(--shadow);animation:rise .2s var(--ease) both}
+.dialog h3{font-size:19px;font-weight:500;letter-spacing:-.02em;margin-bottom:6px}
+.dialog p{margin:0 0 6px;color:var(--muted);font-size:14px}
+.dialog .acts{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.dialog .acts button{min-height:46px;border:1px solid var(--line);border-radius:14px;background:var(--fill);font-weight:500}
+.dialog .acts button:hover{background:var(--fill2)}
+.dialog .acts button.danger{color:var(--err)}
+.dialog .acts button.cancel{border-color:transparent;background:transparent;color:var(--muted)}
+.lightbox{position:fixed;inset:0;z-index:130;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.88);animation:fade .18s both}
+.lightbox .icon-btn{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;color:#fff}
+.lightbox img{max-width:min(92vw,520px);max-height:80dvh;border-radius:20px;object-fit:contain;animation:zoomIn .22s var(--ease) both}
+.toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));z-index:140;transform:translateX(-50%);padding:10px 18px;border-radius:999px;background:var(--ink);color:var(--bg);font-size:13.5px;font-weight:500;box-shadow:0 10px 30px var(--shadow);animation:toast .2s var(--ease) both;pointer-events:none}
+@media (max-width:760px){
+  .menu-bg{background:var(--scrim);animation:fade .18s both}
+  .menu{left:0;right:0;top:auto;bottom:0;border-radius:22px 22px 0 0;border-bottom:0;padding:10px 10px max(14px,env(safe-area-inset-bottom));transform-origin:bottom;animation:sheet .22s var(--ease) both}
+  .menu button{padding:14px 12px;font-size:16px}
+  .modal{animation-name:sheet}
+  .modal-bg.center .dialog{animation-name:rise}
+}
+
+/* Daftar chat: hapus + skeleton */
+.convs li{overflow:hidden;list-style:none}
+.convs li.leaving{animation:out .22s ease forwards}
+.skel{display:block;border-radius:10px;background:linear-gradient(90deg,var(--fill),var(--fill2),var(--fill));background-size:200% 100%;animation:shimmer 1.3s linear infinite}
+.skel-row{display:flex;align-items:center;gap:13px;padding:11px 10px}
+.skel.av{width:48px;height:48px;border-radius:50%;flex-shrink:0}
+.skel-lines{display:flex;flex-direction:column;gap:9px;flex:1}
+.skel-lines i{height:12px}.skel-lines i:first-child{width:46%}.skel-lines i:last-child{width:78%}
+.thread-skel{display:flex;flex-direction:column;gap:10px;padding:8px 0}
+.thread-skel .skel{height:38px;border-radius:18px 18px 18px 6px}
+.thread-skel .skel.r{align-self:flex-end;border-radius:18px 18px 6px 18px}
+
+/* Info kontak */
+.zoomable{padding:0;border:0;background:transparent;border-radius:50%}
+.zoomable:not(:disabled){cursor:zoom-in}
+.info-actions{display:flex;flex-direction:column;gap:6px;padding:10px 14px 24px}
+.info-actions button{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid var(--line);border-radius:14px;background:var(--fill);text-align:left}
+.info-actions button:hover{background:var(--fill2)}
+.members small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* Panel profil & pengaturan ala WhatsApp */
+.profile{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;background:var(--bg-soft);animation:slideL .26s var(--ease) both}
+.profile>header{display:flex;align-items:center;gap:14px;min-height:64px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));border-bottom:1px solid var(--line)}
+.profile>header strong{font-family:var(--font-display);font-size:19px;font-weight:500}
+.profile-body{flex:1;overflow-y:auto;padding:22px 14px 28px;overscroll-behavior:contain}
+.p-avatar{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:20px}
+.p-photo{position:relative;padding:0;border:0;border-radius:50%;background:transparent;overflow:hidden;width:152px;height:152px;transition:transform .2s var(--ease)}
+.p-photo:active{transform:scale(.97)}
+.p-photo .avatar{width:152px;height:152px}
+.p-over{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:rgba(0,0,0,.5);color:#fff;opacity:0;transition:opacity .2s}
+.p-over small{font-size:11px;letter-spacing:.04em}
+.p-photo:hover .p-over,.p-photo:focus-visible .p-over,.p-photo.busy .p-over{opacity:1}
+@media (hover:none){.p-over{opacity:1;background:linear-gradient(transparent 55%,rgba(0,0,0,.55));justify-content:flex-end;padding-bottom:12px}.p-over svg{display:none}}
+.p-photo.busy .avatar{animation:shimmer 1.2s linear infinite}
+.link{padding:6px 12px;border:0;border-radius:10px;background:transparent;font-size:13.5px}
+.link.danger{color:var(--err)}.link:hover{background:var(--fill)}
+.profile h4{padding:16px 6px 8px;color:var(--accent-text);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.card{border:1px solid var(--line);border-radius:18px;background:var(--surface);overflow:hidden}
+.pf{padding:12px 16px;border-bottom:1px solid var(--line)}
+.pf:last-child{border-bottom:0}
+.pf>small{display:block;margin-bottom:2px;color:var(--accent-text);font-size:12px}
+.pf>em{display:block;margin-top:2px;color:var(--dim);font-size:12px;font-style:normal}
+.pf-view{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:2px 0;border:0;background:transparent;text-align:left;font-size:15.5px;overflow-wrap:anywhere}
+.pf-view.static{cursor:default}
+.pf-view svg{flex-shrink:0;color:var(--muted)}
+.pf-view .ph{color:var(--dim)}
+.pf-view .draw path{stroke-dasharray:24;stroke-dashoffset:24;animation:draw .35s .05s forwards}
+.pf-edit{display:flex;align-items:flex-end;gap:8px;animation:fade .15s both}
+.pf-edit input,.pf-edit textarea{flex:1;min-width:0;padding:6px 0;border:0;border-bottom:2px solid var(--violet);background:transparent;outline:none;resize:none;font-size:15.5px}
+.pf-edit .cnt{align-self:center;color:var(--dim);font-size:11px}
+.pf-edit .icon-btn{width:36px;height:36px;flex-shrink:0;background:var(--acid);border-color:transparent;color:#11150c}
+.pf-edit .icon-btn:disabled{opacity:.4}
+.set{display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line)}
+.set:last-child{border-bottom:0}
+.set>svg{color:var(--muted);flex-shrink:0}
+.set>span{display:flex;flex-direction:column;flex:1;min-width:0}
+.set>span small{color:var(--muted);font-size:12px}
+.seg2{display:flex;padding:3px;border-radius:999px;background:var(--fill2)}
+.seg2 button{padding:5px 12px;border:0;border-radius:999px;background:transparent;color:var(--muted);font-size:13px;transition:background .2s,color .2s}
+.seg2 button.on{background:var(--acid);color:#11150c}
+.sw{position:relative;flex-shrink:0;width:46px;height:28px;padding:0;border:0;border-radius:999px;background:var(--fill2);transition:background .2s}
+.sw i{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.35);transition:transform .22s var(--ease)}
+.sw.on{background:var(--violet-deep)}
+.sw.on i{transform:translateX(18px)}
+.logout{display:flex;align-items:center;gap:12px;width:100%;margin-top:18px;padding:14px 16px;border:1px solid var(--line);border-radius:18px;background:var(--surface);color:var(--err)}
+.logout:hover{background:var(--fill)}
+.ver{margin:16px 0 0;text-align:center;color:var(--dim);font-size:12px}
+
+/* Hemat animasi: pilihan pengguna atau pengaturan sistem */
+:root[data-motion="off"] *,:root[data-motion="off"] *::before,:root[data-motion="off"] *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;transition-delay:0s!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;transition-delay:0s!important}}
