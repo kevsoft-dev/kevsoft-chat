@@ -2,6 +2,7 @@ import { randomInt } from "crypto";
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { hashOtp } from "@/lib/otp";
+import { ensureSchema } from "@/lib/migrate";
 
 const schema = z.object({ email: z.string().email().max(254) });
 
@@ -9,6 +10,7 @@ export async function POST(req: Request) {
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Email tidak valid" }, { status: 400 });
   const email = parsed.data.email.toLowerCase();
+  await ensureSchema();
 
   // Batas kirim ulang: 1x per 60 detik per email (tambahkan rate limit per IP di produksi).
   const [prev] = await sql`select sent_at from otp_codes where email = ${email}`;

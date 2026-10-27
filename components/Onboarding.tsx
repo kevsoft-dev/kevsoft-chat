@@ -1,11 +1,9 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { USERNAME_RE, RESERVED } from "@/lib/mentions";
 
 export default function Onboarding({ suggestedName }: { suggestedName: string }) {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [name, setName] = useState(suggestedName);
   const [err, setErr] = useState("");
@@ -18,7 +16,7 @@ export default function Onboarding({ suggestedName }: { suggestedName: string })
     const r = await fetch("/api/me", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: u, name }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { setErr(d.error || "Gagal menyimpan"); setBusy(false); return; }
-    router.refresh();
+    window.location.assign("/"); // muat ulang penuh, langsung masuk ke chat
   }
 
   return (
