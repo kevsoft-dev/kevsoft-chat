@@ -90,6 +90,7 @@ const P: Record<string, string> = {
   edit: "M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z",
   send: "m22 2-7 20-4-9-9-4Zm0 0L11 13",
   plus: "M12 5v14M5 12h14",
+  minus: "M5 12h14",
   back: "m15 18-6-6 6-6",
   close: "M18 6 6 18M6 6l12 12",
   sparkle: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9ZM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z",

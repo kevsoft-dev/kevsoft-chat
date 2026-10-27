@@ -3,42 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePref } from "@/lib/prefs";
 import { Avatar, Banner, Icon, RoleBadge, VerifiedBadge, isStaffRole, type Me } from "./ui";
 import { useTheme } from "./ThemeToggle";
-
-// Foto dipotong persegi dan diperkecil di browser (256px WebP/JPEG, ~10-30 KB) sebelum diunggah.
-async function toSquare(file: File, size = 256): Promise<Blob> {
-  let bmp: ImageBitmap;
-  try { bmp = await createImageBitmap(file, { imageOrientation: "from-image" }); }
-  catch { bmp = await createImageBitmap(file); }
-  const s = Math.min(bmp.width, bmp.height);
-  const cv = document.createElement("canvas");
-  cv.width = cv.height = size;
-  cv.getContext("2d")!.drawImage(bmp, (bmp.width - s) / 2, (bmp.height - s) / 2, s, s, 0, 0, size, size);
-  bmp.close?.();
-  const webp = await new Promise<Blob | null>((r) => cv.toBlob(r, "image/webp", 0.82));
-  if (webp && webp.type === "image/webp") return webp;
-  const jpg = await new Promise<Blob | null>((r) => cv.toBlob(r, "image/jpeg", 0.85));
-  if (!jpg) throw new Error("Gagal memproses foto");
-  return jpg;
-}
-
-// Banner dipotong rasio 3:1 dan diperkecil di browser (960x320 WebP/JPEG, ~30-80 KB) sebelum diunggah.
-async function toBanner(file: File, w = 960, h = 320): Promise<Blob> {
-  let bmp: ImageBitmap;
-  try { bmp = await createImageBitmap(file, { imageOrientation: "from-image" }); }
-  catch { bmp = await createImageBitmap(file); }
-  const ratio = w / h;
-  let sw = bmp.width, sh = bmp.width / ratio;
-  if (sh > bmp.height) { sh = bmp.height; sw = bmp.height * ratio; }
-  const cv = document.createElement("canvas");
-  cv.width = w; cv.height = h;
-  cv.getContext("2d")!.drawImage(bmp, (bmp.width - sw) / 2, (bmp.height - sh) / 2, sw, sh, 0, 0, w, h);
-  bmp.close?.();
-  const webp = await new Promise<Blob | null>((r) => cv.toBlob(r, "image/webp", 0.8));
-  if (webp && webp.type === "image/webp") return webp;
-  const jpg = await new Promise<Blob | null>((r) => cv.toBlob(r, "image/jpeg", 0.82));
-  if (!jpg) throw new Error("Gagal memproses foto");
-  return jpg;
-}
+import Cropper from "./Cropper";
 
 function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return <button type="button" role="switch" aria-checked={on} aria-label={label} className={`sw${on ? " on" : ""}`} onClick={() => onChange(!on)}><i /></button>;
@@ -167,14 +132,20 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
     } catch { return "Jaringan bermasalah, coba lagi"; }
   }
 
-  async function pickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  // Pilih file → editor potong (atur posisi/zoom) → Simpan mengunggah hasil potongan.
+  const [crop, setCrop] = useState<{ kind: "avatar" | "cover"; file: File } | null>(null);
+
+  function pickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
     if (!f.type.startsWith("image/")) { onToast("Pilih file gambar"); return; }
-    setBusy(true);
+    setCrop({ kind: "avatar", file: f });
+  }
+
+  async function uploadPhoto(blob: Blob) {
+    setCrop(null); setBusy(true);
     try {
-      const blob = await toSquare(f);
       setPreview(URL.createObjectURL(blob));
       const r = await fetch("/api/me/avatar", { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
       const d = await r.json().catch(() => ({}));
@@ -198,14 +169,17 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
     setBusy(false);
   }
 
-  async function pickCover(e: React.ChangeEvent<HTMLInputElement>) {
+  function pickCover(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
     if (!f.type.startsWith("image/")) { onToast("Pilih file gambar"); return; }
-    setCoverBusy(true);
+    setCrop({ kind: "cover", file: f });
+  }
+
+  async function uploadCover(blob: Blob) {
+    setCrop(null); setCoverBusy(true);
     try {
-      const blob = await toBanner(f);
       setCoverPreview(URL.createObjectURL(blob));
       const r = await fetch("/api/me/banner", { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
       const d = await r.json().catch(() => ({}));
@@ -301,6 +275,9 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
         <button className="logout" onClick={onLogout}><Icon n="logout" size={20} />Keluar</button>
         <p className="ver">kevsoft-chat</p>
       </div>
+      {crop && (crop.kind === "avatar"
+        ? <Cropper file={crop.file} aspect={1} outW={256} outH={256} round title="Atur foto profil" onCancel={() => setCrop(null)} onSave={uploadPhoto} />
+        : <Cropper file={crop.file} aspect={3} outW={960} outH={320} title="Atur foto sampul" onCancel={() => setCrop(null)} onSave={uploadCover} />)}
     </section>
   );
 }

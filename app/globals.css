@@ -636,3 +636,21 @@ h1 .vbadge,h2 .vbadge{width:.78em;height:.78em;min-width:18px;min-height:18px;ma
 .p-avatar.over-cover{margin-top:-62px;position:relative;z-index:3}
 .p-avatar.over-cover .p-photo{box-shadow:0 0 0 5px var(--bg)}
 .pub-body .cover-hero{padding-top:0}
+
+/* Editor potong foto */
+.crop-bg{z-index:120}
+.crop-modal{width:fit-content;max-width:100%;max-height:94dvh;align-items:center;overflow-y:auto}
+.crop-modal header{align-self:stretch}
+.crop-stage{position:relative;overflow:hidden;border-radius:14px;background:#000;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.crop-stage:active{cursor:grabbing}
+.crop-stage img{position:absolute;left:0;top:0;max-width:none;display:block;pointer-events:none;will-change:transform}
+.crop-mask{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 2px rgba(255,255,255,.75)}
+.crop-stage.round .crop-mask{inset:0;border-radius:50%;box-shadow:0 0 0 999px rgba(0,0,0,.6),inset 0 0 0 2px rgba(255,255,255,.85)}
+.crop-stage:not(.round) .crop-mask{background:linear-gradient(rgba(255,255,255,.28),rgba(255,255,255,.28)) 33.33% 0/1px 100% no-repeat,linear-gradient(rgba(255,255,255,.28),rgba(255,255,255,.28)) 66.66% 0/1px 100% no-repeat}
+.crop-hint{margin:0;text-align:center}
+.crop-zoom{display:flex;align-items:center;gap:10px;align-self:stretch;color:var(--muted)}
+.crop-zoom input{flex:1;accent-color:var(--acid)}
+.crop-actions{display:flex;gap:10px;align-self:stretch;margin-top:4px}
+.crop-actions button{flex:1;min-height:46px;border:1px solid var(--line);border-radius:14px;background:var(--fill);color:inherit;font-weight:500}
+.crop-actions .primary{border:0;background:var(--acid);color:#11150c;margin-top:0}
+.crop-actions button:disabled{opacity:.6}
