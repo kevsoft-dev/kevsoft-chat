@@ -1,7 +1,7 @@
 import { cfg } from "./lib/config";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const isPublic = createRouteMatcher(["/sign-in(.*)", "/sso-callback(.*)", "/api/auth/otp/(.*)"]);
+const isPublic = createRouteMatcher(["/sign-in(.*)", "/sso-callback(.*)", "/api/auth/otp/(.*)", "/api/health"]);
 
 export default clerkMiddleware(async (auth, req) => {
   if (!isPublic(req)) await auth.protect();
