@@ -531,3 +531,16 @@ button.crow-head:hover{background:var(--fill)}
 .sys-panel .field:focus{border-color:var(--violet)}
 .sys-panel .crow-act{margin-top:8px}
 @media (max-width:560px){.crow-act{flex-wrap:wrap}.crow-act .field{flex:1 1 100%}.console .field.sel{max-width:none}}
+
+/* Profil publik /{username} */
+.pub-profile{min-height:100dvh;display:flex;flex-direction:column;background:var(--bg-soft)}
+.pub-bar{display:flex;align-items:center;gap:14px;min-height:64px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));border-bottom:1px solid var(--line)}
+.pub-bar strong{flex:1;font-family:var(--font-display);font-size:19px;font-weight:500}
+.pub-body{flex:1;overflow-y:auto;padding-bottom:max(24px,env(safe-area-inset-bottom))}
+.primary-act{background:color-mix(in srgb,var(--violet) 22%,var(--fill))!important;border-color:var(--violet)!important;color:var(--accent-text)!important;font-weight:600}
+.av-btn{padding:0;border:0;background:transparent;border-radius:50%;cursor:pointer;display:grid;place-items:center}
+.av-btn:hover{opacity:.9}
+button.sender{display:block;width:100%;border:0;background:transparent;padding:0;margin:0 0 2px;text-align:left;font:inherit;cursor:pointer}
+button.sender:disabled{cursor:default}
+a.tag{text-decoration:none;color:inherit}
+a.tag:hover{text-decoration:underline}

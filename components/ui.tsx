@@ -110,7 +110,11 @@ function Tags({ text, mentions, me }: { text: string; mentions: string[]; me: st
     const handle = m[2].toLowerCase();
     if (!mentions.includes(handle)) continue;
     if (start > last) out.push(text.slice(last, start));
-    out.push(<span key={start} className={`tag ${handle === AI_HANDLE ? "ai" : handle === me ? "me" : ""}`}>@{m[2]}</span>);
+    if (handle === AI_HANDLE || handle === me) {
+      out.push(<span key={start} className={`tag ${handle === AI_HANDLE ? "ai" : "me"}`}>@{m[2]}</span>);
+    } else {
+      out.push(<a key={start} className="tag" href={`/${encodeURIComponent(m[2].toLowerCase())}`}>@{m[2]}</a>);
+    }
     last = start + 1 + m[2].length;
   }
   out.push(text.slice(last));

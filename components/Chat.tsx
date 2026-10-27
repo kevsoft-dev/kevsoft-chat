@@ -43,7 +43,7 @@ async function fetchMsgs(id: string): Promise<Msg[] | null> {
   } catch { return null; }
 }
 
-export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pusherKey: string; pusherCluster: string }) {
+export default function Chat({ me: me0, pusherKey, pusherCluster, openDm }: { me: Me; pusherKey: string; pusherCluster: string; openDm?: string }) {
   const [me, setMe] = useState<Me>(me0);
   const [convs, setConvs] = useState<Conv[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -256,6 +256,22 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
       if (d.id) await openById(d.id);
     } catch { toast("Jaringan bermasalah"); }
   }, [openById, toast]);
+
+  // Deep link /@username → buka DM sekali saat mount
+  const dmOpened = useRef(false);
+  useEffect(() => {
+    if (!openDm || dmOpened.current) return;
+    if (openDm.toLowerCase() === me0.username.toLowerCase()) return;
+    dmOpened.current = true;
+    openDmWith(openDm);
+    // bersihkan query di URL tanpa reload
+    try {
+      const u = new URL(window.location.href);
+      if (u.searchParams.has("dm") || u.pathname.startsWith("/@")) {
+        window.history.replaceState({}, "", "/");
+      }
+    } catch {}
+  }, [openDm, openDmWith, me0.username]);
 
   async function copyText(text: string, okMsg: string) {
     try {
@@ -639,7 +655,8 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
                 return (
                   <MessageRow key={m.id} m={m} mine={mine} first={first} newDay={newDay}
                     showName={!mine && first && groupLike} showAv={!mine && groupLike} meUsername={me.username}
-                    fresh={fresh.current.has(m.id)} leaving={leavingMsgs.includes(m.id)} onMenu={openMsgMenu} onRetry={retry} />
+                    fresh={fresh.current.has(m.id)} leaving={leavingMsgs.includes(m.id)} onMenu={openMsgMenu} onRetry={retry}
+                    onOpenProfile={(u) => { window.location.href = "/" + encodeURIComponent(u); }} />
                 );
               })}
               {waiting && <div className="msg ai first"><div className="bubble typing"><i /><i /><i /></div></div>}
@@ -670,6 +687,9 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
                 {/* Chat pribadi: tidak tampil daftar anggota — hanya profil lawan bicara + aksi */}
                 {active.kind === "dm" && active.other_id && (
                   <div className="info-contact-actions">
+                    <button type="button" onClick={() => active.other_username && (window.location.href = "/" + encodeURIComponent(active.other_username))}>
+                      <Icon n="user" size={18} />Lihat profil
+                    </button>
                     <button type="button" onClick={() => copyText("@" + (active.other_username || ""), "Username disalin")}>
                       <Icon n="copy" size={18} />Salin username
                     </button>
@@ -765,6 +785,9 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
             </div>
           </div>
           <div className="info-contact-actions">
+            <button type="button" onClick={() => { window.location.href = "/" + encodeURIComponent(viewUser.username); }}>
+              <Icon n="user" size={18} />Lihat profil
+            </button>
             {viewUser.id !== me.id && (
               <button type="button" onClick={() => openDmWith(viewUser.username)}>
                 <Icon n="chat" size={18} />Chat pribadi

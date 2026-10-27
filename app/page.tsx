@@ -50,11 +50,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
   if (!user || needUsername || needPassword || reset)
     return <Onboarding suggestedName={user?.name ?? ""} needUsername={needUsername} reset={reset} username={user?.username ?? ""} />;
 
+  const openDm = (sp.dm || "").toLowerCase().replace(/^@/, "").trim() || undefined;
+
   return (
     <Chat
       me={{ id: user.id, username: user.username as string, name: user.name ?? (user.username as string), avatarUrl: user.avatar_url || null, bio: user.bio, email: user.email, role: user.role }}
       pusherKey={cfg.pusher.key}
       pusherCluster={cfg.pusher.cluster}
+      openDm={openDm}
     />
   );
 }

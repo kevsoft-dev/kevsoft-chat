@@ -3,10 +3,11 @@ import { memo } from "react";
 import { AI_HANDLE } from "@/lib/mentions";
 import { Avatar, Icon, Rich, clock, dayLabel, nameColor, useLongPress, type Msg } from "./ui";
 
-export default memo(function MessageRow({ m, mine, first, newDay, showName, showAv, meUsername, fresh, leaving, onMenu, onRetry }: {
+export default memo(function MessageRow({ m, mine, first, newDay, showName, showAv, meUsername, fresh, leaving, onMenu, onRetry, onOpenProfile }: {
   m: Msg; mine: boolean; first: boolean; newDay: boolean; showName: boolean; showAv: boolean; meUsername: string;
   fresh: boolean; leaving: boolean;
   onMenu: (m: Msg, x: number, y: number) => void; onRetry: (m: Msg) => void;
+  onOpenProfile?: (username: string) => void;
 }) {
   const lp = useLongPress((x, y) => onMenu(m, x, y));
   const gone = !!m.deleted_at;
@@ -16,13 +17,20 @@ export default memo(function MessageRow({ m, mine, first, newDay, showName, show
       {newDay && <div className="day"><span>{dayLabel(m.created_at)}</span></div>}
       <div className={`msg ${mine ? "mine" : ""} ${ai ? "ai" : ""} ${first ? "first" : ""} ${fresh ? "fresh" : ""}`}>
         {showAv && (
-          <span className="msg-av">{first && <Avatar name={m.name || m.username || "?"} src={m.avatar_url} kind={ai ? "ai" : undefined} size={30} />}</span>
+          <span className="msg-av">{first && (
+            ai ? <Avatar name={m.name || m.username || "?"} src={m.avatar_url} kind="ai" size={30} />
+            : <button type="button" className="av-btn" onClick={() => m.username && onOpenProfile?.(m.username)} aria-label={`Profil @${m.username}`}>
+                <Avatar name={m.name || m.username || "?"} src={m.avatar_url} size={30} />
+              </button>
+          )}</span>
         )}
         <div className={`bubble${gone ? " gone" : ""}${m.status === "failed" ? " failed" : ""}`} {...lp.bind}>
           {showName && (
-            <span className="sender" style={{ color: ai ? "var(--violet)" : nameColor(m.username || "") }}>
+            <button type="button" className="sender" style={{ color: ai ? "var(--violet)" : nameColor(m.username || "") }}
+              onClick={() => !ai && m.username && onOpenProfile?.(m.username)}
+              disabled={ai}>
               {ai ? "Kev-Ai" : m.name}<small> @{m.username}</small>{ai && <em className="badge">AI</em>}
-            </span>
+            </button>
           )}
           {!gone && m.reply_to && m.reply_body != null && (
             <div className="quote">
