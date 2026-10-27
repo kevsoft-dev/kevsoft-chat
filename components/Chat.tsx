@@ -68,6 +68,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
   const [newBelow, setNewBelow] = useState(0);
   const [showConsole, setShowConsole] = useState(false);
   const [memberQ, setMemberQ] = useState("");
+  const [viewUser, setViewUser] = useState<UserLite | null>(null);
 
   const meRef = useRef(me); meRef.current = me;
   const activeRef = useRef<string | null>(null);
@@ -221,7 +222,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
     if (keys.length > 12) delete cache.current[keys[0]];
     activeRef.current = id; setActiveId(id); fresh.current.clear();
     positioned.current = null; stick.current = true; setAway(false); setNewBelow(0); setNoMore(false);
-    setReplyTo(null); setInfo(false); setMembers([]); setMenu(null);
+    setReplyTo(null); setInfo(false); setMembers([]); setMenu(null); setViewUser(null);
     const cached = cache.current[id];
     setMsgs(cached ?? []); setLoading(!cached);
     setConvs((l) => l && l.map((c) => (c.id === id ? { ...c, unread: 0, unread_mention: false } : c)));
@@ -240,6 +241,43 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
       open(id);
     } catch {}
   }, [open]);
+
+  const openDmWith = useCallback(async (username: string) => {
+    setViewUser(null);
+    setInfo(false);
+    try {
+      const r = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "dm", username: username.toLowerCase() }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.error || "Gagal membuka chat"); return; }
+      if (d.id) await openById(d.id);
+    } catch { toast("Jaringan bermasalah"); }
+  }, [openById, toast]);
+
+  async function copyText(text: string, okMsg: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(okMsg);
+    } catch { toast("Gagal menyalin"); }
+  }
+
+  function saveContact(u: { username: string; name?: string | null; bio?: string | null }) {
+    // Simpan sebagai teks kontak (vCard ringan) ke clipboard — HP bisa paste ke kontak.
+    const lines = [
+      "BEGIN:VCARD",
+      "VERSION:3.0",
+      `FN:${u.name || u.username}`,
+      `N:${u.name || u.username};;;;`,
+      `NICKNAME:${u.username}`,
+      u.bio ? `NOTE:${u.bio.replace(/\n/g, "\\n")}` : "",
+      `URL:https://kevsoft-chat.vercel.app`,
+      "END:VCARD",
+    ].filter(Boolean).join("\n");
+    copyText(lines, "Kontak disalin (vCard) — tempel di aplikasi Kontak");
+  }
 
   async function older() {
     const id = activeRef.current;
@@ -449,8 +487,8 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
 
   async function showInfo() {
     if (!active) return;
-    setInfo(true); setMemberQ("");
-    if (active.kind !== "ai") loadMembers(active.id);
+    setInfo(true); setMemberQ(""); setViewUser(null);
+    if (active.kind === "group" || active.kind === "community") loadMembers(active.id);
   }
 
   // ---------- moderasi anggota (menu titik tiga di panel Info) ----------
@@ -629,9 +667,22 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
                   {active.description && <p className="desc">{active.description}</p>}
                   {active.kind === "ai" && <p className="desc">Kev-Ai menjawab lewat kev-ai.vercel.app. Di grup, panggil dengan @kev-ai lalu tulis pertanyaannya.</p>}
                 </div>
-                {active.kind !== "ai" && (
+                {/* Chat pribadi: tidak tampil daftar anggota — hanya profil lawan bicara + aksi */}
+                {active.kind === "dm" && active.other_id && (
+                  <div className="info-contact-actions">
+                    <button type="button" onClick={() => copyText("@" + (active.other_username || ""), "Username disalin")}>
+                      <Icon n="copy" size={18} />Salin username
+                    </button>
+                    <button type="button" onClick={() => saveContact({ username: active.other_username || "", name: active.other_name, bio: active.other_bio })}>
+                      <Icon n="user" size={18} />Simpan kontak
+                    </button>
+                  </div>
+                )}
+
+                {/* Grup / komunitas: daftar anggota; ketuk = info lengkap */}
+                {(active.kind === "group" || active.kind === "community") && (
                   <>
-                    <h4>{active.kind === "dm" ? "Anggota" : `${members.length} anggota`}</h4>
+                    <h4>{members.length} anggota</h4>
                     {members.length > 8 && (
                       <div className="search member-search"><Icon n="search" size={18} /><input placeholder="Cari anggota" value={memberQ} onChange={(e) => setMemberQ(e.target.value)} aria-label="Cari anggota" /></div>
                     )}
@@ -642,11 +693,17 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
                       }).map((u) => {
                         const items = memberItems(u, active, members);
                         return (
-                          <li key={u.id}><Avatar name={u.name || u.username} src={u.avatar_url} size={38} />
-                            <span><b>{u.name || u.username}{u.id === me.id && " (kamu)"}<RoleBadge role={u.role} />{u.banned && <em className="badge warn">diblokir</em>}{u.muted && <em className="badge warn">bisu</em>}</b><small>{u.bio || `@${u.username}`}</small></span>
+                          <li key={u.id} className="member-row">
+                            <button type="button" className="member-main" onClick={() => setViewUser(u)} aria-label={`Info @${u.username}`}>
+                              <Avatar name={u.name || u.username} src={u.avatar_url} size={38} />
+                              <span>
+                                <b>{u.name || u.username}{u.id === me.id && " (kamu)"}<RoleBadge role={u.role} />{u.banned && <em className="badge warn">diblokir</em>}{u.muted && <em className="badge warn">bisu</em>}</b>
+                                <small>{u.bio || `@${u.username}`}</small>
+                              </span>
+                            </button>
                             {items.length > 0 && (
                               <button className="icon-btn mini" aria-label={`Tindakan untuk @${u.username}`}
-                                onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ ...placeMenu(r.right - 220, r.bottom + 6, items.length), items }); }}>
+                                onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setMenu({ ...placeMenu(r.right - 220, r.bottom + 6, items.length), items }); }}>
                                 <Icon n="more" size={18} />
                               </button>
                             )}
@@ -688,6 +745,51 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
         )}
       </section>
 
+      {viewUser && (
+        <aside className="contact-sheet" aria-label={`Info @${viewUser.username}`}>
+          <header>
+            <button className="icon-btn" onClick={() => setViewUser(null)} aria-label="Tutup"><Icon n="close" /></button>
+            <strong>Info kontak</strong>
+          </header>
+          <div className="info-hero">
+            <button className="zoomable" disabled={!viewUser.avatar_url} onClick={() => viewUser.avatar_url && setZoom(viewUser.avatar_url)} aria-label="Perbesar foto">
+              <Avatar name={viewUser.name || viewUser.username} src={viewUser.avatar_url} size={96} />
+            </button>
+            <h2>{viewUser.name || viewUser.username}{viewUser.id === me.id ? " (kamu)" : ""}</h2>
+            <p className="muted">@{viewUser.username}</p>
+            {viewUser.bio && <p className="desc">{viewUser.bio}</p>}
+            <div className="contact-badges">
+              <RoleBadge role={viewUser.role || viewUser.sys_role} />
+              {viewUser.banned && <em className="badge warn">diblokir</em>}
+              {viewUser.muted && <em className="badge warn">bisu</em>}
+            </div>
+          </div>
+          <div className="info-contact-actions">
+            {viewUser.id !== me.id && (
+              <button type="button" onClick={() => openDmWith(viewUser.username)}>
+                <Icon n="chat" size={18} />Chat pribadi
+              </button>
+            )}
+            <button type="button" onClick={() => copyText("@" + viewUser.username, "Username disalin")}>
+              <Icon n="copy" size={18} />Salin username
+            </button>
+            <button type="button" onClick={() => saveContact(viewUser)}>
+              <Icon n="user" size={18} />Simpan kontak
+            </button>
+            {viewUser.id !== me.id && active && (active.kind === "group" || active.kind === "community") && (() => {
+              const items = memberItems(viewUser, active, members);
+              return items.length > 0 ? (
+                <button type="button" className="danger" onClick={(e) => {
+                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  setMenu({ ...placeMenu(r.left, r.bottom + 6, items.length), items });
+                }}>
+                  <Icon n="more" size={18} />Moderasi
+                </button>
+              ) : null;
+            })()}
+          </div>
+        </aside>
+      )}
       {profile && (
         <Profile me={me} onClose={() => setProfile(false)} onToast={toast} onLogout={logout}
           onConsole={isStaffRole(me.role) ? () => { setProfile(false); setShowConsole(true); } : undefined}
