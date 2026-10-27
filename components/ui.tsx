@@ -8,6 +8,7 @@ export type Conv = {
   other_id: string | null; other_username: string | null; other_name: string | null; other_avatar: string | null; other_bio: string | null;
   member_count: number; last_body: string | null; last_at: string | null; last_kind: string | null;
   last_username: string | null; last_deleted: boolean; unread: number; unread_mention: boolean;
+  disappear_seconds?: number;
 };
 export type Msg = {
   id: string; conversation_id: string; sender_id: string | null; kind: "user" | "ai"; body: string; created_at: string;

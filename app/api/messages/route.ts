@@ -41,6 +41,7 @@ export async function GET(req: Request) {
       where me.conversation_id = ${cid.data} and me.user_id = ${uid}
         and (me.cleared_at is null or m.created_at > me.cleared_at)
         and not (${uid} = any(m.hidden_by))
+        and (m.expires_at is null or m.expires_at > now())
         and (${beforeTs}::timestamptz is null or m.created_at < ${beforeTs}::timestamptz)
       order by m.created_at desc limit 50`,
     readMark,
@@ -61,14 +62,18 @@ export async function POST(req: Request) {
   const wantsAi = wanted.includes(AI_HANDLE);
   const msgId = id ?? crypto.randomUUID();
 
-  // Satu query: cek keanggotaan + validasi tag + simpan. ID dari klien membuat kirim ulang aman (idempoten).
+  // Satu query: cek keanggotaan + validasi tag + simpan + expires_at dari timer chat.
+  // ID dari klien membuat kirim ulang aman (idempoten).
   const rows = await sql`
-    insert into messages (id, conversation_id, sender_id, body, mentions, reply_to)
+    insert into messages (id, conversation_id, sender_id, body, mentions, reply_to, expires_at)
     select ${msgId}::uuid, ${conversationId}::uuid, ${uid}, ${body},
       array(select lower(username) from users where lower(username) = any(${wanted}::text[]))
         || ${wantsAi ? [AI_HANDLE] : []}::text[],
-      (select id from messages where id = ${replyTo ?? null}::uuid and conversation_id = ${conversationId}::uuid)
-    where exists (select 1 from conversation_members where conversation_id = ${conversationId}::uuid and user_id = ${uid})
+      (select id from messages where id = ${replyTo ?? null}::uuid and conversation_id = ${conversationId}::uuid),
+      case when c.disappear_seconds > 0 then now() + make_interval(secs => c.disappear_seconds) else null end
+    from conversations c
+    where c.id = ${conversationId}::uuid
+      and exists (select 1 from conversation_members where conversation_id = ${conversationId}::uuid and user_id = ${uid})
       and not exists (select 1 from users where id = ${uid} and muted_until > now())
     on conflict (id) do nothing
     returning id, created_at, mentions`;

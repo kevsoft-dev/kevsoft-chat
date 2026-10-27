@@ -18,6 +18,7 @@ const ACTIONS: Record<string, string> = {
   ban: "memblokir", unban: "membuka blokir", mute: "membisukan", unmute: "membuka bisu", kick: "mengeluarkan",
   rejoin: "mengizinkan kembali", reset_password: "mereset password", delete_message: "menghapus pesan dari",
   delete_group: "menghapus grup", "role:owner": "menjadikan owner", "role:admin": "menjadikan admin", "role:user": "menjadikan user biasa",
+  reset_messages: "mereset semua pesan", reset_chats: "mereset chat", reset_all: "mereset data penuh",
 };
 const MUTES = [[10, "10 menit"], [60, "1 jam"], [1440, "1 hari"], [10080, "7 hari"]] as const;
 
@@ -36,8 +37,10 @@ export default function Console({ me, onClose, onToast, onChanged }: {
   me: Me; onClose: () => void; onToast: (t: string) => void; onChanged: () => void;
 }) {
   const owner = me.role === "owner";
-  const [tab, setTab] = useState<"users" | "groups" | "logs">("users");
+  const [tab, setTab] = useState<"users" | "groups" | "logs" | "system">("users");
   const [dialog, setDialog] = useState<{ title: string; text?: string; actions: DialogAction[] } | null>(null);
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
 
   // ---------- pengguna ----------
   const [q, setQ] = useState("");
@@ -155,7 +158,7 @@ export default function Console({ me, onClose, onToast, onChanged }: {
         )}
 
         <div className="tabs">
-          {([["users", "Pengguna"], ["groups", "Grup"], ["logs", "Log"]] as const).map(([k, l]) => (
+          {([["users", "Pengguna"], ["groups", "Grup"], ["logs", "Log"], ...(owner ? [["system", "Sistem"] as const] : [])] as const).map(([k, l]) => (
             <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>
           ))}
         </div>
@@ -326,6 +329,74 @@ export default function Console({ me, onClose, onToast, onChanged }: {
             ))}
             {logMore && logs && <li><button className="older" onClick={() => loadLogs(logs[logs.length - 1].id)}>Muat lebih banyak</button></li>}
           </ul>
+        )}
+
+        {tab === "system" && owner && (
+          <div className="sys-panel">
+            <h4 className="ctitle">Reset data</h4>
+            <p className="muted small">Tindakan permanen. Ketik <b>RESET</b> lalu pilih cakupan. Komunitas Kevsoft tidak dihapus strukturnya.</p>
+            <input
+              className="field"
+              placeholder="Ketik RESET untuk mengonfirmasi"
+              value={resetConfirm}
+              onChange={(e) => setResetConfirm(e.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <div className="crow-act wrap" style={{ marginTop: 12 }}>
+              <button
+                className="danger"
+                disabled={resetBusy || resetConfirm !== "RESET"}
+                onClick={() => ask(
+                  "Hapus SEMUA pesan?",
+                  "Semua pesan di semua chat (termasuk Komunitas) dihapus permanen. Chat & anggota tetap ada.",
+                  "Hapus semua pesan",
+                  async () => {
+                    setResetBusy(true);
+                    const { ok, data } = await postJson("/api/admin/reset", { scope: "messages", confirm: "RESET" });
+                    setResetBusy(false);
+                    onToast(ok ? "Semua pesan dihapus" : data?.error || "Gagal");
+                    if (ok) { setResetConfirm(""); onChanged(); }
+                  },
+                )}
+              >Hapus semua pesan</button>
+              <button
+                className="danger"
+                disabled={resetBusy || resetConfirm !== "RESET"}
+                onClick={() => ask(
+                  "Hapus semua chat?",
+                  "Semua DM, grup, dan pesan di dalamnya dihapus. Komunitas dikosongkan tapi tetap ada.",
+                  "Hapus chat",
+                  async () => {
+                    setResetBusy(true);
+                    const { ok, data } = await postJson("/api/admin/reset", { scope: "chats", confirm: "RESET" });
+                    setResetBusy(false);
+                    onToast(ok ? "Semua chat dihapus" : data?.error || "Gagal");
+                    if (ok) { setResetConfirm(""); onChanged(); }
+                  },
+                )}
+              >Hapus DM & grup</button>
+              <button
+                className="danger"
+                disabled={resetBusy || resetConfirm !== "RESET"}
+                onClick={() => ask(
+                  "RESET DATA PENUH?",
+                  "Pesan, DM, grup, chat AI dihapus. Komunitas dikosongkan dan semua user dimasukkan ulang. Akun pengguna tetap.",
+                  "Reset semua data",
+                  async () => {
+                    setResetBusy(true);
+                    const { ok, data } = await postJson("/api/admin/reset", { scope: "all", confirm: "RESET" });
+                    setResetBusy(false);
+                    onToast(ok ? "Data di-reset penuh" : data?.error || "Gagal");
+                    if (ok) { setResetConfirm(""); onChanged(); }
+                  },
+                )}
+              >Reset semua data</button>
+            </div>
+            <p className="muted small" style={{ marginTop: 16 }}>
+              Setelah reset, minta semua user me-refresh halaman. Pesan sementara (disappearing) diatur per chat dari Info chat.
+            </p>
+          </div>
         )}
       </div>
 

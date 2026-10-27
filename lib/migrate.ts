@@ -20,8 +20,10 @@ async function run() {
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'muted_until') as roles,
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'password_hash') as pw,
       to_regclass('public.mod_logs') is not null as modlogs,
-      to_regclass('public.conversation_kicks') is not null as kicks`;
-  if (r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks) return;
+      to_regclass('public.conversation_kicks') is not null as kicks,
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'conversations' and column_name = 'disappear_seconds') as disappear,
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'messages' and column_name = 'expires_at') as expires`;
+  if (r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks && r.disappear && r.expires) return;
   for (const s of SCHEMA.split(";").map((x) => x.trim()).filter(Boolean)) await runRaw(s);
 }
 

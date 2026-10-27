@@ -26,6 +26,7 @@ create table if not exists conversations (
 alter table conversations add column if not exists kind text not null default 'dm';
 alter table conversations add column if not exists description text;
 alter table conversations add column if not exists created_by text;
+alter table conversations add column if not exists disappear_seconds int not null default 0;
 create unique index if not exists conversations_one_ai_per_user on conversations (created_by) where kind = 'ai';
 
 create table if not exists conversation_members (
@@ -52,7 +53,9 @@ alter table messages add column if not exists reply_to uuid references messages(
 alter table messages add column if not exists mentions text[] not null default '{}';
 alter table messages add column if not exists deleted_at timestamptz;
 alter table messages add column if not exists hidden_by text[] not null default '{}';
+alter table messages add column if not exists expires_at timestamptz;
 create index if not exists messages_conv_idx on messages (conversation_id, created_at desc);
+create index if not exists messages_expires_idx on messages (expires_at) where expires_at is not null;
 
 create table if not exists otp_codes (
   email text primary key,

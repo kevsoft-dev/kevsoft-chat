@@ -9,7 +9,7 @@ export async function GET() {
   if (!uid) return new Response("Unauthorized", { status: 401 });
 
   const rows = await sql`
-    select c.id, c.kind, c.title, c.description,
+    select c.id, c.kind, c.title, c.description, coalesce(c.disappear_seconds, 0) as disappear_seconds,
       o.id as other_id, o.username as other_username, o.name as other_name, o.avatar_url as other_avatar, o.bio as other_bio,
       (select count(*) from conversation_members where conversation_id = c.id)::int as member_count,
       lm.body as last_body, lm.created_at as last_at, lm.kind as last_kind, lu.username as last_username,
@@ -17,10 +17,12 @@ export async function GET() {
       (select count(*) from messages m
         where m.conversation_id = c.id and m.created_at > me.last_read_at and m.sender_id is distinct from ${uid}
           and m.deleted_at is null and not (${uid} = any(m.hidden_by))
+          and (m.expires_at is null or m.expires_at > now())
           and (me.cleared_at is null or m.created_at > me.cleared_at))::int as unread,
       exists (select 1 from messages m
         where m.conversation_id = c.id and m.created_at > me.last_read_at and m.sender_id is distinct from ${uid}
           and m.deleted_at is null and not (${uid} = any(m.hidden_by))
+          and (m.expires_at is null or m.expires_at > now())
           and (me.cleared_at is null or m.created_at > me.cleared_at)
           and (select lower(username) from users where id = ${uid}) = any(m.mentions)) as unread_mention
     from conversations c
@@ -32,6 +34,7 @@ export async function GET() {
       from messages
       where conversation_id = c.id and (me.cleared_at is null or created_at > me.cleared_at)
         and not (${uid} = any(hidden_by))
+        and (expires_at is null or expires_at > now())
       order by created_at desc limit 1) lm on true
     left join users lu on lu.id = lm.sender_id
     where me.hidden_at is null or lm.created_at > me.hidden_at

@@ -179,6 +179,10 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
     });
 
     ch.bind("conversation", () => scheduleConvs());
+    ch.bind("disappear", (d: { conversationId?: string; seconds?: number }) => {
+      if (!d?.conversationId || typeof d.seconds !== "number") return;
+      setConvs((list) => (list ?? []).map((c) => (c.id === d.conversationId ? { ...c, disappear_seconds: d.seconds } : c)));
+    });
 
     // Moderasi: akun diblokir -> langsung keluar; dibisukan -> pemberitahuan; role berubah -> perbarui menu.
     ch.bind("banned", async () => {
@@ -513,9 +517,32 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
     });
   }, [convs, q, tab]);
 
-  const subtitle = (c: Conv) =>
-    c.kind === "dm" ? `@${c.other_username}` : c.kind === "ai" ? "Asisten AI · selalu online" : `${c.member_count} anggota`;
+  const subtitle = (c: Conv) => {
+    const base = c.kind === "dm" ? `@${c.other_username}` : c.kind === "ai" ? "Asisten AI · selalu online" : `${c.member_count} anggota`;
+    const d = c.disappear_seconds || 0;
+    if (!d) return base;
+    const label = d === 86400 ? "24 jam" : d === 604800 ? "7 hari" : d === 7776000 ? "90 hari" : `${d}s`;
+    return `${base} · ⏱ ${label}`;
+  };
   const groupLike = !!active && active.kind !== "dm" && active.kind !== "ai";
+
+  async function setDisappear(seconds: number) {
+    if (!active || active.kind === "ai") return;
+    const { ok, data } = await (async () => {
+      try {
+        const r = await fetch("/api/conversations/disappear", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationId: active.id, seconds }),
+        });
+        const d = await r.json().catch(() => ({}));
+        return { ok: r.ok, data: d };
+      } catch { return { ok: false, data: { error: "Jaringan bermasalah" } }; }
+    })();
+    if (!ok) { toast(data?.error || "Gagal mengatur pesan sementara"); return; }
+    setConvs((list) => (list ?? []).map((c) => (c.id === active.id ? { ...c, disappear_seconds: seconds } : c)));
+    toast(seconds === 0 ? "Pesan sementara dimatikan" : `Pesan sementara: ${seconds === 86400 ? "24 jam" : seconds === 604800 ? "7 hari" : "90 hari"}`);
+  }
 
   return (
     <div className="app" data-chat={active ? "open" : "list"}>
@@ -543,11 +570,6 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
             <ConvItem key={c.id} c={c} on={activeId === c.id} leaving={leaving.includes(c.id)} meUsername={me.username} onOpen={open} onMenu={openConvMenu} />
           ))}
         </ul>
-        {profile && (
-          <Profile me={me} onClose={() => setProfile(false)} onToast={toast} onLogout={logout}
-            onConsole={isStaffRole(me.role) ? () => { setProfile(false); setShowConsole(true); } : undefined}
-            onUpdate={(p) => setMe((x) => ({ ...x, ...p }))} />
-        )}
       </aside>
 
       <section className="main">
@@ -634,6 +656,21 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
                     </ul>
                   </>
                 )}
+                {active.kind !== "ai" && (
+                  <div className="info-disappear">
+                    <h4>Pesan sementara</h4>
+                    <p className="muted small">Pesan baru hilang otomatis setelah waktu yang dipilih (ala WhatsApp).</p>
+                    <div className="disappear-opts">
+                      {([[0, "Mati"], [86400, "24 jam"], [604800, "7 hari"], [7776000, "90 hari"]] as const).map(([sec, lab]) => (
+                        <button
+                          key={sec}
+                          className={(active.disappear_seconds || 0) === sec ? "on" : ""}
+                          onClick={() => setDisappear(sec)}
+                        >{lab}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="info-actions">
                   <button onClick={() => askConv(active, "clear")}><Icon n="trash" size={18} />Bersihkan chat</button>
                   {active.kind === "dm" && <button className="danger" onClick={() => askConv(active, "delete")}><Icon n="trash" size={18} />Hapus chat</button>}
@@ -651,6 +688,11 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
         )}
       </section>
 
+      {profile && (
+        <Profile me={me} onClose={() => setProfile(false)} onToast={toast} onLogout={logout}
+          onConsole={isStaffRole(me.role) ? () => { setProfile(false); setShowConsole(true); } : undefined}
+          onUpdate={(p) => setMe((x) => ({ ...x, ...p }))} />
+      )}
       {showConsole && <Console me={me} onClose={() => setShowConsole(false)} onToast={toast} onChanged={scheduleConvs} />}
       {showNew && <NewChat onClose={() => setShowNew(false)} onCreated={openById} />}
       {menu && <Menu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}

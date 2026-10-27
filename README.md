@@ -95,4 +95,23 @@ Deploy ke Vercel: import repo, sertakan `config.json` (file ini di-gitignore, ja
 - Admin grup biasa (pembuat grup) juga bisa mengeluarkan anggota biasa dari grupnya. Staf bisa menghapus pesan siapa pun yang role-nya di bawahnya (tekan lama pesan -> Hapus).
 - Akun diblokir: sesi langsung dicabut (realtime lewat Pusher), tidak bisa login password/Google/OTP. Status blokir di-cache maksimal 8 detik per instance server.
 
-**Migrasi database**: otomatis saat halaman pertama dibuka (kolom `role`, `password_hash`, `banned_at`, `ban_reason`, `muted_until`, `login_fails`, `locked_until`; tabel `conversation_kicks`, `mod_logs`). `schema.sql` juga sudah diperbarui.
+**Migrasi database**: otomatis saat halaman pertama dibuka (kolom `role`, `password_hash`, `banned_at`, `ban_reason`, `muted_until`, `login_fails`, `locked_until`, `disappear_seconds`, `expires_at`; tabel `conversation_kicks`, `mod_logs`). `schema.sql` juga sudah diperbarui.
+
+---
+
+## Pembaruan v4: pesan sementara, reset data owner, profil stabil
+
+**Profil tidak hilang**
+- Panel Profil dipindah ke overlay fixed (bukan di dalam sidebar), jadi di HP tetap tampil penuh meskipun chat sedang terbuka.
+
+**Pesan sementara (disappearing)**
+- Di Info chat (bukan chat AI): pilih timer **Mati / 24 jam / 7 hari / 90 hari**.
+- Pesan baru di chat itu otomatis dapat `expires_at`; pesan kedaluwarsa tidak ditampilkan lagi.
+- DM: siapa pun anggota bisa ubah. Grup/Komunitas: admin grup atau staf.
+- Subtitle chat menampilkan ikon ⏱ + durasi jika aktif.
+
+**Console owner → tab Sistem**
+- **Hapus semua pesan** — kosongkan semua pesan, chat tetap.
+- **Hapus DM & grup** — hapus chat pribadi/grup + kosongkan komunitas.
+- **Reset semua data** — pesan + DM/grup/AI chat; komunitas dikosongkan & semua user dimasukkan ulang.
+- Wajib ketik `RESET` + konfirmasi dialog. Tercatat di Log moderasi.
