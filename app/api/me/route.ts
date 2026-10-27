@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { sql } from "@/lib/db";
-import { ensureDefaults, getUserId, syncUser } from "@/lib/auth";
+import { ensureDefaults, getUserId } from "@/lib/auth";
 import { RESERVED, USERNAME_RE } from "@/lib/mentions";
 
 const schema = z.object({
@@ -27,7 +27,6 @@ export async function POST(req: Request) {
     return Response.json({ error: "Username 3-20 karakter: huruf kecil, angka, _ . - (tidak diakhiri . atau -)" }, { status: 400 });
   if (RESERVED.includes(username)) return Response.json({ error: "Username ini dicadangkan" }, { status: 400 });
 
-  await syncUser(uid);
   const [me] = await sql`select username from users where id = ${uid}`;
   if (me?.username) return Response.json({ error: "Username sudah diatur dan tidak bisa diubah" }, { status: 409 });
 
