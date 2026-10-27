@@ -21,7 +21,7 @@ function Problem({ text }: { text: string }) {
   );
 }
 
-type Row = { id: string; username: string | null; name: string | null; avatar_url: string | null; bio: string | null; email: string | null; role: string; has_password: boolean };
+type Row = { id: string; username: string | null; name: string | null; avatar_url: string | null; bio: string | null; email: string | null; role: string; verified?: boolean | null; has_password: boolean };
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ reset?: string; dm?: string }> }) {
   let uid: string | null = null;
