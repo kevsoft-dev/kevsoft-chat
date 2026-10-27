@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { usePref } from "@/lib/prefs";
-import { Avatar, Icon, RoleBadge, isStaffRole, type Me } from "./ui";
+import { Avatar, Icon, RoleBadge, VerifiedBadge, isStaffRole, type Me } from "./ui";
 import { useTheme } from "./ThemeToggle";
 
 // Foto dipotong persegi dan diperkecil di browser (256px WebP/JPEG, ~10-30 KB) sebelum diunggah.
@@ -205,6 +205,7 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
             <em>Username tidak bisa diganti.</em>
           </div>
           {me.email && <div className="pf ro"><small>Email</small><div className="pf-view static"><span>{me.email}</span></div></div>}
+          {me.verified && <div className="pf ro"><small>Verifikasi</small><div className="pf-view static"><span>Terverifikasi<VerifiedBadge /></span></div></div>}
           {isStaffRole(me.role) && <div className="pf ro"><small>Role</small><div className="pf-view static"><span style={{ textTransform: "capitalize" }}>{me.role}<RoleBadge role={me.role} /></span></div></div>}
         </div>
 

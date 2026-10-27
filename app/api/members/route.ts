@@ -14,6 +14,7 @@ export async function GET(req: Request) {
   // role = owner / admin (global atau admin grup) / member. Status blokir hanya terlihat oleh staf.
   const rows = await sql`
     select u.id, u.username, u.name, u.avatar_url, u.bio,
+      coalesce(u.role = 'owner' or u.verified, false) as verified,
       case when u.role = 'owner' then 'owner' when u.role = 'admin' or cm.role = 'admin' then 'admin' else 'member' end as role,
       u.role as sys_role, cm.role as group_role,
       coalesce((select v.role in ('admin', 'owner') from users v where v.id = ${uid}), false) and u.banned_at is not null as banned,

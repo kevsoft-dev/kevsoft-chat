@@ -16,7 +16,7 @@ export default async function DmPage({ params }: { params: Promise<{ username: s
   await ensureSchema();
 
   const [target] = await sql`
-    select id, username, name, avatar_url, bio, role, created_at
+    select id, username, name, avatar_url, bio, role, created_at, (role = 'owner' or verified) as verified
     from users where lower(username) = ${raw} and banned_at is null limit 1`;
   if (!target) notFound();
 
@@ -33,6 +33,7 @@ export default async function DmPage({ params }: { params: Promise<{ username: s
           avatar_url: (target.avatar_url as string | null) ?? null,
           bio: (target.bio as string | null) ?? null,
           role: String(target.role ?? "user"),
+          verified: !!target.verified,
           created_at: String(target.created_at),
         }}
         isMe={false}
@@ -44,7 +45,7 @@ export default async function DmPage({ params }: { params: Promise<{ username: s
   }
 
   const [user] = (await sql`
-    select id, username, name, avatar_url, bio, email, role, (password_hash is not null) as has_password
+    select id, username, name, avatar_url, bio, email, role, (role = 'owner' or verified) as verified, (password_hash is not null) as has_password
     from users where id = ${uid}`) as any[];
 
   if (!user?.username || !user?.has_password) {
@@ -88,6 +89,7 @@ export default async function DmPage({ params }: { params: Promise<{ username: s
         bio: user.bio,
         email: user.email,
         role: user.role,
+        verified: !!user.verified,
       }}
       pusherKey={cfg.pusher.key}
       pusherCluster={cfg.pusher.cluster}

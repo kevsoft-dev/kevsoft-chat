@@ -600,3 +600,19 @@ a.tag:hover{text-decoration:underline}
 .label-grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
 .label-grid .field{width:100%}
 .console .primary{padding:10px 16px;border:0;border-radius:12px;background:var(--violet);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+
+/* Role badge + ikon king/admin */
+.role-badge{display:inline-flex;align-items:center;gap:4px;vertical-align:middle;line-height:1}
+.role-badge .role-ico{flex:0 0 auto;display:block}
+.badge.owner{background:linear-gradient(135deg,#f5c542,#e8a317);color:#3a2a00;border:0;font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.badge.owner .role-ico{color:#3a2a00}
+:root[data-theme="dark"] .badge.owner{background:linear-gradient(135deg,#f0c14b,#c9920a);color:#1a1200}
+
+.title-edit{width:100%;margin:4px 0 8px}
+.title-row{display:flex;gap:8px;align-items:center}
+.title-row .field{flex:1}
+.title-row button{flex:0 0 auto;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--fill);font:inherit;font-size:13px;cursor:pointer}
+
+/* Centang biru (verified) */
+.vbadge{display:inline-block;width:1.05em;height:1.05em;min-width:13px;min-height:13px;margin-left:5px;vertical-align:-.18em;flex:none;border-radius:50%;user-select:none;-webkit-user-drag:none;object-fit:contain}
+h1 .vbadge,h2 .vbadge{width:.78em;height:.78em;min-width:18px;min-height:18px;margin-left:8px;vertical-align:-.06em}

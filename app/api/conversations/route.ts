@@ -11,6 +11,7 @@ export async function GET() {
   const rows = await sql`
     select c.id, c.kind, c.title, c.description, coalesce(c.disappear_seconds, 0) as disappear_seconds,
       o.id as other_id, o.username as other_username, o.name as other_name, o.avatar_url as other_avatar, o.bio as other_bio,
+      coalesce(o.role = 'owner' or o.verified, false) as other_verified,
       (select count(*) from conversation_members where conversation_id = c.id)::int as member_count,
       lm.body as last_body, lm.created_at as last_at, lm.kind as last_kind, lu.username as last_username,
       (lm.deleted_at is not null) as last_deleted,

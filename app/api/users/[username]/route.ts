@@ -11,7 +11,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ username: stri
   if (!USERNAME_RE.test(raw)) return Response.json({ error: "Username tidak valid" }, { status: 400 });
 
   const [u] = await sql`
-    select id, username, name, avatar_url, bio, role, created_at
+    select id, username, name, avatar_url, bio, role, created_at, (role = 'owner' or verified) as verified
     from users
     where lower(username) = ${raw} and banned_at is null
     limit 1`;
@@ -24,6 +24,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ username: stri
     avatar_url: u.avatar_url,
     bio: u.bio,
     role: u.role,
+    verified: !!u.verified,
     created_at: u.created_at,
     is_me: u.id === uid,
   });

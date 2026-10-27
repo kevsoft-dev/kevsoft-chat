@@ -1,7 +1,7 @@
 "use client";
 import { memo } from "react";
 import { AI_HANDLE } from "@/lib/mentions";
-import { Avatar, Icon, Rich, clock, dayLabel, nameColor, useLongPress, type Msg } from "./ui";
+import { Avatar, Icon, Rich, VerifiedBadge, clock, dayLabel, nameColor, useLongPress, type Msg } from "./ui";
 
 export default memo(function MessageRow({ m, mine, first, newDay, showName, showAv, meUsername, fresh, leaving, onMenu, onRetry, onOpenProfile }: {
   m: Msg; mine: boolean; first: boolean; newDay: boolean; showName: boolean; showAv: boolean; meUsername: string;
@@ -29,7 +29,7 @@ export default memo(function MessageRow({ m, mine, first, newDay, showName, show
             <button type="button" className="sender" style={{ color: ai ? "var(--violet)" : nameColor(m.username || "") }}
               onClick={() => !ai && m.username && onOpenProfile?.(m.username)}
               disabled={ai}>
-              {ai ? "Kev-Ai" : m.name}<small> @{m.username}</small>{ai && <em className="badge">AI</em>}
+              {ai ? "Kev-Ai" : m.name}{!ai && m.verified && <VerifiedBadge />}<small> @{m.username}</small>{ai && <em className="badge">AI</em>}
             </button>
           )}
           {!gone && m.reply_to && m.reply_body != null && (

@@ -1,6 +1,6 @@
 "use client";
 import { memo } from "react";
-import { Avatar, convName, listTime, useLongPress, type Conv } from "./ui";
+import { Avatar, VerifiedBadge, convName, listTime, useLongPress, type Conv } from "./ui";
 
 function previewOf(c: Conv, meUsername: string) {
   if (c.last_deleted) return "Pesan ini telah dihapus";
@@ -22,7 +22,7 @@ export default memo(function ConvItem({ c, on, leaving, meUsername, onOpen, onMe
         <Avatar name={convName(c)} src={c.other_avatar} kind={c.kind === "dm" ? undefined : c.kind} />
         <span className="meta">
           <span className="row">
-            <b>{convName(c)}{c.kind === "ai" && <em className="badge">AI</em>}</b>
+            <b>{convName(c)}{c.kind === "dm" && c.other_verified && <VerifiedBadge />}{c.kind === "ai" && <em className="badge">AI</em>}</b>
             {c.last_at && <small className={c.unread ? "hot" : ""}>{listTime(c.last_at)}</small>}
           </span>
           <span className="row">

@@ -116,4 +116,5 @@ insert into app_settings (key, value) values
 on conflict (key) do nothing;
 
 alter table users add column if not exists role_title text;
+alter table users add column if not exists verified boolean not null default false;
 `;

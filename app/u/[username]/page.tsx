@@ -14,7 +14,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ us
 
   await ensureSchema();
   const [u] = await sql`
-    select id, username, name, avatar_url, bio, role, created_at
+    select id, username, name, avatar_url, bio, role, created_at, (role = 'owner' or verified) as verified
     from users where lower(username) = ${raw} and banned_at is null limit 1`;
   if (!u) notFound();
 
@@ -33,6 +33,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ us
         avatar_url: (u.avatar_url as string | null) ?? null,
         bio: (u.bio as string | null) ?? null,
         role: String(u.role ?? "user"),
+        verified: !!u.verified,
         created_at: String(u.created_at),
       }}
       isMe={!!uid && u.id === uid}

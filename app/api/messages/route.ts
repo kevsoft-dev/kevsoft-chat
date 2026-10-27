@@ -34,6 +34,7 @@ export async function GET(req: Request) {
         case when m.kind = 'ai' then 'kev-ai' else u.username end as username,
         case when m.kind = 'ai' then 'Kev-Ai' else coalesce(u.name, u.username) end as name,
         u.avatar_url,
+        coalesce(u.role = 'owner' or u.verified, false) as verified,
         case when r.id is null then null when r.deleted_at is not null then '' else left(r.body, 140) end as reply_body,
         case when r.kind = 'ai' then 'kev-ai' else ru.username end as reply_username
       from conversation_members me

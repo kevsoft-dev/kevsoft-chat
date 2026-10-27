@@ -2,10 +2,10 @@
 import { useRef } from "react";
 import { AI_HANDLE, LOGO, mentionRegex } from "@/lib/mentions";
 
-export type Me = { id: string; username: string; name: string; avatarUrl?: string | null; bio?: string | null; email?: string | null; role?: string };
+export type Me = { id: string; username: string; name: string; avatarUrl?: string | null; bio?: string | null; email?: string | null; role?: string; verified?: boolean };
 export type Conv = {
   id: string; kind: "dm" | "group" | "community" | "ai"; title: string | null; description: string | null;
-  other_id: string | null; other_username: string | null; other_name: string | null; other_avatar: string | null; other_bio: string | null;
+  other_id: string | null; other_username: string | null; other_name: string | null; other_avatar: string | null; other_bio: string | null; other_verified?: boolean;
   member_count: number; last_body: string | null; last_at: string | null; last_kind: string | null;
   last_username: string | null; last_deleted: boolean; unread: number; unread_mention: boolean;
   disappear_seconds?: number;
@@ -14,6 +14,7 @@ export type Msg = {
   id: string; conversation_id: string; sender_id: string | null; kind: "user" | "ai"; body: string; created_at: string;
   reply_to: string | null; mentions: string[]; username: string | null; name: string | null; avatar_url: string | null;
   reply_body: string | null; reply_username: string | null; deleted_at: string | null;
+  verified?: boolean;
   pinned_at?: string | null;
   has_media?: boolean; media_mime?: string | null; media_name?: string | null;
   poll_data?: { question: string; options: string[]; votes: Record<string, number> } | null;
@@ -21,25 +22,63 @@ export type Msg = {
 };
 export type UserLite = {
   id: string; username: string; name: string | null; avatar_url: string | null; bio?: string | null;
-  role?: "owner" | "admin" | "member"; sys_role?: string; group_role?: string; banned?: boolean; muted?: boolean;
+  verified?: boolean; role?: "owner" | "admin" | "member"; sys_role?: string; group_role?: string; banned?: boolean; muted?: boolean;
 };
 
 export const isStaffRole = (r?: string | null) => r === "admin" || r === "owner";
 export type RoleLabels = { owner: string; admin: string; user: string };
 export const DEFAULT_ROLE_LABELS: RoleLabels = { owner: "Owner", admin: "Admin", user: "Member" };
 
+/** Mahkota king — SVG path, bukan emoji */
+function CrownIcon({ size = 11 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden className="role-ico">
+      <path d="M3 18h18v2.5H3V18Zm1.2-3.5L2 7.5l5.2 3.2L12 4l4.8 6.7L22 7.5l-2.2 7H4.2Z" />
+    </svg>
+  );
+}
+
+function ShieldIcon({ size = 11 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="role-ico">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+    </svg>
+  );
+}
+
 export function RoleBadge({ role, title, labels }: {
   role?: string | null; title?: string | null; labels?: Partial<RoleLabels> | null;
 }) {
   const L = { ...DEFAULT_ROLE_LABELS, ...labels };
-  // title kustom per-user menang
-  if (title && title.trim()) {
-    const cls = role === "owner" ? "badge owner" : role === "admin" ? "badge" : "badge soft";
-    return <em className={cls}>{title.trim()}</em>;
+  const text = (title && title.trim()) || (role === "owner" ? L.owner : role === "admin" ? L.admin : null);
+  if (!text) return null;
+
+  if (role === "owner") {
+    return (
+      <em className="badge owner role-badge">
+        <CrownIcon />
+        <span>{text}</span>
+      </em>
+    );
   }
-  if (role === "owner") return <em className="badge owner">{L.owner}</em>;
-  if (role === "admin") return <em className="badge">{L.admin}</em>;
+  if (role === "admin") {
+    return (
+      <em className="badge role-badge">
+        <ShieldIcon />
+        <span>{text}</span>
+      </em>
+    );
+  }
+  // role biasa + sebutan kustom
+  if (title && title.trim()) {
+    return <em className="badge soft role-badge"><span>{text}</span></em>;
+  }
   return null;
+}
+
+/** Centang biru (verified) — gambar dari /public/verified.png */
+export function VerifiedBadge({ title = "Terverifikasi" }: { title?: string }) {
+  return <img className="vbadge" src="/verified.png" alt="Terverifikasi" title={title} width={16} height={16} draggable={false} />;
 }
 
 export const convName = (c: Conv) => (c.kind === "dm" ? c.other_name || c.other_username || "Pengguna" : c.title || "Grup");

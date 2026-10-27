@@ -11,7 +11,7 @@ import MessageRow from "./MessageRow";
 import NewChat from "./NewChat";
 import Profile from "./Profile";
 import { Dialog, Lightbox, Menu, type DialogAction, type MenuItem } from "./overlays";
-import { Avatar, Icon, Logo, RoleBadge, DEFAULT_ROLE_LABELS, convName, isStaffRole, type Conv, type Me, type Msg, type UserLite, type RoleLabels } from "./ui";
+import { Avatar, Icon, Logo, RoleBadge, VerifiedBadge, DEFAULT_ROLE_LABELS, convName, isStaffRole, type Conv, type Me, type Msg, type UserLite, type RoleLabels } from "./ui";
 
 type MenuState = { x: number; y: number; items: MenuItem[] };
 type DialogState = { title: string; text?: string; actions: DialogAction[] };
@@ -205,7 +205,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       window.location.assign("/sign-in");
     });
     ch.bind("muted", () => toast("Kamu dibisukan oleh moderator"));
-    ch.bind("role", (d: { role?: string }) => { if (d?.role) setMe((x) => ({ ...x, role: d.role })); });
+    ch.bind("role", (d: { role?: string; verified?: boolean }) => { if (d?.role) setMe((x) => ({ ...x, role: d.role, ...(typeof d.verified === "boolean" ? { verified: d.verified } : {}) })); });
 
     let first = true; // setelah tersambung ulang, ambil pesan yang mungkin terlewat
     pusher.connection.bind("connected", () => {
@@ -415,7 +415,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     const mm = meRef.current;
     const m: Msg = {
       id: newId(), conversation_id: cid, sender_id: mm.id, kind: "user", body, created_at: new Date().toISOString(),
-      reply_to: rt?.id ?? null, mentions: parseMentions(body), username: mm.username, name: mm.name, avatar_url: mm.avatarUrl ?? null,
+      reply_to: rt?.id ?? null, mentions: parseMentions(body), username: mm.username, name: mm.name, avatar_url: mm.avatarUrl ?? null, verified: !!mm.verified,
       reply_body: rt ? (rt.deleted_at ? "" : rt.body.slice(0, 140)) : null, reply_username: rt ? rt.username : null,
       deleted_at: null, status: "sending",
     };
@@ -585,6 +585,8 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
         run: () => confirm(`Blokir @${u.username}?`, "Akun langsung keluar dan tidak bisa masuk lagi sampai blokir dibuka di Console.", "Blokir akun", () => adminAct({ action: "ban", userId: u.id, reason: "Melanggar aturan komunitas" }, "Akun diblokir")) });
       items.push({ icon: "mute", label: "Bisukan 1 jam", run: () => adminAct({ action: "mute", userId: u.id, minutes: 60 }, "Pengguna dibisukan 1 jam") });
       if (myRank === 2) {
+        items.push({ icon: "check", label: u.verified ? "Cabut centang biru" : "Beri centang biru",
+          run: () => adminAct({ action: "verify", userId: u.id, verified: !u.verified }, u.verified ? "Centang biru dicabut" : "Centang biru diberikan") });
         if (u.sys_role !== "admin") items.push({ icon: "shield", label: "Jadikan admin", run: () => adminAct({ action: "role", userId: u.id, role: "admin" }, "Dijadikan admin") });
         if (u.sys_role !== "owner") items.push({ icon: "key", label: "Jadikan owner",
           run: () => confirm(`Jadikan @${u.username} owner?`, "Owner punya console penuh dan bisa menambah owner lain.", "Jadikan owner", () => adminAct({ action: "role", userId: u.id, role: "owner" }, "Dijadikan owner"), false) });
@@ -672,7 +674,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
               <button className="icon-btn back" onClick={closeChat} aria-label="Kembali"><Icon n="back" /></button>
               <button className="who" onClick={showInfo}>
                 <Avatar name={convName(active)} src={active.other_avatar} kind={active.kind === "dm" ? undefined : active.kind} size={42} />
-                <div><strong>{convName(active)}</strong><small>{waiting ? "sedang mengetik…" : subtitle(active)}</small></div>
+                <div><strong>{convName(active)}{active.kind === "dm" && active.other_verified && <VerifiedBadge />}</strong><small>{waiting ? "sedang mengetik…" : subtitle(active)}</small></div>
               </button>
               <button className="icon-btn" aria-label="Menu chat"
                 onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); const items: MenuItem[] = [{ icon: "info", label: "Info", run: showInfo }, ...convItems(active)]; setMenu({ ...placeMenu(r.right - 220, r.bottom + 6, items.length), items }); }}>
@@ -722,7 +724,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                 const optimistic: Msg = {
                   id, conversation_id: active.id, sender_id: me.id, kind: "user", body: caption || "",
                   created_at: new Date().toISOString(), reply_to: null, mentions: [], username: me.username,
-                  name: me.name, avatar_url: me.avatarUrl ?? null, reply_body: null, reply_username: null,
+                  name: me.name, avatar_url: me.avatarUrl ?? null, verified: !!me.verified, reply_body: null, reply_username: null,
                   deleted_at: null, has_media: true, media_mime: file.type, media_name: file.name, status: "sending",
                 };
                 setMsgs((x) => [...x, optimistic]);
@@ -755,7 +757,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                   <button className="zoomable" disabled={!active.other_avatar || active.kind !== "dm"} onClick={() => active.other_avatar && setZoom(active.other_avatar)} aria-label="Perbesar foto">
                     <Avatar name={convName(active)} src={active.other_avatar} kind={active.kind === "dm" ? undefined : active.kind} size={96} />
                   </button>
-                  <h2>{convName(active)}</h2>
+                  <h2>{convName(active)}{active.kind === "dm" && active.other_verified && <VerifiedBadge />}</h2>
                   <p className="muted">{active.kind === "dm" ? `@${active.other_username}` : subtitle(active)}</p>
                   {active.kind === "dm" && active.other_bio && <p className="desc">{active.other_bio}</p>}
                   {active.description && <p className="desc">{active.description}</p>}
@@ -794,7 +796,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                             <button type="button" className="member-main" onClick={() => setViewUser(u)} aria-label={`Info @${u.username}`}>
                               <Avatar name={u.name || u.username} src={u.avatar_url} size={38} />
                               <span>
-                                <b>{u.name || u.username}{u.id === me.id && " (kamu)"}<RoleBadge role={u.role} labels={roleLabels} />{u.banned && <em className="badge warn">diblokir</em>}{u.muted && <em className="badge warn">bisu</em>}</b>
+                                <b>{u.name || u.username}{u.verified && <VerifiedBadge />}{u.id === me.id && " (kamu)"}<RoleBadge role={u.role} labels={roleLabels} />{u.banned && <em className="badge warn">diblokir</em>}{u.muted && <em className="badge warn">bisu</em>}</b>
                                 <small>{u.bio || `@${u.username}`}</small>
                               </span>
                             </button>
@@ -852,7 +854,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
             <button className="zoomable" disabled={!viewUser.avatar_url} onClick={() => viewUser.avatar_url && setZoom(viewUser.avatar_url)} aria-label="Perbesar foto">
               <Avatar name={viewUser.name || viewUser.username} src={viewUser.avatar_url} size={96} />
             </button>
-            <h2>{viewUser.name || viewUser.username}{viewUser.id === me.id ? " (kamu)" : ""}</h2>
+            <h2>{viewUser.name || viewUser.username}{viewUser.verified && <VerifiedBadge />}{viewUser.id === me.id ? " (kamu)" : ""}</h2>
             <p className="muted">@{viewUser.username}</p>
             {viewUser.bio && <p className="desc">{viewUser.bio}</p>}
             <div className="contact-badges">

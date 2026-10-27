@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { COMMUNITY_ID } from "@/lib/mentions";
 import { Dialog, type DialogAction } from "./overlays";
-import { Avatar, Icon, RoleBadge, DEFAULT_ROLE_LABELS, type Me, type RoleLabels } from "./ui";
+import { Avatar, Icon, RoleBadge, VerifiedBadge, DEFAULT_ROLE_LABELS, type Me, type RoleLabels } from "./ui";
 
 type AUser = {
   id: string; username: string | null; name: string | null; avatar_url: string | null; role: string; email: string | null;
@@ -214,7 +214,7 @@ export default function Console({ me, onClose, onToast, onChanged }: {
                     <button className="crow-head" onClick={() => setSel(open ? null : u.id)} aria-expanded={open}>
                       <Avatar name={u.name || u.username || "?"} src={u.avatar_url} size={40} />
                       <span className="meta">
-                        <b>{u.name || u.username || "Tanpa nama"} <RoleBadge role={u.role} title={(u as any).role_title} labels={roleLabels} />
+                        <b>{u.name || u.username || "Tanpa nama"} <RoleBadge role={u.role} title={(u as any).role_title} labels={roleLabels} />{(u as any).verified && <VerifiedBadge />}
                           {u.banned && <em className="badge warn">diblokir</em>}
                           {isMuted(u) && <em className="badge warn">bisu</em>}
                           {u.kicked && <em className="badge warn">kick</em>}</b>
@@ -265,14 +265,21 @@ export default function Console({ me, onClose, onToast, onChanged }: {
                             </div>
                             {owner && (
                               <div className="crow-act wrap">
-                                <input className="field" placeholder="Sebutan kustom (opsional)" maxLength={24} defaultValue={(u as any).role_title || ""}
-                                  onBlur={(e) => {
-                                    const v = e.target.value.trim();
-                                    if (v === ((u as any).role_title || "")) return;
-                                    act({ action: "title", userId: u.id, title: v }, v ? `Sebutan: ${v}` : "Sebutan dihapus");
-                                  }} />
+                                <div className="title-edit">
+                                  <label className="muted small">Sebutan role (custom per orang)</label>
+                                  <div className="title-row">
+                                    <input className="field" id={`title-${u.id}`} placeholder={u.role === "owner" ? roleLabels.owner : u.role === "admin" ? roleLabels.admin : roleLabels.user}
+                                      maxLength={24} defaultValue={(u as any).role_title || ""} />
+                                    <button type="button" onClick={() => {
+                                      const el = document.getElementById(`title-${u.id}`) as HTMLInputElement | null;
+                                      const v = (el?.value || "").trim();
+                                      act({ action: "title", userId: u.id, title: v }, v ? `Sebutan: ${v}` : "Sebutan dihapus");
+                                    }}>Simpan</button>
+                                  </div>
+                                </div>
+                                {u.role !== "owner" && <button onClick={() => act({ action: "verify", userId: u.id, verified: !(u as any).verified }, (u as any).verified ? "Centang biru dicabut" : "Centang biru diberikan")}>{(u as any).verified ? "Cabut centang biru" : "Beri centang biru"}</button>}
                                 {u.role !== "admin" && <button onClick={() => act({ action: "role", userId: u.id, role: "admin" }, `Dijadikan ${roleLabels.admin}`)}>Jadikan {roleLabels.admin}</button>}
-                                {u.role !== "owner" && <button onClick={() => ask(`Jadikan ${label} owner?`, "Owner punya console penuh: bisa kick, ban, mengubah role, dan menambah owner lain.", "Jadikan owner", () => act({ action: "role", userId: u.id, role: "owner" }, "Dijadikan owner"), false)}>{roleLabels.owner}</button>}
+                                {u.role !== "owner" && <button onClick={() => ask(`Jadikan ${label} ${roleLabels.owner}?`, `${roleLabels.owner} punya console penuh: kick, ban, ubah role, tambah ${roleLabels.owner} lain.`, `Jadikan ${roleLabels.owner}`, () => act({ action: "role", userId: u.id, role: "owner" }, `Dijadikan ${roleLabels.owner}`), false)}>Jadikan {roleLabels.owner}</button>}
                                 {u.role !== "user" && <button onClick={() => act({ action: "role", userId: u.id, role: "user" }, "Role dicabut")}>Jadikan {roleLabels.user}</button>}
                                 <button className="danger" onClick={() => ask(`Reset password ${label}?`, "Password dihapus. Mereka diminta membuat password baru saat membuka aplikasi lagi.", "Reset password", () => act({ action: "reset_password", userId: u.id }, "Password direset"))}>Reset password</button>
                               </div>
@@ -324,7 +331,7 @@ export default function Console({ me, onClose, onToast, onChanged }: {
                       <li key={u.id} className="crow">
                         <div className="crow-head static">
                           <Avatar name={u.name || u.username} src={u.avatar_url} size={40} />
-                          <span className="meta"><b>{u.name || u.username} <RoleBadge role={u.role} title={(u as any).role_title} labels={roleLabels} />{u.banned && <em className="badge warn">diblokir</em>}</b><small>@{u.username}</small></span>
+                          <span className="meta"><b>{u.name || u.username} <RoleBadge role={u.role} title={(u as any).role_title} labels={roleLabels} />{(u as any).verified && <VerifiedBadge />}{u.banned && <em className="badge warn">diblokir</em>}</b><small>@{u.username}</small></span>
                           {canKick && <button className="link danger" onClick={() => ask(`Keluarkan @${u.username}?`, `Dikeluarkan dari “${curGroup.title}”.`, "Kick", () => kickFrom(curGroup.id, u))}>Kick</button>}
                         </div>
                       </li>

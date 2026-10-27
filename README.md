@@ -115,3 +115,12 @@ Deploy ke Vercel: import repo, sertakan `config.json` (file ini di-gitignore, ja
 - **Hapus DM & grup** — hapus chat pribadi/grup + kosongkan komunitas.
 - **Reset semua data** — pesan + DM/grup/AI chat; komunitas dikosongkan & semua user dimasukkan ulang.
 - Wajib ketik `RESET` + konfirmasi dialog. Tercatat di Log moderasi.
+
+## Centang biru (verified)
+
+- Semua **owner** otomatis punya centang biru (`/public/verified.png`) di samping nama: pesan, daftar chat, info kontak, daftar anggota, profil publik, dan profil sendiri.
+- Owner bisa **memberi / mencabut** centang biru user lain lewat:
+  - Console → Pengguna → buka user → tombol **Beri centang biru** / **Cabut centang biru**
+  - Menu tindakan (⋮) di daftar anggota grup/Komunitas
+- Disimpan di kolom `users.verified` (dibuat otomatis oleh `ensureSchema`, atau jalankan ulang `schema.sql`).
+- API: `POST /api/admin/users` `{ "action": "verify", "userId": "...", "verified": true|false }` (hanya owner; dicatat di mod log).

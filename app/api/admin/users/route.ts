@@ -22,7 +22,7 @@ export async function GET(req: Request) {
 
   const [rows, [stats]] = await Promise.all([
     sql`
-      select id, username, name, email, avatar_url, role, role_title, banned_at, ban_reason, muted_until, created_at,
+      select id, username, name, email, avatar_url, role, role_title, verified, banned_at, ban_reason, muted_until, created_at,
         (password_hash is not null) as has_password,
         exists (select 1 from conversation_kicks k where k.conversation_id = ${COMMUNITY_ID}::uuid and k.user_id = users.id) as kicked
       from users
@@ -45,6 +45,7 @@ export async function GET(req: Request) {
   const more = rows.length > 50;
   const users = rows.slice(0, 50).map((u) => ({
     id: u.id, username: u.username, name: u.name, avatar_url: u.avatar_url, role: u.role, role_title: u.role_title ?? null,
+    verified: u.role === "owner" || !!u.verified,
     email: rank(me.role) === 2 ? u.email : null,
     banned: !!u.banned_at, ban_reason: u.ban_reason, muted_until: u.muted_until, created_at: u.created_at,
     has_password: u.has_password, kicked: u.kicked, root: isRootEmail(u.email),
@@ -61,6 +62,7 @@ const body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("unmute"), userId }),
   z.object({ action: z.literal("role"), userId, role: z.enum(["user", "admin", "owner"]), title: z.string().trim().max(24).optional() }),
   z.object({ action: z.literal("title"), userId, title: z.string().trim().max(24) }),
+  z.object({ action: z.literal("verify"), userId, verified: z.boolean() }),
   z.object({ action: z.literal("grant"), email: z.string().trim().toLowerCase().email().max(254), role: z.enum(["admin", "owner"]) }),
   z.object({ action: z.literal("rejoin"), userId }),
   z.object({ action: z.literal("reset_password"), userId }),
@@ -97,7 +99,7 @@ export async function POST(req: Request) {
     return Response.json({ ok: true });
   }
 
-  const [t] = await sql`select id, role, email, username, name from users where id = ${d.userId}`;
+  const [t] = await sql`select id, role, email, username, name, verified from users where id = ${d.userId}`;
   if (!t) return deny("Pengguna tidak ditemukan", 404);
   const target = { id: t.id as string, role: String(t.role), email: (t.email as string | null) ?? null };
   if (!canManage(me, target)) return deny("Kamu tidak bisa menindak akun ini");
@@ -132,7 +134,7 @@ export async function POST(req: Request) {
       if (!isOwner) return deny("Hanya owner yang bisa mengubah role");
       const title = "title" in d && d.title ? String(d.title).trim() || null : null;
       await sql`update users set role = ${d.role}, role_title = coalesce(${title}, role_title) where id = ${t.id}`;
-      await pushTo(t.id, "role", { role: d.role, title });
+      await pushTo(t.id, "role", { role: d.role, title, verified: d.role === "owner" || !!t.verified });
       await log(`role:${d.role}`, tn, title ? `title:${title}` : `sebelumnya ${t.role}`);
       break;
     }
@@ -140,8 +142,15 @@ export async function POST(req: Request) {
       if (!isOwner) return deny("Hanya owner yang bisa mengubah sebutan");
       const title = d.title.trim() || null;
       await sql`update users set role_title = ${title} where id = ${t.id}`;
-      await pushTo(t.id, "role", { role: t.role, title });
+      await pushTo(t.id, "role", { role: t.role, title, verified: t.role === "owner" || !!t.verified });
       await log("role_title", tn, title || "dihapus");
+      break;
+    }
+    case "verify": {
+      if (!isOwner) return deny("Hanya owner yang bisa memberi centang biru");
+      await sql`update users set verified = ${d.verified} where id = ${t.id}`;
+      await pushTo(t.id, "role", { role: t.role, verified: d.verified || t.role === "owner" });
+      await log(d.verified ? "verify" : "unverify", tn, "centang biru");
       break;
     }
     case "rejoin": {
