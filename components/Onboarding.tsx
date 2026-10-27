@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Account from "./Account";
 import { Logo } from "./ui";
+import ThemeToggle from "./ThemeToggle";
 import { USERNAME_RE, RESERVED } from "@/lib/mentions";
 
 export default function Onboarding({ suggestedName }: { suggestedName: string }) {
@@ -22,6 +23,7 @@ export default function Onboarding({ suggestedName }: { suggestedName: string })
 
   return (
     <main className="auth">
+      <ThemeToggle className="icon-btn theme-fab" />
       <div className="auth-card">
         <div className="auth-top"><Logo /><Account name={suggestedName || "Akun"} /></div>
         <span className="eyebrow">Satu langkah lagi</span>

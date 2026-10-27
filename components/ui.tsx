@@ -16,7 +16,7 @@ export type UserLite = { id: string; username: string; name: string | null; avat
 
 export const convName = (c: Conv) => (c.kind === "dm" ? c.other_name || c.other_username || "Pengguna" : c.title || "Grup");
 export const hue = (s: string) => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
-export const nameColor = (s: string) => `hsl(${hue(s)} 75% 72%)`;
+export const nameColor = (s: string) => `hsl(${hue(s)} 70% var(--name-l, 72%))`;
 
 const P: Record<string, string> = {
   search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm10 2-4.3-4.3",
@@ -32,6 +32,8 @@ const P: Record<string, string> = {
   at: "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 0c0 1.7 1.3 3 3 3s3-1.3 3-3v-4a9 9 0 1 0-3.5 7.1",
   chat: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z",
   down: "m6 9 6 6 6-6",
+  sun: "M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4",
+  moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z",
 };
 export function Icon({ n, size = 20 }: { n: keyof typeof P; size?: number }) {
   return (

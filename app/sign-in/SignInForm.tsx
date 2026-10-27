@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { GoogleAuthProvider, getAuth, signInWithPopup, signOut } from "firebase/auth";
+import { GoogleAuthProvider, getAuth, getRedirectResult, signInWithPopup, signInWithRedirect, signOut } from "firebase/auth";
 import { Logo } from "@/components/ui";
+import ThemeToggle from "@/components/ThemeToggle";
 
 type FirebaseWeb = { apiKey: string; authDomain: string; projectId: string; appId: string };
 
@@ -21,6 +22,17 @@ const Google = () => (
     <path fill="#34A853" d="M24 48c6.500 0 11.900-2.100 15.900-5.800l-7.600-5.900c-2.100 1.400-4.900 2.300-8.300 2.300-6.300 0-11.600-4.100-13.500-9.800l-7.900 6.100C6.500 42.600 14.600 48 24 48Z" />
   </svg>
 );
+
+const fbAuth = (cfg: FirebaseWeb) => getAuth(getApps().length ? getApp() : initializeApp(cfg));
+
+const googleError = (e: any) => {
+  switch (e?.code) {
+    case "auth/unauthorized-domain": return "Domain ini belum diizinkan di Firebase (Authentication → Settings → Authorized domains)";
+    case "auth/operation-not-allowed": return "Login Google belum diaktifkan di Firebase (Authentication → Sign-in method → Google)";
+    case "auth/network-request-failed": return "Jaringan bermasalah, coba lagi";
+    default: return e?.message || "Login Google gagal";
+  }
+};
 
 export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
   const [email, setEmail] = useState("");
@@ -41,19 +53,40 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
   const sendCode = () => run(async () => { await post("/api/auth/otp/send", { email }); setStep("code"); setCode(""); setWait(60); setBusy(false); });
   const verify = (c: string) => run(async () => { await post("/api/auth/otp/verify", { email, code: c }); window.location.assign("/"); });
   const google = () => run(async () => {
-    const auth = getAuth(getApps().length ? getApp() : initializeApp(firebase));
+    const auth = fbAuth(firebase);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
     try {
-      const res = await signInWithPopup(auth, new GoogleAuthProvider());
+      const res = await signInWithPopup(auth, provider);
       await post("/api/auth/google", { idToken: await res.user.getIdToken() });
       await signOut(auth);
+      window.location.assign("/");
     } catch (e: any) {
       if (e?.code === "auth/popup-closed-by-user" || e?.code === "auth/cancelled-popup-request") { setBusy(false); return; }
-      if (e?.code === "auth/unauthorized-domain") throw new Error("Domain belum diizinkan di Firebase (Authentication → Settings → Authorized domains)");
-      if (e?.code === "auth/operation-not-allowed") throw new Error("Provider Google belum diaktifkan di Firebase");
-      throw e;
+      // Popup diblokir (umum di browser HP / in-app browser): pakai redirect.
+      if (e?.code === "auth/popup-blocked" || e?.code === "auth/operation-not-supported-in-this-environment") {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+      throw new Error(googleError(e));
     }
-    window.location.assign("/");
   });
+
+  // Menyelesaikan login Google yang memakai redirect.
+  useEffect(() => {
+    (async () => {
+      try {
+        const auth = fbAuth(firebase);
+        const res = await getRedirectResult(auth);
+        if (!res) return;
+        setBusy(true);
+        await post("/api/auth/google", { idToken: await res.user.getIdToken() });
+        await signOut(auth);
+        window.location.assign("/");
+      } catch (e: any) { setErr(googleError(e)); setBusy(false); }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (step === "code" && /^\d{6}$/.test(code) && !busy && !sent.current) { sent.current = true; verify(code).finally(() => { sent.current = false; }); }
@@ -62,6 +95,7 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
 
   return (
     <main className="login">
+      <ThemeToggle className="icon-btn theme-fab" />
       <div className="login-bg" aria-hidden><i className="orbit o1" /><i className="orbit o2" /><i className="glow" /></div>
 
       <section className="login-hero">
@@ -75,6 +109,13 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
         <div className="auth-top"><Logo /><strong>kevsoft-chat</strong></div>
         <h2>{step === "email" ? "Masuk atau daftar" : "Cek email kamu"}</h2>
         <p className="muted">{step === "email" ? "Masukkan email, kami kirim kode 6 digit." : <>Kode 6 digit dikirim ke <b>{email}</b>.</>}</p>
+
+        {step === "email" && (
+          <>
+            <button className="ghost g google-main" onClick={google} disabled={busy}><Google />Lanjut dengan Google</button>
+            <div className="or"><span>atau pakai email</span></div>
+          </>
+        )}
 
         {step === "email" ? (
           <form onSubmit={(e) => { e.preventDefault(); sendCode(); }}>
@@ -94,8 +135,6 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
           </form>
         )}
 
-        <div className="or"><span>atau</span></div>
-        <button className="ghost g" onClick={google} disabled={busy}><Google />Lanjut dengan Google</button>
         {err && <p className="error" role="alert">{err}</p>}
       </section>
     </main>
