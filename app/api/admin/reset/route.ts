@@ -23,12 +23,12 @@ export async function POST(req: Request) {
 
   if (scope.data === "messages") {
     // Hapus semua pesan (termasuk di Komunitas), biarkan chat & anggota.
-    const r = await sql`delete from messages`;
+    await sql`delete from messages`;
     await logMod({
       actorId: me.id,
       actorName: me.name,
       action: "reset_messages",
-      detail: `semua pesan dihapus (${r.count ?? "?"} baris)`,
+      detail: "semua pesan dihapus",
     });
     return Response.json({ ok: true, cleared: "messages" });
   }
