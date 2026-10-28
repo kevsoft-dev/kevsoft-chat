@@ -2,8 +2,9 @@
 import { neon } from "@neondatabase/serverless";
 import fs from "node:fs";
 
-let url; try { url = JSON.parse(fs.readFileSync(new URL("../config.json", import.meta.url), "utf8")).databaseUrl; } catch {}
-if (!url) { console.error("databaseUrl di config.json belum diisi"); process.exit(1); }
+let url = process.env.DATABASE_URL;
+if (!url) { try { url = JSON.parse(fs.readFileSync(new URL("../config.json", import.meta.url), "utf8")).databaseUrl; } catch {} }
+if (!url) { console.error("DATABASE_URL (env) atau databaseUrl di config.json belum diisi"); process.exit(1); }
 const sql = neon(url);
 const stmts = fs.readFileSync(new URL("../schema.sql", import.meta.url), "utf8")
   .split(";").map(s => s.trim()).filter(Boolean);

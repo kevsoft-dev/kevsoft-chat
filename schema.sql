@@ -131,4 +131,3 @@ create table if not exists rate_limits (
 );
 create index if not exists rate_limits_reset_idx on rate_limits (reset_at);
 create index if not exists messages_sender_idx on messages (sender_id, created_at desc);
-

@@ -118,11 +118,6 @@ const P: Record<string, string> = {
   shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z",
   key: "M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8Zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3",
   mute: "M11 5 6 9H2v6h4l5 4ZM22 9l-6 6M16 9l6 6",
-  heart: "M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8Z",
-  share: "M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14",
-  play: "M6 4l14 8-14 8Z",
-  link: "M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1",
-  news: "M4 4h13a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2ZM19 8h2v10a2 2 0 0 1-2 2M8 8h7M8 12h7M8 16h4",
 };
 export type IconName = keyof typeof P;
 export function Icon({ n, size = 20 }: { n: IconName; size?: number }) {

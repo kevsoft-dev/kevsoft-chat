@@ -1,13 +1,10 @@
 import { SignJWT, jwtVerify } from "jose";
-import { cfg, configIssue } from "./config";
+import { cfg } from "./config";
 
 // Sesi login: JWT HS256 di cookie httpOnly. Aman dipakai di middleware (edge) dan server.
 export const COOKIE = "kc_session";
 export const MAX_AGE = 60 * 60 * 24 * 30;
-const key = () => {
-  if (configIssue) throw new Error(configIssue);
-  return new TextEncoder().encode("session:" + cfg.otpSecret);
-};
+const key = () => new TextEncoder().encode("session:" + cfg.otpSecret);
 
 // via = cara login ("otp" / "google" = baru diverifikasi email; kosong = login password).
 // sv = versi sesi user; dinaikkan saat ganti/reset password atau "keluar dari semua perangkat" sehingga token lama langsung mati.

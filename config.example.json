@@ -9,7 +9,7 @@
     "appId": "1:52584199215:web:ff6d64b9a61f4857a882da",
     "measurementId": "G-0K8P631H47"
   },
-  "otpSecret": "GANTI-DENGAN-HASIL-openssl-rand-hex-32",
+  "otpSecret": "isi-string-acak-panjang (openssl rand -hex 32)",
   "pusher": {
     "appId": "",
     "key": "",
@@ -18,12 +18,5 @@
   },
   "owners": [
     "kevsoft.cs@gmail.com"
-  ],
-  "firebaseDb": {
-    "url": "https://kevsoft-apps-default-rtdb.asia-southeast1.firebasedatabase.app",
-    "serviceAccount": {
-      "client_email": "",
-      "private_key": ""
-    }
-  }
+  ]
 }

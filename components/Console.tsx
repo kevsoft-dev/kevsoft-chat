@@ -17,7 +17,7 @@ type Log = { id: number; actor_name: string; action: string; target_name: string
 const ACTIONS: Record<string, string> = {
   ban: "memblokir", unban: "membuka blokir", mute: "membisukan", unmute: "membuka bisu", kick: "mengeluarkan",
   rejoin: "mengizinkan kembali", reset_password: "mereset password", delete_message: "menghapus pesan dari",
-  delete_group: "menghapus grup", news_add: "menambah berita", news_delete: "menghapus berita", "role:owner": "menjadikan owner", "role:admin": "menjadikan admin", "role:user": "menjadikan user biasa",
+  delete_group: "menghapus grup", "role:owner": "menjadikan owner", "role:admin": "menjadikan admin", "role:user": "menjadikan user biasa",
   reset_messages: "mereset semua pesan", reset_chats: "mereset chat", reset_all: "mereset data penuh",
 };
 const MUTES = [[10, "10 menit"], [60, "1 jam"], [1440, "1 hari"], [10080, "7 hari"]] as const;
@@ -37,7 +37,6 @@ export default function Console({ me, onClose, onToast, onChanged }: {
   me: Me; onClose: () => void; onToast: (t: string) => void; onChanged: () => void;
 }) {
   const owner = me.role === "owner";
-  const [root, setRoot] = useState(false); // owner utama (dikonfirmasi server)
   const [tab, setTab] = useState<"users" | "groups" | "logs" | "system">("users");
   const [dialog, setDialog] = useState<{ title: string; text?: string; actions: DialogAction[] } | null>(null);
   const [resetConfirm, setResetConfirm] = useState("");
@@ -70,7 +69,7 @@ export default function Console({ me, onClose, onToast, onChanged }: {
     setLoading(false);
     if (!ok) { onToast(data?.error || "Gagal memuat pengguna"); return; }
     setUsers((l) => (append ? [...l, ...data.users] : data.users));
-    setMore(!!data.more); setStats(data.stats); setRoot(!!data.me_root);
+    setMore(!!data.more); setStats(data.stats);
   }, [q, filter, onToast]);
 
   useEffect(() => {
@@ -172,7 +171,7 @@ export default function Console({ me, onClose, onToast, onChanged }: {
         )}
 
         <div className="tabs">
-          {([["users", "Pengguna"], ["groups", "Grup"], ["logs", "Log"], ...(root ? [["system", "Sistem"] as const] : [])] as const).map(([k, l]) => (
+          {([["users", "Pengguna"], ["groups", "Grup"], ["logs", "Log"], ...(owner ? [["system", "Sistem"] as const] : [])] as const).map(([k, l]) => (
             <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>
           ))}
         </div>
@@ -186,7 +185,7 @@ export default function Console({ me, onClose, onToast, onChanged }: {
               </select>
             </div>
 
-            {root && (
+            {owner && (
               <div className="grant">
                 <button className="link" onClick={() => setGrantOpen((o) => !o)}><Icon n="key" size={16} /> Tambah owner / admin lewat email</button>
                 {grantOpen && (
@@ -279,9 +278,9 @@ export default function Console({ me, onClose, onToast, onChanged }: {
                                   </div>
                                 </div>
                                 {u.role !== "owner" && <button onClick={() => act({ action: "verify", userId: u.id, verified: !(u as any).verified }, (u as any).verified ? "Centang biru dicabut" : "Centang biru diberikan")}>{(u as any).verified ? "Cabut centang biru" : "Beri centang biru"}</button>}
-                                {root && u.role !== "admin" && <button onClick={() => act({ action: "role", userId: u.id, role: "admin" }, `Dijadikan ${roleLabels.admin}`)}>Jadikan {roleLabels.admin}</button>}
-                                {root && u.role !== "owner" && <button onClick={() => ask(`Jadikan ${label} ${roleLabels.owner}?`, `${roleLabels.owner} punya console penuh: kick, ban, ubah role, tambah ${roleLabels.owner} lain.`, `Jadikan ${roleLabels.owner}`, () => act({ action: "role", userId: u.id, role: "owner" }, `Dijadikan ${roleLabels.owner}`), false)}>Jadikan {roleLabels.owner}</button>}
-                                {root && u.role !== "user" && <button onClick={() => act({ action: "role", userId: u.id, role: "user" }, "Role dicabut")}>Jadikan {roleLabels.user}</button>}
+                                {u.role !== "admin" && <button onClick={() => act({ action: "role", userId: u.id, role: "admin" }, `Dijadikan ${roleLabels.admin}`)}>Jadikan {roleLabels.admin}</button>}
+                                {u.role !== "owner" && <button onClick={() => ask(`Jadikan ${label} ${roleLabels.owner}?`, `${roleLabels.owner} punya console penuh: kick, ban, ubah role, tambah ${roleLabels.owner} lain.`, `Jadikan ${roleLabels.owner}`, () => act({ action: "role", userId: u.id, role: "owner" }, `Dijadikan ${roleLabels.owner}`), false)}>Jadikan {roleLabels.owner}</button>}
+                                {u.role !== "user" && <button onClick={() => act({ action: "role", userId: u.id, role: "user" }, "Role dicabut")}>Jadikan {roleLabels.user}</button>}
                                 <button className="danger" onClick={() => ask(`Reset password ${label}?`, "Password dihapus. Mereka diminta membuat password baru saat membuka aplikasi lagi.", "Reset password", () => act({ action: "reset_password", userId: u.id }, "Password direset"))}>Reset password</button>
                               </div>
                             )}
@@ -320,14 +319,14 @@ export default function Console({ me, onClose, onToast, onChanged }: {
               <>
                 <div className="console-tools">
                   <button className="link" onClick={() => setGSel(null)}><Icon n="back" size={16} /> Semua grup</button>
-                  {root && curGroup.kind === "group" && (
+                  {owner && curGroup.kind === "group" && (
                     <button className="link danger" onClick={() => ask(`Hapus grup “${curGroup.title}”?`, "Grup dan semua pesannya dihapus permanen untuk semua anggota.", "Hapus grup", () => deleteGroup(curGroup))}>Hapus grup</button>
                   )}
                 </div>
                 <h4 className="ctitle">{curGroup.title} · {gMembers.length} anggota</h4>
                 <ul className="clist">
                   {gMembers.map((u) => {
-                    const canKick = u.id !== me.id && (root ? u.sys_role !== "owner" : u.sys_role === "user");
+                    const canKick = u.id !== me.id && (owner ? u.sys_role !== "owner" : u.sys_role === "user");
                     return (
                       <li key={u.id} className="crow">
                         <div className="crow-head static">
@@ -358,7 +357,7 @@ export default function Console({ me, onClose, onToast, onChanged }: {
           </ul>
         )}
 
-        {tab === "system" && root && (
+        {tab === "system" && owner && (
           <div className="sys-panel">
             <h4 className="ctitle">Nama role (sebutan)</h4>
             <p className="muted small">Ganti sebutan di seluruh app. Hak akses tetap: owner &gt; admin &gt; member.</p>

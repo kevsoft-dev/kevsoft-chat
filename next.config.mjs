@@ -9,8 +9,7 @@ const csp = [
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
   "connect-src 'self' https://*.googleapis.com https://*.firebaseapp.com https://*.google.com https://*.pusher.com wss://*.pusher.com",
-  "media-src 'self' blob: https:",
-  "frame-src https://*.firebaseapp.com https://accounts.google.com https://*.google.com https://www.youtube-nocookie.com",
+  "frame-src https://*.firebaseapp.com https://accounts.google.com https://*.google.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -19,7 +18,7 @@ const csp = [
 ].join("; ");
 
 const headers = [
-  { key: "Content-Security-Policy" /* ganti ke "Content-Security-Policy-Report-Only" untuk uji tanpa memblokir */, value: csp },
+  { key: process.env.CSP_MODE === "report" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy", value: csp },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

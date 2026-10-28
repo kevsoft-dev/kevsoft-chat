@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE, verifyToken } from "./lib/token";
-import { configIssue } from "./lib/config";
 
 const PUBLIC = [
   /^\/sign-in/,
@@ -17,7 +16,6 @@ const RESERVED_PATH = new Set([
 
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (configIssue) return new NextResponse(configIssue, { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
   // Anti-CSRF: permintaan yang mengubah data harus berasal dari origin yang sama.
   if (pathname.startsWith("/api/") && !["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     const origin = req.headers.get("origin");

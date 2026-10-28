@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { getUserId, getStaff } from "@/lib/auth";
-import { isRootEmail, rank } from "@/lib/roles";
+import { rank } from "@/lib/roles";
 import { ensureSchema } from "@/lib/migrate";
 
 const DEFAULTS = { role_owner: "Owner", role_admin: "Admin", role_user: "Member" };
@@ -21,7 +21,7 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   const me = await getStaff();
-  if (!me || rank(me.role) < 2 || !isRootEmail(me.email)) return Response.json({ error: "Hanya owner utama" }, { status: 403 });
+  if (!me || rank(me.role) < 2) return Response.json({ error: "Hanya owner" }, { status: 403 });
   await ensureSchema();
 
   const body = z.object({
