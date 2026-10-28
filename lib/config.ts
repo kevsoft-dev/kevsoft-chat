@@ -38,7 +38,8 @@ export const cfg = {
   owners: ((f.owners as string[] | undefined) ?? []).map((e) => String(e).trim().toLowerCase()).filter(Boolean),
 };
 
-// Kunci penanda tangan sesi harus kuat. Di produksi, kunci lemah/placeholder = aplikasi menolak jalan.
+// Kunci penanda tangan sesi harus kuat. Kunci lemah/placeholder = aplikasi menolak melayani (503 dengan pesan jelas).
 const WEAK = !cfg.otpSecret || cfg.otpSecret.length < 32 || /isi-string|ganti|change|example/i.test(cfg.otpSecret);
-if (WEAK && process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build")
-  throw new Error("otpSecret di config.json belum diisi atau terlalu lemah (minimal 32 karakter). Buat dengan: openssl rand -hex 32");
+export const configIssue: string | null = WEAK
+  ? "Konfigurasi belum lengkap: otpSecret di config.json kosong, placeholder, atau kurang dari 32 karakter."
+  : null;
