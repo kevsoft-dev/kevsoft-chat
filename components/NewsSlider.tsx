@@ -241,7 +241,7 @@ function Viewer({ item, me, isOwner, onToast, onClose, onPatch, onDeleted }: {
           {slides.length > 0 && (
             <div className="nw-media">
               {slides[slide].t === "img" && <img src={slides[slide].src} alt={item.title} referrerPolicy="no-referrer" />}
-              {slides[slide].t === "vid" && <video key={slides[slide].src} src={slides[slide].src} controls playsInline preload="metadata" referrerPolicy="no-referrer" />}
+              {slides[slide].t === "vid" && <video key={slides[slide].src} src={slides[slide].src} controls playsInline preload="metadata" />}
               {slides[slide].t === "yt" && <iframe src={slides[slide].src} title={item.title} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />}
               {slides[slide].t === "url" && <a className="nw-btn" href={slides[slide].src} target="_blank" rel="noopener noreferrer nofollow"><Icon n="play" size={16} /> Tonton video</a>}
               {slides.length > 1 && (
