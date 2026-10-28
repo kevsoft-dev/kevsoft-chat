@@ -26,10 +26,13 @@ export default memo(function MessageRow({ m, mine, first, newDay, showName, show
         )}
         <div className={`bubble${gone ? " gone" : ""}${m.status === "failed" ? " failed" : ""}`} {...lp.bind}>
           {showName && (
-            <button type="button" className="sender" style={{ color: ai ? "var(--violet)" : nameColor(m.username || "") }}
+            <button type="button" className="sender" style={{ color: ai ? "var(--accent-text)" : nameColor(m.username || "") }}
               onClick={() => !ai && m.username && onOpenProfile?.(m.username)}
               disabled={ai}>
-              {ai ? "Kev-Ai" : m.name}{!ai && m.verified && <VerifiedBadge />}<small> @{m.username}</small>{ai && <em className="badge">AI</em>}
+              {ai ? "Kev-Ai" : m.name}
+              {!ai && m.verified && <VerifiedBadge />}
+              <small> @{m.username}</small>
+              {ai && <em className="badge">AI</em>}
             </button>
           )}
           {!gone && m.reply_to && m.reply_body != null && (

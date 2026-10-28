@@ -222,13 +222,16 @@ export default function Composer({ convId, kind, me, replyTo, onCancelReply, onS
       {menuOpen && kind !== "ai" && (
         <div className="attach-menu">
           <button type="button" onClick={() => { setMenuOpen(false); imgRef.current?.click(); }}>
-            <span className="am-ico img">🖼</span> Galeri
+            <span className="am-ico img"><Icon n="image" size={22} /></span>
+            Galeri
           </button>
           <button type="button" onClick={() => { setMenuOpen(false); fileRef.current?.click(); }}>
-            <span className="am-ico doc">📄</span> Dokumen
+            <span className="am-ico doc"><Icon n="file" size={22} /></span>
+            Dokumen
           </button>
           <button type="button" onClick={() => { setMenuOpen(false); setPollOpen(true); }}>
-            <span className="am-ico poll">📊</span> Polling
+            <span className="am-ico poll"><Icon n="poll" size={22} /></span>
+            Polling
           </button>
         </div>
       )}
@@ -237,7 +240,7 @@ export default function Composer({ convId, kind, me, replyTo, onCancelReply, onS
         {kind !== "ai" && (
           <button type="button" className={`icon-btn attach${menuOpen ? " on" : ""}`}
             aria-label="Lampirkan" onClick={() => setMenuOpen((o) => !o)}>
-            <Icon n="plus" size={22} />
+            <Icon n="paperclip" size={20} />
           </button>
         )}
         <input ref={imgRef} type="file" hidden accept="image/jpeg,image/png,image/webp,image/gif"

@@ -123,6 +123,10 @@ const P: Record<string, string> = {
   play: "M6 4l14 8-14 8Z",
   link: "M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1",
   news: "M4 4h13a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2ZM19 8h2v10a2 2 0 0 1-2 2M8 8h7M8 12h7M8 16h4",
+  image: "M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Zm0 10 4-4 3 3 5-6 4 5",
+  file: "M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Zm0 0v6h6M9 13h6M9 17h6",
+  poll: "M4 19V9M10 19V5M16 19v-7M22 19V11",
+  paperclip: "m21.4 11.6-8.8 8.8a5 5 0 0 1-7.1-7.1l9.2-9.2a3.2 3.2 0 0 1 4.5 4.5l-9.2 9.2a1.4 1.4 0 0 1-2-2l8.1-8.1",
 };
 export type IconName = keyof typeof P;
 export function Icon({ n, size = 20 }: { n: IconName; size?: number }) {

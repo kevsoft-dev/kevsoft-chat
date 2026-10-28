@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 
   const { conversationId, question, options } = parsed.data;
   const poll = { question, options, votes: {} as Record<string, number> };
-  const body = `📊 ${question}`;
+  const body = question;
 
   const [row] = await sql`
     insert into messages (conversation_id, sender_id, kind, body, poll_data, expires_at)
