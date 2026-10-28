@@ -17,6 +17,12 @@ export const cfg = {
     appId: env("FIREBASE_APP_ID") || String(f.firebase?.appId ?? ""),
     measurementId: env("FIREBASE_MEASUREMENT_ID") || String(f.firebase?.measurementId ?? ""),
   },
+  // Firebase Realtime Database khusus berita (terpisah dari Neon). Diakses HANYA dari server.
+  firebaseDb: {
+    url: (env("FIREBASE_DATABASE_URL") || String(f.firebaseDb?.url ?? "") || "https://kevsoft-apps-default-rtdb.asia-southeast1.firebasedatabase.app").replace(/\/+$/, ""),
+    serviceAccount: env("FIREBASE_SERVICE_ACCOUNT"),
+    secret: env("FIREBASE_DB_SECRET"),
+  },
   pusher: {
     appId: env("PUSHER_APP_ID") || String(f.pusher?.appId ?? ""),
     key: env("PUSHER_KEY") || String(f.pusher?.key ?? ""),

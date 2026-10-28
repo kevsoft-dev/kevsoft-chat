@@ -3,7 +3,7 @@ import { sql } from "@/lib/db";
 import { getStaff } from "@/lib/auth";
 import { logMod } from "@/lib/audit";
 import { pushTo } from "@/lib/messages";
-import { rank } from "@/lib/roles";
+import { isRootEmail, rank } from "@/lib/roles";
 
 // Daftar grup untuk Console. Dengan ?id= -> anggota grup itu (staf tidak perlu menjadi anggota).
 export async function GET(req: Request) {
@@ -36,7 +36,7 @@ export async function GET(req: Request) {
 export async function DELETE(req: Request) {
   const me = await getStaff();
   if (!me) return new Response("Forbidden", { status: 403 });
-  if (rank(me.role) < 2) return Response.json({ error: "Hanya owner yang bisa menghapus grup" }, { status: 403 });
+  if (rank(me.role) < 2 || !isRootEmail(me.email)) return Response.json({ error: "Hanya owner utama yang bisa menghapus grup" }, { status: 403 });
   const cid = z.string().uuid().safeParse(new URL(req.url).searchParams.get("id"));
   if (!cid.success) return new Response("Bad request", { status: 400 });
 

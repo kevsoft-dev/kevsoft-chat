@@ -18,5 +18,8 @@
   },
   "owners": [
     "kevsoft.cs@gmail.com"
-  ]
+  ],
+  "firebaseDb": {
+    "url": "https://kevsoft-apps-default-rtdb.asia-southeast1.firebasedatabase.app"
+  }
 }

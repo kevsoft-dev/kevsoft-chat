@@ -138,3 +138,18 @@ Deploy ke Vercel: import repo, sertakan `config.json` (file ini di-gitignore, ja
 - **Pin** di Komunitas hanya staf, di grup hanya admin grup. **Vote poll** kini atomik (tidak saling menimpa).
 - `/api/health` publik hanya `{ok}`; diagnosis lengkap khusus owner. Reset data massal hanya owner utama (email di `OWNER_EMAILS`).
 - Pesan kedaluwarsa dibersihkan otomatis.
+
+## Fitur baru: Berita Kevsoft (slide news)
+
+Carousel berita di atas daftar chat (auto-slide 6 detik, bisa digeser). Klik kartu untuk membuka berita penuh.
+
+- **Owner**: tambah berita (judul, isi, hingga 6 **URL gambar**, hingga 3 **URL video** YouTube/.mp4/.webm, hingga 3 tombol link) dan hapus berita. Tidak ada upload file; semua media berupa URL `https://`.
+- **Semua user**: lihat, **like**, **share** (Web Share / salin link `/?news=<id>`), **komentar** (bisa dibalas dan di-**tag** `@username`, yang di-tag/dibalas dapat notifikasi realtime).
+- **Penyimpanan: Firebase Realtime Database** (bukan Neon). Node: `news`, `news_comments`, `user_likes`. Profil penulis komentar tetap diambil dari Neon.
+
+### Setup Firebase (wajib, sekali saja)
+1. Firebase Console > Realtime Database > **Rules**, isi lalu Publish:
+   `{ "rules": { ".read": false, ".write": false } }`
+   Server kita memakai kredensial admin sehingga tetap bisa baca/tulis, sedangkan orang luar tidak bisa. **Jangan biarkan rules terbuka**, kalau tidak siapa pun bisa menulis berita langsung ke database.
+2. Project settings > Service accounts > **Generate new private key**. Isi seluruh JSON itu (satu baris) ke env `FIREBASE_SERVICE_ACCOUNT`.
+   (Alternatif lama: `FIREBASE_DB_SECRET`.) `FIREBASE_DATABASE_URL` sudah default ke database Kevsoft.

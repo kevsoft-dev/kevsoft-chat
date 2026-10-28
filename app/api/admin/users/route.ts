@@ -52,7 +52,7 @@ export async function GET(req: Request) {
     has_password: u.has_password, kicked: u.kicked, root: isRootEmail(u.email),
     can_manage: canManage(me, { id: u.id, role: u.role, email: u.email }),
   }));
-  return Response.json({ users, more, stats });
+  return Response.json({ users, more, stats, me_root: rank(me.role) === 2 && isRootEmail(me.email) });
 }
 
 const userId = z.string().min(1).max(64);
@@ -79,12 +79,13 @@ export async function POST(req: Request) {
   if (!parsed.success) return deny("Data tidak valid", 400);
   const d = parsed.data;
   const isOwner = rank(me.role) === 2;
+  const isRoot = isOwner && isRootEmail(me.email);
   const log = (action: string, t: { id: string; name: string }, detail?: string) =>
     logMod({ actorId: me.id, actorName: me.name, action, targetId: t.id, targetName: t.name, detail });
 
   // Tambah owner/admin lewat email (boleh sebelum orangnya mendaftar). Hanya owner.
   if (d.action === "grant") {
-    if (!isOwner) return deny("Hanya owner yang bisa menambah staf");
+    if (!isRoot) return deny("Hanya owner utama yang bisa menambah staf");
     if (isRootEmail(d.email)) return Response.json({ ok: true });
     const [ex] = await sql`select id, role, email, username, name from users where email = ${d.email}`;
     if (ex) {
@@ -134,7 +135,7 @@ export async function POST(req: Request) {
       break;
     }
     case "role": {
-      if (!isOwner) return deny("Hanya owner yang bisa mengubah role");
+      if (!isRoot) return deny("Hanya owner utama yang bisa mengubah role");
       const title = "title" in d && d.title ? String(d.title).trim() || null : null;
       await sql`update users set role = ${d.role}, role_title = coalesce(${title}, role_title) where id = ${t.id}`;
       await pushTo(t.id, "role", { role: d.role, title, verified: d.role === "owner" || !!t.verified });

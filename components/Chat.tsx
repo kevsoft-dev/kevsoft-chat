@@ -6,6 +6,7 @@ import { readPref } from "@/lib/prefs";
 import { blip, unlockAudio } from "@/lib/sound";
 import Composer from "./Composer";
 import Console from "./Console";
+import NewsSlider from "./NewsSlider";
 import ConvItem from "./ConvItem";
 import MessageRow from "./MessageRow";
 import NewChat from "./NewChat";
@@ -205,6 +206,8 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       window.location.assign("/sign-in");
     });
     ch.bind("muted", () => toast("Kamu dibisukan oleh moderator"));
+    ch.bind("news_mention", (d: { title?: string; from?: string; reply?: boolean }) =>
+      toast(d?.reply ? `@${d.from} membalas komentarmu di berita` : `@${d?.from} menyebut kamu di komentar berita`));
     ch.bind("role", (d: { role?: string; verified?: boolean }) => { if (d?.role) setMe((x) => ({ ...x, role: d.role, ...(typeof d.verified === "boolean" ? { verified: d.verified } : {}) })); });
 
     let first = true; // setelah tersambung ulang, ambil pesan yang mungkin terlewat
@@ -650,6 +653,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
             <button className="account-btn" onClick={() => setProfile(true)} aria-label="Profil dan pengaturan"><Avatar name={me.name} src={me.avatarUrl} size={40} /></button>
           </div>
         </header>
+        <NewsSlider me={{ id: me.id, username: me.username, role: me.role }} onToast={toast} />
         <div className="search"><Icon n="search" size={18} /><input placeholder="Cari chat" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari chat" /></div>
         <div className="tabs">
           {([["all", "Semua"], ["dm", "Pribadi"], ["group", "Grup"]] as const).map(([k, l]) => (
