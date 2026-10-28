@@ -12,7 +12,7 @@
 ## 1. Install
 ```bash
 npm install
-cp config.example.json config.json   # lalu isi semua nilainya (config.json sudah berisi database Neon)
+cp .env.example .env.local   # isi DATABASE_URL, OTP_SECRET, PUSHER_* (jangan taruh rahasia di config.json)
 ```
 
 ## 2. Neon
@@ -124,3 +124,17 @@ Deploy ke Vercel: import repo, sertakan `config.json` (file ini di-gitignore, ja
   - Menu tindakan (⋮) di daftar anggota grup/Komunitas
 - Disimpan di kolom `users.verified` (dibuat otomatis oleh `ensureSchema`, atau jalankan ulang `schema.sql`).
 - API: `POST /api/admin/users` `{ "action": "verify", "userId": "...", "verified": true|false }` (hanya owner; dicatat di mod log).
+
+
+---
+
+## Pembaruan v11: pengerasan keamanan
+
+- **Rahasia keluar dari kode**: `DATABASE_URL`, `OTP_SECRET`, `PUSHER_*`, `OWNER_EMAILS` dibaca dari environment variable (lihat `.env.example`). `config.json` hanya cadangan dev dan berisi placeholder. Produksi menolak jalan jika `OTP_SECRET` lemah.
+- **Rate limit** berbasis database (`rate_limits`) untuk login, OTP, Google, kirim pesan, file, poll, foto, ganti password, pencarian user, dan aksi admin.
+- **Pencabutan sesi**: `users.token_version`. Ganti/reset password, ban, dan menu "Keluar dari semua perangkat" mematikan semua token lama.
+- **Anti-CSRF** (cek Origin / Sec-Fetch-Site) untuk semua API non-GET, plus **CSP** dan header keamanan tambahan. Jika ada yang terblokir di produksi, set `CSP_MODE=report` sementara lalu lihat console browser.
+- **File**: isi file dicek (magic bytes) terhadap tipe yang diklaim; hanya gambar/PDF tampil inline, sisanya diunduh; nama file aman untuk karakter non-ASCII.
+- **Pin** di Komunitas hanya staf, di grup hanya admin grup. **Vote poll** kini atomik (tidak saling menimpa).
+- `/api/health` publik hanya `{ok}`; diagnosis lengkap khusus owner. Reset data massal hanya owner utama (email di `OWNER_EMAILS`).
+- Pesan kedaluwarsa dibersihkan otomatis.

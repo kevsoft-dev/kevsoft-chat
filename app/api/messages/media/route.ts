@@ -3,6 +3,8 @@ import { z } from "zod";
 import { sql } from "@/lib/db";
 import { getUserId } from "@/lib/auth";
 import { broadcast, getMessage } from "@/lib/messages";
+import { limit, tooMany } from "@/lib/ratelimit";
+import { sniffMime } from "@/lib/sniff";
 
 export const maxDuration = 60;
 
@@ -20,6 +22,10 @@ const ALLOWED = new Set([
 export async function POST(req: Request) {
   const uid = await getUserId();
   if (!uid) return new Response("Unauthorized", { status: 401 });
+
+  const rl = await limit(`media:${uid}`, 10, 60);
+  if (!rl.ok) return tooMany(rl, "Terlalu banyak kirim file. Coba lagi sebentar.");
+  if (Number(req.headers.get("content-length") ?? 0) > 700_000) return Response.json({ error: "File terlalu besar" }, { status: 413 });
 
   const parsed = z.object({
     id: z.string().uuid().optional(),
@@ -41,6 +47,12 @@ export async function POST(req: Request) {
   if (/\.zip$/i.test(name) || mime.includes("zip") || mime.includes("compressed")) {
     return Response.json({ error: "File ZIP tidak diizinkan" }, { status: 400 });
   }
+
+  // Isi file harus benar-benar sesuai tipe yang diklaim (bukan sekadar header dari klien).
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return Response.json({ error: "Data file tidak valid" }, { status: 400 });
+  const bytes = Buffer.from(data, "base64");
+  if (bytes.length < 4 || bytes.length > 450_000) return Response.json({ error: "Ukuran file tidak valid" }, { status: 400 });
+  if (!sniffMime(bytes, mime)) return Response.json({ error: "Isi file tidak cocok dengan tipenya" }, { status: 400 });
 
   const caption = (body ?? "").trim().slice(0, 4000);
 

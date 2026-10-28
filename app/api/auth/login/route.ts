@@ -1,3 +1,4 @@
+import { clientIp, limit, tooMany } from "@/lib/ratelimit";
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { ensureSchema } from "@/lib/migrate";
@@ -13,6 +14,8 @@ export async function POST(req: Request) {
   const p = schema.safeParse(await req.json().catch(() => null));
   if (!p.success) return bad();
   await ensureSchema();
+  const rl = await limit(`login:ip:${clientIp(req)}`, 20, 600);
+  if (!rl.ok) return tooMany(rl, "Terlalu banyak percobaan login dari jaringan ini. Coba lagi nanti.");
 
   const [u] = await sql`
     select id, password_hash, banned_at, ban_reason, locked_until from users where lower(username) = ${p.data.username}`;

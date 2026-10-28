@@ -1,3 +1,4 @@
+import { clientIp, limit, tooMany } from "@/lib/ratelimit";
 import { sql } from "@/lib/db";
 import { getUserId } from "@/lib/auth";
 
@@ -14,6 +15,9 @@ function sniff(b: Uint8Array): string | null {
 export async function POST(req: Request) {
   const uid = await getUserId();
   if (!uid) return new Response("Unauthorized", { status: 401 });
+  const rl = await limit(`img:${uid}`, 10, 600);
+  if (!rl.ok) return tooMany(rl);
+  if (Number(req.headers.get("content-length") ?? 0) > MAX * 2) return Response.json({ error: "Foto terlalu besar" }, { status: 413 });
   const buf = new Uint8Array(await req.arrayBuffer());
   if (buf.length < 100) return Response.json({ error: "File foto tidak valid" }, { status: 400 });
   if (buf.length > MAX) return Response.json({ error: "Foto terlalu besar" }, { status: 413 });

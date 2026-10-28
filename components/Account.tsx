@@ -18,6 +18,12 @@ export default function Account({ name, username, avatar }: { name: string; user
     window.location.assign("/sign-in");
   }
 
+  async function logoutAll() {
+    if (!confirm("Keluar dari semua perangkat? Kamu harus login ulang di mana pun.")) return;
+    await fetch("/api/me/sessions", { method: "DELETE" });
+    window.location.assign("/sign-in");
+  }
+
   return (
     <div className="account" ref={ref}>
       <button className="account-btn" onClick={() => setOpen((o) => !o)} aria-label="Akun" aria-expanded={open}>
@@ -31,6 +37,7 @@ export default function Account({ name, username, avatar }: { name: string; user
             <Icon n={theme === "dark" ? "sun" : "moon"} size={18} />{theme === "dark" ? "Tema terang" : "Tema gelap"}
           </button>
           <button role="menuitem" onClick={logout}>Keluar</button>
+          <button role="menuitem" onClick={logoutAll}>Keluar dari semua perangkat</button>
         </div>
       )}
     </div>

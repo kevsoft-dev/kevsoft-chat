@@ -1,5 +1,5 @@
 {
-  "databaseUrl": "postgresql://neondb_owner:npg_cehIS7odvB5R@ep-dark-frog-b59qql2v-pooler.c-7.us-east-2.aws.neon.tech/kevsoft-chat?sslmode=require&channel_binding=require",
+  "databaseUrl": "postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require",
   "firebase": {
     "apiKey": "AIzaSyAKM8_18a6GfuyWK6EwtWh1hsu7X-dmIXs",
     "authDomain": "kevsoft-apps.firebaseapp.com",
@@ -9,7 +9,7 @@
     "appId": "1:52584199215:web:ff6d64b9a61f4857a882da",
     "measurementId": "G-0K8P631H47"
   },
-  "otpSecret": "6d2085b2a7adb6f9e3a2d87f54f461f98398e5ad611302ad78b9fcd5f99ff07b",
+  "otpSecret": "GANTI-DENGAN-HASIL-openssl-rand-hex-32",
   "pusher": {
     "appId": "",
     "key": "",

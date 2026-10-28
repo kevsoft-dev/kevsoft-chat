@@ -1,15 +1,18 @@
+import { clientIp, limit, tooMany } from "@/lib/ratelimit";
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { getStaff } from "@/lib/auth";
 import { logMod } from "@/lib/audit";
 import { COMMUNITY_ID } from "@/lib/mentions";
-import { rank } from "@/lib/roles";
+import { isRootEmail, rank } from "@/lib/roles";
 
 // Owner-only: hapus data massal (pesan / chat / semua kecuali akun owner).
 export async function POST(req: Request) {
   const me = await getStaff();
   if (!me) return new Response("Forbidden", { status: 403 });
-  if (rank(me.role) < 2) return Response.json({ error: "Hanya owner yang bisa mereset data" }, { status: 403 });
+  if (rank(me.role) < 2 || !isRootEmail(me.email)) return Response.json({ error: "Hanya owner utama yang bisa mereset data" }, { status: 403 });
+  const rl = await limit(`reset:${me.id}`, 5, 3600);
+  if (!rl.ok) return tooMany(rl);
 
   const body = await req.json().catch(() => ({}));
   const scope = z.enum(["messages", "chats", "all"]).safeParse(body?.scope);

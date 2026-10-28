@@ -1,3 +1,4 @@
+import { clientIp, limit, tooMany } from "@/lib/ratelimit";
 import { timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { startSession } from "@/lib/session";
@@ -12,6 +13,8 @@ export async function POST(req: Request) {
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return bad();
   const email = parsed.data.email.toLowerCase();
+  const rl = await limit(`otpv:ip:${clientIp(req)}`, 30, 900);
+  if (!rl.ok) return tooMany(rl);
 
   // Naikkan jumlah percobaan secara atomik; maksimal 5.
   const [row] = await sql`

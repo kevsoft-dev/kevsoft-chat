@@ -1,3 +1,4 @@
+import { clientIp, limit, tooMany } from "@/lib/ratelimit";
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { forgetBan, getActor } from "@/lib/auth";
@@ -72,7 +73,9 @@ export async function POST(req: Request) {
   const me = await getActor();
   if (!me) return new Response("Unauthorized", { status: 401 });
   if (rank(me.role) < 1) return deny();
-  const parsed = body.safeParse(await req.json().catch(() => null));
+  const rl = await limit(`adm:${me.id}`, 60, 60);
+  if (!rl.ok) return tooMany(rl);
+  const parsed(await req.json().catch(() => null));
   if (!parsed.success) return deny("Data tidak valid", 400);
   const d = parsed.data;
   const isOwner = rank(me.role) === 2;
@@ -107,7 +110,7 @@ export async function POST(req: Request) {
 
   switch (d.action) {
     case "ban": {
-      await sql`update users set banned_at = now(), ban_reason = ${d.reason || null}, muted_until = null where id = ${t.id}`;
+      await sql`update users set banned_at = now(), ban_reason = ${d.reason || null}, muted_until = null, token_version = token_version + 1 where id = ${t.id}`;
       forgetBan(t.id);
       await pushTo(t.id, "banned", { reason: d.reason ?? null });
       await log("ban", tn, d.reason || undefined);
@@ -163,7 +166,8 @@ export async function POST(req: Request) {
     }
     case "reset_password": {
       if (!isOwner) return deny("Hanya owner yang bisa mereset password");
-      await sql`update users set password_hash = null, login_fails = 0, locked_until = null where id = ${t.id}`;
+      await sql`update users set password_hash = null, login_fails = 0, locked_until = null, token_version = token_version + 1 where id = ${t.id}`;
+      forgetBan(t.id);
       await log("reset_password", tn);
       break;
     }

@@ -1,4 +1,4 @@
-import { getUserId } from "@/lib/auth";
+import { getActor } from "@/lib/auth";
 import { cfg } from "@/lib/config";
 import { sql } from "@/lib/db";
 import { ensureSchema } from "@/lib/migrate";
@@ -7,6 +7,12 @@ export const dynamic = "force-dynamic";
 
 // Diagnosis: buka /api/health untuk melihat bagian mana yang bermasalah (tanpa menampilkan rahasia).
 export async function GET() {
+  // Publik hanya tahu hidup/tidak. Detail diagnosis khusus owner (tidak membocorkan konfigurasi/error ke orang luar).
+  let actor = null;
+  try { actor = await getActor(); } catch {}
+  if (actor?.role !== "owner") {
+    try { await sql`select 1`; return Response.json({ ok: true }); } catch { return Response.json({ ok: false }, { status: 503 }); }
+  }
   const out: Record<string, unknown> = {};
   const step = async (name: string, fn: () => Promise<unknown> | unknown) => {
     try { out[name] = (await fn()) ?? "ok"; }
@@ -26,6 +32,6 @@ export async function GET() {
     const r = await fetch("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com");
     if (!r.ok) throw new Error("HTTP " + r.status);
   });
-  await step("session", async () => ((await getUserId()) ? "signed-in" : "signed-out"));
+  
   return Response.json(out);
 }

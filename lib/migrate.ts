@@ -28,8 +28,10 @@ async function run() {
       to_regclass('public.app_settings') is not null as settings,
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'role_title') as role_title,
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'verified') as verified,
-      to_regclass('public.user_banners') is not null as banners`;
-  if (r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks && r.disappear && r.expires && r.pinned && r.media && r.settings && r.role_title && r.verified && r.banners) return;
+      to_regclass('public.user_banners') is not null as banners,
+      to_regclass('public.rate_limits') is not null as ratelimits,
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'token_version') as tokenver`;
+  if (r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks && r.disappear && r.expires && r.pinned && r.media && r.settings && r.role_title && r.verified && r.banners && r.ratelimits && r.tokenver) return;
   for (const s of SCHEMA.split(";").map((x) => x.trim()).filter(Boolean)) await runRaw(s);
 }
 

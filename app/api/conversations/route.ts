@@ -8,6 +8,10 @@ export async function GET() {
   const uid = await getUserId();
   if (!uid) return new Response("Unauthorized", { status: 401 });
 
+  // Bersihkan pesan kedaluwarsa (acak ~2% request) supaya database tidak membengkak.
+  if (Math.random() < 0.02)
+    after(async () => { try { await sql`delete from messages where expires_at < now() - interval '1 hour'`; } catch {} });
+
   const rows = await sql`
     select c.id, c.kind, c.title, c.description, coalesce(c.disappear_seconds, 0) as disappear_seconds,
       o.id as other_id, o.username as other_username, o.name as other_name, o.avatar_url as other_avatar, o.banner_url as other_banner, o.bio as other_bio,

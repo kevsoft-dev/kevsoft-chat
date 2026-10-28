@@ -1,3 +1,4 @@
+import { limit, tooMany } from "@/lib/ratelimit";
 import { after } from "next/server";
 import { z } from "zod";
 import { sql } from "@/lib/db";
@@ -61,6 +62,8 @@ export async function POST(req: Request) {
     .safeParse(await req.json().catch(() => null));
   if (!parsed.success) return new Response("Bad request", { status: 400 });
   const { id, conversationId, body, replyTo } = parsed.data;
+  const rl = await limit(`msg:${uid}`, 20, 10);
+  if (!rl.ok) return tooMany(rl, "Kamu mengirim terlalu cepat. Pelan-pelan ya.");
 
   const wanted = parseMentions(body);
   const wantsAi = wanted.includes(AI_HANDLE);
@@ -197,13 +200,19 @@ export async function PATCH(req: Request) {
   const { id, action, option } = parsed.data;
 
   const [m] = await sql`
-    select m.id, m.conversation_id, m.poll_data, m.pinned_at
+    select m.id, m.conversation_id, m.poll_data, m.pinned_at, c.kind, cm.role as member_role, v.role as sys_role
     from messages m
-    where m.id = ${id} and m.deleted_at is null
-      and exists (select 1 from conversation_members where conversation_id = m.conversation_id and user_id = ${uid})`;
+    join conversations c on c.id = m.conversation_id
+    join conversation_members cm on cm.conversation_id = m.conversation_id and cm.user_id = ${uid}
+    join users v on v.id = ${uid}
+    where m.id = ${id} and m.deleted_at is null`;
   if (!m) return new Response("Not found", { status: 404 });
 
   if (action === "pin" || action === "unpin") {
+    // DM/AI: kedua pihak. Grup: admin grup atau staf. Komunitas: hanya staf (anggota biasa tidak boleh menyematkan di ruang publik).
+    const staff = m.sys_role === "admin" || m.sys_role === "owner";
+    const can = m.kind === "dm" || m.kind === "ai" || staff || (m.kind === "group" && m.member_role === "admin");
+    if (!can) return Response.json({ error: "Hanya admin yang bisa menyematkan pesan di sini" }, { status: 403 });
     await sql`update messages set pinned_at = ${action === "pin" ? new Date().toISOString() : null} where id = ${id}`;
     after(() => broadcast(m.conversation_id, "pin", { id, conversation_id: m.conversation_id, pinned: action === "pin" }));
     return Response.json({ ok: true, pinned: action === "pin" });
@@ -211,11 +220,15 @@ export async function PATCH(req: Request) {
 
   // vote
   if (option == null || !m.poll_data) return Response.json({ error: "Poll tidak valid" }, { status: 400 });
-  const poll = m.poll_data as { question: string; options: string[]; votes: Record<string, number> };
-  if (!poll.options || option >= poll.options.length) return Response.json({ error: "Opsi tidak ada" }, { status: 400 });
-  poll.votes = poll.votes || {};
-  poll.votes[uid] = option;
-  await sql`update messages set poll_data = ${JSON.stringify(poll)}::jsonb where id = ${id}`;
+  const vr = await limit(`vote:${uid}`, 30, 60);
+  if (!vr.ok) return tooMany(vr);
+  // Satu statement atomik: dua orang memilih bersamaan tidak saling menimpa.
+  const [upd] = await sql`
+    update messages set poll_data = jsonb_set(poll_data, '{votes}', coalesce(poll_data->'votes', '{}'::jsonb) || jsonb_build_object(${uid}::text, ${option}::int))
+    where id = ${id} and deleted_at is null and jsonb_typeof(poll_data->'options') = 'array'
+      and ${option}::int < jsonb_array_length(poll_data->'options')
+    returning poll_data`;
+  if (!upd) return Response.json({ error: "Opsi tidak ada" }, { status: 400 });
   after(async () => broadcast(m.conversation_id, "message", await getMessage(id)));
-  return Response.json({ ok: true, poll });
+  return Response.json({ ok: true, poll: upd.poll_data });
 }

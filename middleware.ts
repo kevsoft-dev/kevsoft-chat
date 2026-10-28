@@ -16,6 +16,14 @@ const RESERVED_PATH = new Set([
 
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  // Anti-CSRF: permintaan yang mengubah data harus berasal dari origin yang sama.
+  if (pathname.startsWith("/api/") && !["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    const origin = req.headers.get("origin");
+    if (origin && origin !== req.nextUrl.origin)
+      return new NextResponse("Forbidden (cross-origin)", { status: 403 });
+    if (!origin && req.headers.get("sec-fetch-site") === "cross-site")
+      return new NextResponse("Forbidden (cross-site)", { status: 403 });
+  }
   const authed = await verifyToken(req.cookies.get(COOKIE)?.value);
 
   let path = pathname;

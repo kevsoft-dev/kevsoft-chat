@@ -1,3 +1,4 @@
+import { limit, tooMany } from "@/lib/ratelimit";
 import { sql } from "@/lib/db";
 import { getUserId } from "@/lib/auth";
 
@@ -7,7 +8,11 @@ export async function GET(req: Request) {
   if (!uid) return new Response("Unauthorized", { status: 401 });
   const url = new URL(req.url);
   const q = (url.searchParams.get("q") ?? "").toLowerCase().replace(/[^a-z0-9_.\- ]/g, "").slice(0, 30);
-  const cid = url.searchParams.get("cid");
+  const rl = await limit(`usr:${uid}`, 60, 60);
+  if (!rl.ok) return tooMany(rl);
+  const cidRaw = url.searchParams.get("cid");
+  const cid = cidRaw && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cidRaw) ? cidRaw : null;
+  if (cidRaw && !cid) return new Response("Bad request", { status: 400 });
 
   if (cid) {
     const rows = await sql`

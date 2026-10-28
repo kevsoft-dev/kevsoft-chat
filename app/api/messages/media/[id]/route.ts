@@ -17,10 +17,17 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (!m?.media_data) return new Response("Not found", { status: 404 });
 
   const buf = Buffer.from(String(m.media_data), "base64");
-  return new Response(buf, {
+  const mime = String(m.media_mime || "application/octet-stream");
+  // Hanya gambar dan PDF yang boleh tampil langsung; sisanya selalu diunduh. Nama file di-encode (aman untuk karakter non-ASCII).
+  const inline = /^image\/(jpeg|png|webp|gif)$/.test(mime) || mime === "application/pdf";
+  const name = String(m.media_name || "file").replace(/[\u0000-\u001f\u007f"\\/]/g, "_").slice(0, 120);
+  return new Response(new Uint8Array(buf), {
     headers: {
-      "Content-Type": String(m.media_mime || "application/octet-stream"),
-      "Content-Disposition": `inline; filename="${String(m.media_name || "file").replace(/"/g, "")}"`,
+      "Content-Type": mime,
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="file"; filename*=UTF-8''${encodeURIComponent(name)}`,
+      "Content-Security-Policy": mime === "application/pdf" ? "default-src 'none'; object-src 'self'; style-src 'unsafe-inline'" : "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'",
+      "X-Content-Type-Options": "nosniff",
+      "Cross-Origin-Resource-Policy": "same-origin",
       "Cache-Control": "private, max-age=86400",
     },
   });

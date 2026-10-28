@@ -1,3 +1,4 @@
+import { clientIp, limit, tooMany } from "@/lib/ratelimit";
 import { randomInt } from "crypto";
 import { z } from "zod";
 import { sql } from "@/lib/db";
@@ -11,6 +12,10 @@ export async function POST(req: Request) {
   if (!parsed.success) return Response.json({ error: "Email tidak valid" }, { status: 400 });
   const email = parsed.data.email.toLowerCase();
   await ensureSchema();
+  const ip = await limit(`otp:ip:${clientIp(req)}`, 10, 900);
+  if (!ip.ok) return tooMany(ip);
+  const em = await limit(`otp:mail:${email}`, 5, 3600);
+  if (!em.ok) return tooMany(em, "Terlalu banyak permintaan kode untuk email ini. Coba lagi dalam 1 jam.");
 
   // Batas kirim ulang: 1x per 60 detik per email (tambahkan rate limit per IP di produksi).
   const [prev] = await sql`select sent_at from otp_codes where email = ${email}`;
@@ -28,6 +33,7 @@ export async function POST(req: Request) {
   try {
     const r = await fetch("https://api-email-otp-lovat.vercel.app/api/send", {
       method: "POST",
+      signal: AbortSignal.timeout(10_000),
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         to: email,

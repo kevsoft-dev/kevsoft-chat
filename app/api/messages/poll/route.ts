@@ -1,3 +1,4 @@
+import { limit, tooMany } from "@/lib/ratelimit";
 import { after } from "next/server";
 import { z } from "zod";
 import { sql } from "@/lib/db";
@@ -7,6 +8,9 @@ import { broadcast, getMessage } from "@/lib/messages";
 export async function POST(req: Request) {
   const uid = await getUserId();
   if (!uid) return new Response("Unauthorized", { status: 401 });
+
+  const rl = await limit(`poll:${uid}`, 10, 60);
+  if (!rl.ok) return tooMany(rl);
 
   const parsed = z.object({
     conversationId: z.string().uuid(),
