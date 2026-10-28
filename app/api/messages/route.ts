@@ -100,33 +100,48 @@ export async function POST(req: Request) {
   }
   const row = rows[0];
 
-  // Balas klien secepat mungkin; siaran realtime dan AI dikerjakan setelah respons terkirim.
+  // Balas klien secepat mungkin; siaran realtime + AI jalan paralel setelah respons terkirim.
   after(async () => {
-    try {
-      const msg = await getMessage(row.id);
-      await Promise.all([
-        sql`update conversation_members set last_read_at = now() where conversation_id = ${conversationId} and user_id = ${uid}`,
-        broadcast(conversationId, "message", msg),
-      ]);
-    } catch {}
+    // 1) Broadcast pesan user dulu (jangan ditahan AI)
+    const fanout = (async () => {
+      try {
+        const msg = await getMessage(row.id);
+        await Promise.all([
+          sql`update conversation_members set last_read_at = now() where conversation_id = ${conversationId} and user_id = ${uid}`,
+          broadcast(conversationId, "message", msg),
+        ]);
+      } catch {}
+    })();
 
+    // 2) AI: mulai secepat mungkin (paralel dengan fanout)
     const [conv] = await sql`select kind from conversations where id = ${conversationId}`;
-    if (!(conv?.kind === "ai" || wantsAi)) return;
+    if (!(conv?.kind === "ai" || wantsAi)) {
+      await fanout;
+      return;
+    }
 
-    const [{ n }] = await sql`
+    const prompt = aiPrompt(body);
+    const rateP = sql`
       select count(*)::int as n from messages m join conversations c on c.id = m.conversation_id
       where m.sender_id = ${uid} and m.created_at > now() - interval '1 minute'
         and (c.kind = 'ai' or ${AI_HANDLE} = any(m.mentions))`;
-    const prompt = aiPrompt(body);
-    let answer: string;
-    if (n > 8) answer = "Pelan-pelan ya, terlalu banyak pertanyaan dalam semenit. Coba lagi sebentar lagi.";
-    else if (!prompt) answer = "Halo! Aku Kev-Ai. Tulis pertanyaanmu setelah @kev-ai, contoh: @kev-ai apa itu Next.js?";
-    else answer = await askKevAi(prompt);
+
+    // Mulai panggil model sambil cek rate-limit (kecuali prompt kosong)
+    const answerP =
+      !prompt
+        ? Promise.resolve("Halo! Aku Kev-Ai. Tulis pertanyaanmu setelah @kev-ai, contoh: @kev-ai apa itu Next.js?")
+        : askKevAi(prompt);
+
+    const [[{ n }], answer0] = await Promise.all([rateP, answerP]);
+    const answer =
+      n > 8
+        ? "Pelan-pelan ya, terlalu banyak pertanyaan dalam semenit. Coba lagi sebentar lagi."
+        : answer0;
 
     const [r] = await sql`
       insert into messages (conversation_id, sender_id, kind, body, reply_to, expires_at)
       values (${conversationId}, null, 'ai', ${answer}, ${row.id}, now() + interval '1 day') returning id`;
-    await broadcast(conversationId, "message", await getMessage(r.id));
+    await Promise.all([fanout, broadcast(conversationId, "message", await getMessage(r.id))]);
   });
 
   return Response.json({ id: row.id, created_at: row.created_at, mentions: row.mentions });

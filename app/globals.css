@@ -132,10 +132,19 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .msg.mine .tag,.msg.mine .tag.ai,.msg.mine .tag.me{background:rgba(17,21,12,.14);color:#2a1f6b}
 .code{margin:6px 0;padding:10px 12px;border-radius:10px;background:var(--code);overflow-x:auto;font:13px/1.5 ui-monospace,Menlo,monospace;white-space:pre}
 .msg.mine .code{background:rgba(0,0,0,.12)}
-.typing{display:flex;gap:5px;padding:13px 16px}
-.typing i{width:7px;height:7px;border-radius:50%;background:var(--violet);animation:blink 1.2s infinite ease-in-out}
-.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
-@keyframes blink{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+/* Titik "sedang mengetik" — stabil, tidak loncat layout, soft */
+.typing{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:52px;height:18px;padding:12px 16px;line-height:0}
+.typing i{display:block;width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.45;flex-shrink:0;will-change:transform,opacity;animation:typing-dot 1.15s ease-in-out infinite}
+.typing i:nth-child(1){animation-delay:0s}
+.typing i:nth-child(2){animation-delay:.15s}
+.typing i:nth-child(3){animation-delay:.3s}
+@keyframes typing-dot{
+  0%,60%,100%{transform:translateY(0);opacity:.35}
+  30%{transform:translateY(-4px);opacity:1}
+}
+/* AI bubble typing: warna aksen lembut */
+.msg.ai .bubble.typing i{background:var(--violet);opacity:.55}
+:root[data-theme="light"] .msg.ai .bubble.typing i{background:var(--violet)}
 .hero-note{align-self:center;max-width:380px;margin:auto;padding:28px;text-align:center;border:1px solid var(--line);border-radius:24px;background:var(--surface);color:var(--muted)}
 .hero-note svg{color:var(--accent-text)}.hero-note h3{color:var(--ink);font-size:24px;margin:10px 0 6px;font-weight:500}.hero-note p{margin:0;font-size:14px}
 

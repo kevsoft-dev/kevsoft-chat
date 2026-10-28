@@ -12,9 +12,14 @@ function pick(v: unknown, depth = 0): string | null {
 
 export async function askKevAi(text: string): Promise<string> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 45_000);
+  // Timeout lebih ketat supaya UI tidak “menggantung” terlalu lama
+  const timer = setTimeout(() => ctrl.abort(), 22_000);
   try {
-    const r = await fetch(ENDPOINT + encodeURIComponent(text), { signal: ctrl.signal, cache: "no-store" });
+    const r = await fetch(ENDPOINT + encodeURIComponent(text.slice(0, 1800)), {
+      signal: ctrl.signal,
+      cache: "no-store",
+      headers: { Accept: "application/json, text/plain;q=0.9,*/*;q=0.8" },
+    });
     const raw = (await r.text()).trim();
     if (!r.ok) throw new Error(String(r.status));
     let out = raw;

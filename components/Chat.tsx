@@ -37,7 +37,7 @@ const mergePending = (list: Msg[], cur: Msg[]) => {
 
 async function fetchMsgs(id: string): Promise<Msg[] | null> {
   try {
-    const r = await fetch(`/api/messages?conversationId=${id}`);
+    const r = await fetch(`/api/messages?conversationId=${id}`, { cache: "no-store" });
     if (r.status === 401) { window.location.assign("/sign-in"); return null; }
     return r.ok ? await r.json() : null;
   } catch { return null; }
@@ -223,6 +223,49 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     if (!readPref("motion", true)) document.documentElement.dataset.motion = "off";
     return () => { pusher.disconnect(); window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock); };
   }, [me0.id, pusherKey, pusherCluster, loadConvs, scheduleConvs, bump, markRead, mutate, toast]);
+
+  // Fallback sinkron: polling ringan + refetch saat tab fokusus/visible
+  // Supaya pesan masuk tetap muncul meski event Pusher terlewat (tanpa harus keluar-masuk chat).
+  useEffect(() => {
+    if (!activeId) return;
+
+    const syncActive = async () => {
+      const id = activeRef.current;
+      if (!id || document.visibilityState === "hidden") return;
+      try {
+        const list = await fetchMsgs(id);
+        if (!list || activeRef.current !== id) return;
+        setMsgs((prev) => {
+          const merged = mergePending(list, prev);
+          // Deteksi pesan baru dari orang lain untuk update sidebar + suara
+          const known = new Set(prev.map((m) => m.id));
+          for (const m of list) {
+            if (known.has(m.id)) continue;
+            if (m.sender_id === meRef.current.id) continue;
+            if (m.kind === "ai") setAiWait((w) => w.filter((x) => x !== id));
+            bump(m, true, true);
+            if (readPref("sound", true) && document.hidden) blip("in");
+          }
+          // update cache
+          cache.current[id] = merged;
+          return merged;
+        });
+      } catch {}
+    };
+
+    // Poll tiap 2.5 dtk saat chat terbuka (tab terlihat)
+    const tick = setInterval(syncActive, 2500);
+    // Langsung sinkron saat kembali ke tab / fokusus window
+    const onVis = () => { if (document.visibilityState === "visible") syncActive(); };
+    const onFocus = () => syncActive();
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(tick);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [activeId, bump]);
 
   useEffect(() => {
     const onVote = async (e: Event) => {
@@ -426,8 +469,9 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     setReplyTo(null);
     bump(m, false, true);
     if (kind === "ai" || m.mentions.includes(AI_HANDLE)) {
-      setAiWait((w) => [...w, cid]);
-      setTimeout(() => setAiWait((w) => w.filter((x) => x !== cid)), 60_000);
+      setAiWait((w) => (w.includes(cid) ? w : [...w, cid]));
+      // timeout selaras dengan batas AI server (~22s) + buffer
+      setTimeout(() => setAiWait((w) => w.filter((x) => x !== cid)), 28_000);
     }
     if (readPref("sound", true)) blip("out");
     deliver(m);
