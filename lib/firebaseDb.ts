@@ -14,8 +14,7 @@ let cached: { token: string; exp: number } | null = null;
 async function accessToken(): Promise<{ param: string; value: string }> {
   if (cfg.firebaseDb.serviceAccount) {
     if (cached && cached.exp > Date.now() + 60_000) return { param: "access_token", value: cached.token };
-    let sa: { client_email: string; private_key: string };
-    try { sa = JSON.parse(cfg.firebaseDb.serviceAccount); } catch { throw new DbNotConfigured("FIREBASE_SERVICE_ACCOUNT bukan JSON valid"); }
+    const sa = cfg.firebaseDb.serviceAccount;
     const key = await importPKCS8(String(sa.private_key).replace(/\\n/g, "\n"), "RS256");
     const assertion = await new SignJWT({ scope: "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email" })
       .setProtectedHeader({ alg: "RS256", typ: "JWT" })
@@ -33,7 +32,7 @@ async function accessToken(): Promise<{ param: string; value: string }> {
     return { param: "access_token", value: cached.token };
   }
   if (cfg.firebaseDb.secret) return { param: "auth", value: cfg.firebaseDb.secret };
-  throw new DbNotConfigured("Firebase Database belum dikonfigurasi (isi FIREBASE_SERVICE_ACCOUNT atau FIREBASE_DB_SECRET)");
+  throw new DbNotConfigured("Firebase Database belum dikonfigurasi (isi firebaseDb.serviceAccount di config.json)");
 }
 
 export type DbRes = { status: number; data: any };

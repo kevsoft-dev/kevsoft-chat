@@ -75,7 +75,7 @@ export async function POST(req: Request) {
   if (rank(me.role) < 1) return deny();
   const rl = await limit(`adm:${me.id}`, 60, 60);
   if (!rl.ok) return tooMany(rl);
-  const parsed(await req.json().catch(() => null));
+  const parsed = body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return deny("Data tidak valid", 400);
   const d = parsed.data;
   const isOwner = rank(me.role) === 2;

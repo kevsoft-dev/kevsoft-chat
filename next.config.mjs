@@ -19,7 +19,7 @@ const csp = [
 ].join("; ");
 
 const headers = [
-  { key: process.env.CSP_MODE === "report" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy", value: csp },
+  { key: "Content-Security-Policy" /* ganti ke "Content-Security-Policy-Report-Only" untuk uji tanpa memblokir */, value: csp },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

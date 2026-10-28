@@ -1,38 +1,44 @@
 import file from "../config.json";
 
-// Konfigurasi: environment variable diutamakan (aman untuk produksi), config.json jadi cadangan untuk dev lokal.
-// JANGAN commit rahasia asli ke config.json. Isi lewat env di hosting (Vercel -> Settings -> Environment Variables).
-const env = (k: string) => (process.env[k] ?? "").trim();
+// SEMUA konfigurasi dibaca dari config.json (tanpa environment variable).
+// PENTING: config.json berisi rahasia, jadi repo GitHub-nya HARUS Private.
 const f = file as any;
 
+// Service account Firebase boleh berupa objek JSON langsung atau string JSON.
+function serviceAccount(): { client_email: string; private_key: string } | null {
+  let v = f.firebaseDb?.serviceAccount;
+  if (typeof v === "string" && v.trim()) { try { v = JSON.parse(v); } catch { v = null; } }
+  return v && typeof v === "object" && v.client_email && v.private_key ? { client_email: String(v.client_email), private_key: String(v.private_key) } : null;
+}
+
 export const cfg = {
-  databaseUrl: env("DATABASE_URL") || String(f.databaseUrl ?? ""),
-  otpSecret: env("OTP_SECRET") || String(f.otpSecret ?? ""),
+  databaseUrl: String(f.databaseUrl ?? "").trim(),
+  otpSecret: String(f.otpSecret ?? "").trim(),
   firebase: {
-    apiKey: env("FIREBASE_API_KEY") || String(f.firebase?.apiKey ?? ""),
-    authDomain: env("FIREBASE_AUTH_DOMAIN") || String(f.firebase?.authDomain ?? ""),
-    projectId: env("FIREBASE_PROJECT_ID") || String(f.firebase?.projectId ?? ""),
-    storageBucket: env("FIREBASE_STORAGE_BUCKET") || String(f.firebase?.storageBucket ?? ""),
-    messagingSenderId: env("FIREBASE_MESSAGING_SENDER_ID") || String(f.firebase?.messagingSenderId ?? ""),
-    appId: env("FIREBASE_APP_ID") || String(f.firebase?.appId ?? ""),
-    measurementId: env("FIREBASE_MEASUREMENT_ID") || String(f.firebase?.measurementId ?? ""),
+    apiKey: String(f.firebase?.apiKey ?? ""),
+    authDomain: String(f.firebase?.authDomain ?? ""),
+    projectId: String(f.firebase?.projectId ?? ""),
+    storageBucket: String(f.firebase?.storageBucket ?? ""),
+    messagingSenderId: String(f.firebase?.messagingSenderId ?? ""),
+    appId: String(f.firebase?.appId ?? ""),
+    measurementId: String(f.firebase?.measurementId ?? ""),
   },
   // Firebase Realtime Database khusus berita (terpisah dari Neon). Diakses HANYA dari server.
   firebaseDb: {
-    url: (env("FIREBASE_DATABASE_URL") || String(f.firebaseDb?.url ?? "") || "https://kevsoft-apps-default-rtdb.asia-southeast1.firebasedatabase.app").replace(/\/+$/, ""),
-    serviceAccount: env("FIREBASE_SERVICE_ACCOUNT"),
-    secret: env("FIREBASE_DB_SECRET"),
+    url: String(f.firebaseDb?.url || "https://kevsoft-apps-default-rtdb.asia-southeast1.firebasedatabase.app").replace(/\/+$/, ""),
+    serviceAccount: serviceAccount(),
+    secret: String(f.firebaseDb?.secret ?? "").trim(),
   },
   pusher: {
-    appId: env("PUSHER_APP_ID") || String(f.pusher?.appId ?? ""),
-    key: env("PUSHER_KEY") || String(f.pusher?.key ?? ""),
-    secret: env("PUSHER_SECRET") || String(f.pusher?.secret ?? ""),
-    cluster: env("PUSHER_CLUSTER") || String(f.pusher?.cluster ?? "ap1"),
+    appId: String(f.pusher?.appId ?? ""),
+    key: String(f.pusher?.key ?? ""),
+    secret: String(f.pusher?.secret ?? ""),
+    cluster: String(f.pusher?.cluster ?? "ap1"),
   },
-  owners: (env("OWNER_EMAILS") ? env("OWNER_EMAILS").split(",") : ((f.owners as string[] | undefined) ?? [])).map((e) => e.trim().toLowerCase()).filter(Boolean),
+  owners: ((f.owners as string[] | undefined) ?? []).map((e) => String(e).trim().toLowerCase()).filter(Boolean),
 };
 
 // Kunci penanda tangan sesi harus kuat. Di produksi, kunci lemah/placeholder = aplikasi menolak jalan.
-const WEAK = !cfg.otpSecret || cfg.otpSecret.length < 32 || /isi-string|change|secret|example/i.test(cfg.otpSecret);
+const WEAK = !cfg.otpSecret || cfg.otpSecret.length < 32 || /isi-string|ganti|change|example/i.test(cfg.otpSecret);
 if (WEAK && process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build")
-  throw new Error("OTP_SECRET belum diatur atau terlalu lemah (minimal 32 karakter). Buat dengan: openssl rand -hex 32");
+  throw new Error("otpSecret di config.json belum diisi atau terlalu lemah (minimal 32 karakter). Buat dengan: openssl rand -hex 32");
