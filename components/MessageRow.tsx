@@ -3,9 +3,9 @@ import { memo } from "react";
 import { AI_HANDLE } from "@/lib/mentions";
 import { Avatar, Icon, Rich, VerifiedBadge, clock, dayLabel, nameColor, useLongPress, type Msg } from "./ui";
 
-export default memo(function MessageRow({ m, mine, first, newDay, showName, showAv, meUsername, fresh, leaving, onMenu, onRetry, onOpenProfile }: {
+export default memo(function MessageRow({ m, mine, first, newDay, showName, showAv, meUsername, fresh, leaving, readBlue, onMenu, onRetry, onOpenProfile }: {
   m: Msg; mine: boolean; first: boolean; newDay: boolean; showName: boolean; showAv: boolean; meUsername: string;
-  fresh: boolean; leaving: boolean;
+  fresh: boolean; leaving: boolean; readBlue?: boolean;
   onMenu: (m: Msg, x: number, y: number) => void; onRetry: (m: Msg) => void;
   onOpenProfile?: (username: string) => void;
 }) {
@@ -30,7 +30,7 @@ export default memo(function MessageRow({ m, mine, first, newDay, showName, show
               onClick={() => !ai && m.username && onOpenProfile?.(m.username)}
               disabled={ai}>
               {ai ? "Kev-Ai" : m.name}
-              {!ai && m.verified && <VerifiedBadge />}
+              {(ai || m.verified) && <VerifiedBadge title={ai ? "Kev-Ai terverifikasi" : "Terverifikasi"} />}
               <small> @{m.username}</small>
               {ai && <em className="badge">AI</em>}
             </button>
@@ -89,7 +89,9 @@ export default memo(function MessageRow({ m, mine, first, newDay, showName, show
             {mine && !gone && (
               m.status === "sending" ? <span className="st sending" title="Mengirim"><Icon n="clock" size={12} /></span>
               : m.status === "failed" ? <button className="st failed" onClick={() => onRetry(m)}><Icon n="alert" size={13} />Gagal, ulangi</button>
-              : <span className="st ok" title="Terkirim"><Icon n="check" size={13} /></span>
+              : readBlue
+                ? <span className="st ok read" title="Dibaca"><Icon n="checks" size={14} /></span>
+                : <span className="st ok" title="Terkirim"><Icon n="check" size={13} /></span>
             )}
           </span>
           {m.status !== "sending" && (

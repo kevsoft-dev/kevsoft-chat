@@ -723,7 +723,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
               <button className="icon-btn back" onClick={closeChat} aria-label="Kembali"><Icon n="back" /></button>
               <button className="who" onClick={showInfo}>
                 <Avatar name={convName(active)} src={active.other_avatar} kind={active.kind === "dm" ? undefined : active.kind} size={42} />
-                <div><strong>{convName(active)}{active.kind === "dm" && active.other_verified && <VerifiedBadge />}</strong><small>{waiting ? "sedang mengetik…" : subtitle(active)}</small></div>
+                <div><strong>{convName(active)}{(active.kind === "ai" || (active.kind === "dm" && active.other_verified)) && <VerifiedBadge title={active.kind === "ai" ? "Kev-Ai terverifikasi" : "Terverifikasi"} />}</strong><small>{waiting ? "sedang mengetik…" : subtitle(active)}</small></div>
               </button>
               <button className="icon-btn" aria-label="Menu chat"
                 onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); const items: MenuItem[] = [{ icon: "info", label: "Info", run: showInfo }, ...convItems(active)]; setMenu({ ...placeMenu(r.right - 220, r.bottom + 6, items.length), items }); }}>
@@ -742,10 +742,18 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                 const newDay = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
                 const first = newDay || !prev || prev.sender_id !== m.sender_id || prev.kind !== m.kind;
                 const mine = m.sender_id === me.id;
+                // Centang biru: chat AI selalu (setelah terkirim), atau @kev-ai di grup setelah AI membalas
+                const isAiConv = active?.kind === "ai";
+                const mentionsAi = (m.mentions || []).includes(AI_HANDLE);
+                const aiRepliedAfter = msgs.slice(i + 1).some((x) => x.kind === "ai");
+                const readBlue = mine && m.status !== "sending" && m.status !== "failed" && (
+                  isAiConv || (mentionsAi && aiRepliedAfter)
+                );
                 return (
                   <MessageRow key={m.id} m={m} mine={mine} first={first} newDay={newDay}
                     showName={!mine && first && groupLike} showAv={!mine && groupLike} meUsername={me.username}
-                    fresh={fresh.current.has(m.id)} leaving={leavingMsgs.includes(m.id)} onMenu={openMsgMenu} onRetry={retry}
+                    fresh={fresh.current.has(m.id)} leaving={leavingMsgs.includes(m.id)} readBlue={readBlue}
+                    onMenu={openMsgMenu} onRetry={retry}
                     onOpenProfile={(u) => { window.location.href = "/" + encodeURIComponent(u); }} />
                 );
               })}
@@ -807,7 +815,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                   <button className="zoomable" disabled={!active.other_avatar || active.kind !== "dm"} onClick={() => active.other_avatar && setZoom(active.other_avatar)} aria-label="Perbesar foto">
                     <Avatar name={convName(active)} src={active.other_avatar} kind={active.kind === "dm" ? undefined : active.kind} size={96} />
                   </button>
-                  <h2>{convName(active)}{active.kind === "dm" && active.other_verified && <VerifiedBadge />}</h2>
+                  <h2>{convName(active)}{(active.kind === "ai" || (active.kind === "dm" && active.other_verified)) && <VerifiedBadge title={active.kind === "ai" ? "Kev-Ai terverifikasi" : "Terverifikasi"} />}</h2>
                   <p className="muted">{active.kind === "dm" ? `@${active.other_username}` : subtitle(active)}</p>
                   {active.kind === "dm" && active.other_bio && <p className="desc">{active.other_bio}</p>}
                   {active.description && <p className="desc">{active.description}</p>}

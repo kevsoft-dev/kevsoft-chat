@@ -180,7 +180,7 @@ export default function Console({ me, onClose, onToast, onChanged }: {
         {tab === "users" && (
           <>
             <div className="console-tools">
-              <div className="search"><Icon n="search" size={18} /><input placeholder={owner ? "Cari username, nama, atau email" : "Cari username atau nama"} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari pengguna" /></div>
+              <div className="search"><Icon n="search" size={18} /><input placeholder={root ? "Cari username, nama, atau email" : "Cari username atau nama"} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari pengguna" /></div>
               <select className="field sel" value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Filter">
                 <option value="all">Semua</option><option value="staff">Staf</option><option value="banned">Diblokir</option><option value="muted">Dibisukan</option>
               </select>

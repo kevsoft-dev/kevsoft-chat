@@ -1162,3 +1162,12 @@ h1,h2,h3,h4{font-weight:600;letter-spacing:-.015em}
   .thread{padding:12px 10px 8px}
   .composer{border-radius:26px}
 }
+
+
+/* Centang pesan: terkirim vs dibaca (biru) */
+.st{display:inline-flex;align-items:center;line-height:0;vertical-align:middle}
+.st.ok{opacity:.9}
+.msg.mine .st.ok{color:rgba(255,255,255,.8)}
+.msg.mine .st.ok.read{color:#93c5fd;opacity:1;filter:drop-shadow(0 0 4px rgba(147,197,253,.45))}
+.msg.mine .st.sending{opacity:.7}
+.st.failed{display:inline-flex;align-items:center;gap:4px;border:0;background:transparent;color:#fecaca;font-size:11px;padding:0;cursor:pointer}

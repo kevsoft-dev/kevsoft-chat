@@ -9,7 +9,7 @@ import { canManage, isRootEmail, rank, userIdForEmail } from "@/lib/roles";
 
 const deny = (m = "Tidak diizinkan", s = 403) => Response.json({ error: m }, { status: s });
 
-// Daftar pengguna untuk Console (owner & admin). Email hanya terlihat oleh owner.
+// Daftar pengguna untuk Console (owner & admin). Email hanya terlihat oleh owner utama (root).
 export async function GET(req: Request) {
   const me = await getActor();
   if (!me) return new Response("Unauthorized", { status: 401 });
@@ -20,6 +20,7 @@ export async function GET(req: Request) {
   const filter = ["all", "staff", "banned", "muted"].includes(sp.get("filter") ?? "") ? (sp.get("filter") as string) : "all";
   const off = Math.max(0, Math.min(10_000, Number(sp.get("offset")) || 0));
   const like = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+  const isRoot = isRootEmail(me.email);
 
   const [rows, [stats]] = await Promise.all([
     sql`
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
         (password_hash is not null) as has_password,
         exists (select 1 from conversation_kicks k where k.conversation_id = ${COMMUNITY_ID}::uuid and k.user_id = users.id) as kicked
       from users
-      where (${q} = '' or lower(coalesce(username, '')) like ${like} or lower(coalesce(name, '')) like ${like} or lower(coalesce(email, '')) like ${like})
+      where (${q} = '' or lower(coalesce(username, '')) like ${like} or lower(coalesce(name, '')) like ${like} or (${isRoot} and lower(coalesce(email, '')) like ${like}))
         and (${filter} = 'all'
           or (${filter} = 'staff' and role in ('admin', 'owner'))
           or (${filter} = 'banned' and banned_at is not null)
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
   const users = rows.slice(0, 50).map((u) => ({
     id: u.id, username: u.username, name: u.name, avatar_url: u.avatar_url, role: u.role, role_title: u.role_title ?? null,
     verified: u.role === "owner" || !!u.verified,
-    email: rank(me.role) === 2 ? u.email : null,
+    email: isRootEmail(me.email) ? u.email : null,
     banned: !!u.banned_at, ban_reason: u.ban_reason, muted_until: u.muted_until, created_at: u.created_at,
     has_password: u.has_password, kicked: u.kicked, root: isRootEmail(u.email),
     can_manage: canManage(me, { id: u.id, role: u.role, email: u.email }),
