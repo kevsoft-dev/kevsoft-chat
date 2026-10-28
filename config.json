@@ -1,5 +1,5 @@
 {
-  "databaseUrl": "postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require",
+  "databaseUrl": "postgresql://neondb_owner:npg_cehIS7odvB5R@ep-dark-frog-b59qql2v-pooler.c-7.us-east-2.aws.neon.tech/kevsoft-chat?sslmode=require&channel_binding=require",
   "firebase": {
     "apiKey": "AIzaSyAKM8_18a6GfuyWK6EwtWh1hsu7X-dmIXs",
     "authDomain": "kevsoft-apps.firebaseapp.com",
@@ -21,8 +21,8 @@
   "firebaseDb": {
     "url": "https://kevsoft-apps-default-rtdb.asia-southeast1.firebasedatabase.app",
     "serviceAccount": {
-      "client_email": "",
-      "private_key": ""
+      "client_email": "firebase-adminsdk-fbsvc@kevsoft-apps.iam.gserviceaccount.com",
+      "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDjOJ4xd91WODQy\ncmQtH7A1Rt5Q+zbdM4xpN/ZLXhiBj60f5fRO8mz1Q44PHVq5uihGjpE5CIkhIDdb\nJX8ZELIwP3x4uDxq734JyhUj9kr4vbetFn6YEHN8hAsULPt7+A2NsIxeF7o5LjbV\nMBha+M+/sGSPTlDYlE6uXzCkB1RmBp5nBxYMG4SB1gtepiQO5KEDWlIuhzZ2Y2aY\nPtClD/VVjkfosqxTZoOvVof2Lc7ipyWYJdLgJxmTD37qBML8ygo0NGHBov8+Cmwz\noZt7zPi/WmIDv9MK4KLwpOExbdtGG9ef//ujNrCP5E0I/7Qmz93sHIBhaqIxw0cl\nsnqkNX5rAgMBAAECggEAOF02GK1UMWwVvqHTqcHfkwe2ZD482NhNr1gbd4yq5ZC/\ncFc5qE/IqXqNhcBRXhsInKAG9C/i3F3CfZCqm4wht4g4FzYUfq5UBJelcNtKs7NU\nGdKnqo8CJtQWb3XNGG5q5kfyOfEG1+JX5cBdekuYNUPLXiUeNutrLSQdy8Kps/je\nmrf2IA4bKyP+MtceJtkVaDafMZB/+Fra62neVsaQhRdOo8EDLP6KxptikAZrtpni\njkHzB0avAbb3Z9gPZggdYGPURZQR4oi085T3Vk3AbzIMmQ4KgUFAZdx9+c/h6Vui\nPSCJEUTQyseykjVQ9AFLqOxAGgHLo95BV7rMOhUrcQKBgQD6aoKt8Fb+Hoc2SAaL\niOtjeT9QNE6tYvnzL0RUiy6zw7/de0EJQ3ZiJUI/XlioD5NwBse7Rq5nLjXhgZG/\nly3AZIhaPN81dYWYgVGahFfLaf0PF9tFxnd/NUhn2hDachX4Mp1Mn/bi6BLtOQZu\nRbWc23tU4rhU3veknfdHrCaauQKBgQDoSbNNy3xKJsoYVLmQFVzWJ8O/MPJbrei6\n4brzA0TF3bW6hCAJawYB3qNv/Fy03Niz2WL8KiDnC7zj7SR2jcHm0TZDLYVL7FmP\n5qAkUIWO4yjDcsWls7b7l0FEAEzNycdc/4WTeWKyp9t+fTmEuIS5rxwDKaHqN3nX\nYKkbPXMAQwKBgGIM5GAw9A8Kaw0BBLcMBIbtibHg2VGgqJfk0Q99c+rlYbHaOevj\no23ogtkHGxWrC6LYtMoKce1qtaQ3tJbdHgfwFUeoAAoRmx7Mu+QRn8LBHFoVkEDw\n5gdEGLa5NtIhy6JkRx0ioWvVTNvf8TmqR+NEOTVSlLR+nV6yj4lbyb3ZAoGBANPB\nXBOvTL7MXa+QjRksYFVaKrhAhq/M+jxjS2n9sNQwKVq+1/W9+tv5ekS8akb2jRZn\nNjVqslPt/2RI6tSopfsk/bJ/7OQpsfvc4mA4h4iazK5gEo3cJxNz76tuGpX/PB8r\nUTn/jloPa6kDv0ueamBboc3ARjqeGBSfqYmLmyrBAoGAZIIcjdLO3yPHQBCuZmCo\niNB7OECNV2kt9H8S4SUJ71oysK3qyxF59I3/kd8T0CHZF8m3jX3q5C0mog6yBV3O\nJYiy87ZJ5tV+VcxIInX6fDDJgXrFmZc0qjHTzhuF2SBLcqpI+WNE4PHGRbMhIsd3\nOWjNxoghbo3UrWUNwAr5WPU=\n-----END PRIVATE KEY-----\n"
     }
   }
 }
