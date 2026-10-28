@@ -12,9 +12,9 @@ export class DbNotConfigured extends Error {}
 let cached: { token: string; exp: number } | null = null;
 
 async function accessToken(): Promise<{ param: string; value: string }> {
-  if (cfg.firebaseDb.serviceAccount) {
+  const sa = cfg.firebaseDb.serviceAccount;
+  if (sa) {
     if (cached && cached.exp > Date.now() + 60_000) return { param: "access_token", value: cached.token };
-    const sa = cfg.firebaseDb.serviceAccount;
     const key = await importPKCS8(String(sa.private_key).replace(/\\n/g, "\n"), "RS256");
     const assertion = await new SignJWT({ scope: "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email" })
       .setProtectedHeader({ alg: "RS256", typ: "JWT" })

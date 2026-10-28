@@ -653,7 +653,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
             <button className="account-btn" onClick={() => setProfile(true)} aria-label="Profil dan pengaturan"><Avatar name={me.name} src={me.avatarUrl} size={40} /></button>
           </div>
         </header>
-        <NewsSlider me={{ id: me.id, username: me.username, role: me.role }} onToast={toast} />
+        <NewsSlider me={{ id: me.id, username: me.username ?? "", role: me.role ?? "user" }} onToast={toast} />
         <div className="search"><Icon n="search" size={18} /><input placeholder="Cari chat" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari chat" /></div>
         <div className="tabs">
           {([["all", "Semua"], ["dm", "Pribadi"], ["group", "Grup"]] as const).map(([k, l]) => (
