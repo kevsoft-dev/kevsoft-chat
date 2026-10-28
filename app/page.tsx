@@ -23,7 +23,7 @@ function Problem({ text }: { text: string }) {
 
 type Row = { id: string; username: string | null; name: string | null; avatar_url: string | null; banner_url?: string | null; bio: string | null; email: string | null; role: string; verified?: boolean | null; has_password: boolean };
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ reset?: string; dm?: string }> }) {
+export default async function Home({ searchParams }: { searchParams: Promise<{ reset?: string; dm?: string; news?: string }> }) {
   let uid: string | null = null;
   let authError = "";
   try { uid = (await getUserId()) ?? null; } catch (e: any) { authError = String(e?.message ?? e); }
@@ -51,6 +51,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
     return <Onboarding suggestedName={user?.name ?? ""} needUsername={needUsername} reset={reset} username={user?.username ?? ""} />;
 
   const openDm = (sp.dm || "").toLowerCase().replace(/^@/, "").trim() || undefined;
+  // Legacy deep-link berita: /?news=<id> → /news?id=<id>
+  if (sp.news) redirect(`/news?id=${encodeURIComponent(sp.news)}`);
 
   return (
     <Chat

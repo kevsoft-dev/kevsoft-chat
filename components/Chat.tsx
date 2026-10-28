@@ -6,7 +6,6 @@ import { readPref } from "@/lib/prefs";
 import { blip, unlockAudio } from "@/lib/sound";
 import Composer from "./Composer";
 import Console from "./Console";
-import NewsSlider from "./NewsSlider";
 import ConvItem from "./ConvItem";
 import MessageRow from "./MessageRow";
 import NewChat from "./NewChat";
@@ -648,12 +647,14 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
         <header className="bar">
           <div className="brand"><Logo /><div><strong>kevsoft-chat</strong><small>@{me.username}</small></div></div>
           <div className="bar-actions">
+            <a className="icon-btn news-entry" href="/news" aria-label="Berita">
+              <Icon n="news" />
+            </a>
             {isStaffRole(me.role) && <button className="icon-btn" onClick={() => setShowConsole(true)} aria-label="Console"><Icon n="shield" /></button>}
             <button className="icon-btn" onClick={() => setShowNew(true)} aria-label="Chat baru"><Icon n="edit" /></button>
             <button className="account-btn" onClick={() => setProfile(true)} aria-label="Profil dan pengaturan"><Avatar name={me.name} src={me.avatarUrl} size={40} /></button>
           </div>
         </header>
-        <NewsSlider me={{ id: me.id, username: me.username ?? "", role: me.role ?? "user" }} onToast={toast} />
         <div className="search"><Icon n="search" size={18} /><input placeholder="Cari chat" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari chat" /></div>
         <div className="tabs">
           {([["all", "Semua"], ["dm", "Pribadi"], ["group", "Grup"]] as const).map(([k, l]) => (

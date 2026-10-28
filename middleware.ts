@@ -11,7 +11,7 @@ const PUBLIC = [
 ];
 
 const RESERVED_PATH = new Set([
-  "sign-in", "api", "u", "dm", "_next", "favicon.ico", "robots.txt",
+  "sign-in", "api", "u", "dm", "news", "_next", "favicon.ico", "robots.txt",
   "health", "console", "admin", "static", "assets",
 ]);
 
