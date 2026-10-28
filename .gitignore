@@ -1,7 +1,8 @@
 node_modules
 .next
-config.json
 .env
 .env.*
-!.env.example
 tsconfig.tsbuildinfo
+*adminsdk*.json
+*service-account*.json
+# config.json SENGAJA ikut di-commit (konfigurasi 100% lewat file). Repo WAJIB Private.

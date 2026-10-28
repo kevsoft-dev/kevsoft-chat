@@ -7,6 +7,8 @@ import { aiPrompt, AI_HANDLE, parseMentions } from "@/lib/mentions";
 import { askKevAi } from "@/lib/ai";
 import { broadcast, getMessage } from "@/lib/messages";
 import { logMod } from "@/lib/audit";
+import { getActor } from "@/lib/auth";
+import { isRootEmail } from "@/lib/roles";
 
 export const maxDuration = 60;
 const uuid = z.string().uuid();
@@ -138,6 +140,10 @@ export async function DELETE(req: Request) {
   const id = uuid.safeParse(sp.get("id"));
   if (!id.success) return new Response("Bad request", { status: 400 });
 
+  // Owner biasa hanya boleh menindak pesan milik user biasa; owner utama (root) bebas.
+  const actor = await getActor();
+  const root = !!actor && actor.role === "owner" && isRootEmail(actor.email);
+
   // Owner/admin: hapus diam-diam (pesan hilang total, tanpa "telah dihapus")
   if (sp.get("scope") === "silent") {
     const [row] = await sql`
@@ -148,7 +154,8 @@ export async function DELETE(req: Request) {
           where v.id = ${uid} and v.role in ('admin', 'owner')
             and exists (select 1 from conversation_members where conversation_id = m.conversation_id and user_id = v.id)
             and (case v.role when 'owner' then 2 else 1 end) >= (case coalesce(s.role, 'user') when 'owner' then 2 when 'admin' then 1 else 0 end)
-            and (v.role = 'owner' or coalesce(s.role, 'user') <> 'owner'))
+            and (v.role = 'owner' or coalesce(s.role, 'user') <> 'owner')
+            and (${root} or v.role <> 'owner' or coalesce(s.role, 'user') = 'user'))
       returning m.id, m.conversation_id, m.sender_id`;
     if (!row) return new Response("Not found", { status: 404 });
     const [who] = await sql`select coalesce(username, name) as n from users where id = ${uid}`;
@@ -167,7 +174,8 @@ export async function DELETE(req: Request) {
           select 1 from users v left join users s on s.id = messages.sender_id
           where v.id = ${uid} and v.role in ('admin', 'owner')
             and exists (select 1 from conversation_members where conversation_id = messages.conversation_id and user_id = v.id)
-            and (case v.role when 'owner' then 2 else 1 end) > (case coalesce(s.role, 'user') when 'owner' then 2 when 'admin' then 1 else 0 end)))
+            and (case v.role when 'owner' then 2 else 1 end) > (case coalesce(s.role, 'user') when 'owner' then 2 when 'admin' then 1 else 0 end)
+          and (${root} or v.role <> 'owner' or coalesce(s.role, 'user') = 'user')))
       returning id, conversation_id, sender_id`;
     if (!row) return new Response("Not found", { status: 404 });
     if (row.sender_id !== uid) {

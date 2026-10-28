@@ -12,7 +12,7 @@
 ## 1. Install
 ```bash
 npm install
-cp .env.example .env.local   # isi DATABASE_URL, OTP_SECRET, PUSHER_* (jangan taruh rahasia di config.json)
+cp config.example.json config.json   # isi databaseUrl, otpSecret, pusher, firebaseDb
 ```
 
 ## 2. Neon
@@ -130,7 +130,7 @@ Deploy ke Vercel: import repo, sertakan `config.json` (file ini di-gitignore, ja
 
 ## Pembaruan v11: pengerasan keamanan
 
-- **Rahasia keluar dari kode**: `DATABASE_URL`, `OTP_SECRET`, `PUSHER_*`, `OWNER_EMAILS` dibaca dari environment variable (lihat `.env.example`). `config.json` hanya cadangan dev dan berisi placeholder. Produksi menolak jalan jika `OTP_SECRET` lemah.
+- **Konfigurasi 100% lewat `config.json`** (tanpa environment variable). Karena berisi rahasia, repo GitHub WAJIB **Private**. Produksi menolak jalan jika `otpSecret` lemah/placeholder.
 - **Rate limit** berbasis database (`rate_limits`) untuk login, OTP, Google, kirim pesan, file, poll, foto, ganti password, pencarian user, dan aksi admin.
 - **Pencabutan sesi**: `users.token_version`. Ganti/reset password, ban, dan menu "Keluar dari semua perangkat" mematikan semua token lama.
 - **Anti-CSRF** (cek Origin / Sec-Fetch-Site) untuk semua API non-GET, plus **CSP** dan header keamanan tambahan. Jika ada yang terblokir di produksi, set `CSP_MODE=report` sementara lalu lihat console browser.
@@ -138,3 +138,15 @@ Deploy ke Vercel: import repo, sertakan `config.json` (file ini di-gitignore, ja
 - **Pin** di Komunitas hanya staf, di grup hanya admin grup. **Vote poll** kini atomik (tidak saling menimpa).
 - `/api/health` publik hanya `{ok}`; diagnosis lengkap khusus owner. Reset data massal hanya owner utama (email di `OWNER_EMAILS`).
 - Pesan kedaluwarsa dibersihkan otomatis.
+
+## Fitur baru: Berita Kevsoft (slide news)
+
+Carousel berita di atas daftar chat (auto-slide 6 detik, bisa digeser). Klik kartu untuk membuka berita penuh.
+
+- **Owner**: tambah berita (judul, isi, hingga 6 **URL gambar**, hingga 3 **URL video** YouTube/.mp4/.webm, hingga 3 tombol link) dan hapus berita. Tidak ada upload file; semua media berupa URL `https://`.
+- **Semua user**: lihat, **like**, **share** (Web Share / salin link `/?news=<id>`), **komentar** (bisa dibalas dan di-**tag** `@username`, yang di-tag/dibalas dapat notifikasi realtime).
+- **Penyimpanan: Firebase Realtime Database** (bukan Neon). Node: `news`, `news_comments`, `user_likes`. Profil penulis komentar tetap diambil dari Neon.
+
+### Setup Firebase (sekali saja)
+1. Firebase Console > Realtime Database > **Rules**, isi lalu Publish: `{ "rules": { ".read": false, ".write": false } }`. Server memakai kredensial admin sehingga tetap bisa baca/tulis; orang luar tidak bisa.
+2. Project settings > Service accounts > **Generate new private key**, lalu jalankan `node scripts/firebase-config.mjs file-kunci.json`. Kunci masuk ke `config.json` (`firebaseDb.serviceAccount`). Hapus file JSON aslinya setelahnya.
