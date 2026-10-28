@@ -11,9 +11,14 @@ function serviceAccount(): { client_email: string; private_key: string } | null 
   return v && typeof v === "object" && v.client_email && v.private_key ? { client_email: String(v.client_email), private_key: String(v.private_key) } : null;
 }
 
+const databaseUrl = String(f.databaseUrl ?? "").trim();
+// Kunci sesi/OTP TIDAK perlu diisi manual: diturunkan otomatis dari databaseUrl (berisi password database yang rahasia dan acak).
+// Konsekuensi: mengganti password database otomatis mengeluarkan semua sesi login (itu hal yang baik setelah rotasi).
+const DB_OK = /^postgres(ql)?:\/\/[^:/\s]+:[^@\s]{8,}@[^/\s]+\//.test(databaseUrl) && !/user:pass@|ep-xxx|GANTI/i.test(databaseUrl);
+
 export const cfg = {
-  databaseUrl: String(f.databaseUrl ?? "").trim(),
-  otpSecret: String(f.otpSecret ?? "").trim(),
+  databaseUrl,
+  otpSecret: DB_OK ? `kevsoft-chat|session-and-otp|v1|${databaseUrl}` : "",
   firebase: {
     apiKey: String(f.firebase?.apiKey ?? ""),
     authDomain: String(f.firebase?.authDomain ?? ""),
@@ -38,8 +43,7 @@ export const cfg = {
   owners: ((f.owners as string[] | undefined) ?? []).map((e) => String(e).trim().toLowerCase()).filter(Boolean),
 };
 
-// Kunci penanda tangan sesi harus kuat. Kunci lemah/placeholder = aplikasi menolak melayani (503 dengan pesan jelas).
-const WEAK = !cfg.otpSecret || cfg.otpSecret.length < 32 || /isi-string|ganti|change|example/i.test(cfg.otpSecret);
-export const configIssue: string | null = WEAK
-  ? "Konfigurasi belum lengkap: otpSecret di config.json kosong, placeholder, atau kurang dari 32 karakter."
-  : null;
+// Tanpa databaseUrl yang valid tidak ada kunci sesi yang aman: aplikasi menolak melayani (503 dengan pesan jelas).
+export const configIssue: string | null = DB_OK
+  ? null
+  : "Konfigurasi belum lengkap: databaseUrl di config.json masih kosong atau placeholder.";

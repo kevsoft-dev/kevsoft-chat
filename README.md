@@ -12,7 +12,7 @@
 ## 1. Install
 ```bash
 npm install
-cp config.example.json config.json   # isi databaseUrl, otpSecret, pusher, firebaseDb
+cp config.example.json config.json   # isi databaseUrl, pusher, firebaseDb
 ```
 
 ## 2. Neon
@@ -23,13 +23,13 @@ Database sudah dikonfigurasi di `config.json`. Jalankan `npm run db:setup` untuk
 - Firebase Console → Authentication → Sign-in method → aktifkan **Google**.
 - Authentication → Settings → **Authorized domains** → tambahkan domain deploy (mis. `kevsoft-chat.vercel.app`).
 - Login email memakai OTP 6 digit lewat API email; email yang sama di OTP dan Google = satu akun.
-- Sesi disimpan di cookie httpOnly yang ditandatangani server (`otpSecret`).
+- Sesi disimpan di cookie httpOnly yang ditandatangani server (kunci diturunkan otomatis dari `databaseUrl`, tidak perlu `otpSecret`).
 
 ## 4. Pusher (realtime)
 Buat app di pusher.com Channels, isi `pusher.appId`, `pusher.secret`, `pusher.key`, `pusher.cluster`.
 
 ## 5. OTP
-Isi `otpSecret` dengan string acak panjang (`openssl rand -hex 32`). Email OTP dikirim server lewat `https://api-email-otp-lovat.vercel.app/api/send` dengan field `to`, `app`, `otp`, `logo` (ubah nama app dan logo di `app/api/auth/otp/send/route.ts`).
+Tidak ada `otpSecret` yang perlu diisi: kunci sesi/OTP diturunkan otomatis dari `databaseUrl`. Email OTP dikirim server lewat `https://api-email-otp-lovat.vercel.app/api/send` dengan field `to`, `app`, `otp`, `logo` (ubah nama app dan logo di `app/api/auth/otp/send/route.ts`).
 
 ## 6. Jalankan / deploy
 ```bash
@@ -130,7 +130,7 @@ Deploy ke Vercel: import repo, sertakan `config.json` (file ini di-gitignore, ja
 
 ## Pembaruan v11: pengerasan keamanan
 
-- **Konfigurasi 100% lewat `config.json`** (tanpa environment variable). Karena berisi rahasia, repo GitHub WAJIB **Private**. Produksi menolak jalan jika `otpSecret` lemah/placeholder.
+- **Konfigurasi 100% lewat `config.json`** (tanpa environment variable). Karena berisi rahasia, repo GitHub WAJIB **Private**. Aplikasi menolak jalan (503 dengan pesan jelas) jika `databaseUrl` masih kosong/placeholder.
 - **Rate limit** berbasis database (`rate_limits`) untuk login, OTP, Google, kirim pesan, file, poll, foto, ganti password, pencarian user, dan aksi admin.
 - **Pencabutan sesi**: `users.token_version`. Ganti/reset password, ban, dan menu "Keluar dari semua perangkat" mematikan semua token lama.
 - **Anti-CSRF** (cek Origin / Sec-Fetch-Site) untuk semua API non-GET, plus **CSP** dan header keamanan tambahan. Jika ada yang terblokir di produksi, set `CSP_MODE=report` sementara lalu lihat console browser.

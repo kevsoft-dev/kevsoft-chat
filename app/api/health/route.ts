@@ -21,7 +21,7 @@ export async function GET() {
   await step("config", () => ({
     firebaseProjectId: cfg.firebase.projectId,
     firebaseApiKey: !!cfg.firebase.apiKey,
-    otpSecret: !!cfg.otpSecret,
+    sessionKey: !!cfg.otpSecret,
     pusherAppId: !!cfg.pusher.appId,
     pusherKey: !!cfg.pusher.key,
     pusherSecret: !!cfg.pusher.secret,

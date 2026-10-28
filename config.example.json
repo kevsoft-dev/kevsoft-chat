@@ -9,7 +9,6 @@
     "appId": "1:52584199215:web:ff6d64b9a61f4857a882da",
     "measurementId": "G-0K8P631H47"
   },
-  "otpSecret": "GANTI-DENGAN-HASIL-openssl-rand-hex-32",
   "pusher": {
     "appId": "",
     "key": "",
