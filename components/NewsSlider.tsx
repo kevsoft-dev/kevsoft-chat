@@ -88,7 +88,7 @@ export default function NewsSlider({ me, onToast }: { me: MeLite; onToast: (t: s
   return (
     <div className="nw" onMouseEnter={() => setPause(true)} onMouseLeave={() => setPause(false)} onTouchStart={() => setPause(true)} onTouchEnd={() => setPause(false)}>
       <div className="nw-head">
-        <span><Icon n="news" size={15} /> Berita Kevsoft</span>
+        <span>Berita</span>
         {isOwner && <button className="nw-add" onClick={() => setCompose(true)}><Icon n="plus" size={14} /> Tambah</button>}
       </div>
       {news.length === 0 ? (
