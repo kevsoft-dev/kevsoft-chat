@@ -100,9 +100,9 @@ export async function POST(req: Request) {
   }
   const row = rows[0];
 
-  // Balas klien secepat mungkin; siaran realtime + AI jalan paralel setelah respons terkirim.
+  // Balas klien secepat mungkin; siaran realtime + AI / away-reply setelah respons.
   after(async () => {
-    // 1) Broadcast pesan user dulu (jangan ditahan AI)
+    // 1) Broadcast pesan user dulu
     const fanout = (async () => {
       try {
         const msg = await getMessage(row.id);
@@ -113,8 +113,48 @@ export async function POST(req: Request) {
       } catch {}
     })();
 
-    // 2) AI: mulai secepat mungkin (paralel dengan fanout)
     const [conv] = await sql`select kind from conversations where id = ${conversationId}`;
+
+    // 2) Auto-balas "tidak di tempat" (hanya DM, lawan bicara sedang away)
+    if (conv?.kind === "dm") {
+      try {
+        const DEFAULT_AWAY =
+          "Halo,\nTerima kasih sudah menghubungi Kevsoft. Saat ini saya sedang tidak di tempat.\nPesan kamu akan saya balas segera setelah kembali online.";
+        const others = await sql`
+          select u.id, u.away_enabled, u.away_message, u.away_since
+          from conversation_members cm
+          join users u on u.id = cm.user_id
+          where cm.conversation_id = ${conversationId} and cm.user_id <> ${uid}
+            and coalesce(u.away_enabled, false) = true
+            and not exists (select 1 from users x where x.id = u.id and x.muted_until > now())
+          limit 1`;
+        const other = others[0];
+        if (other) {
+          const since = other.away_since || new Date(0).toISOString();
+          // Hindari spam: hanya satu auto-balas per sesi away (sejak away_since)
+          const [dup] = await sql`
+            select id from messages
+            where conversation_id = ${conversationId}
+              and sender_id = ${other.id}
+              and created_at >= ${since}::timestamptz
+              and kind = 'user'
+            limit 1`;
+          if (!dup) {
+            const text = (String(other.away_message || "").trim() || DEFAULT_AWAY).slice(0, 500);
+            const [ar] = await sql`
+              insert into messages (conversation_id, sender_id, kind, body, expires_at)
+              select ${conversationId}::uuid, ${other.id}, 'user', ${text},
+                case when c.disappear_seconds > 0 then now() + make_interval(secs => c.disappear_seconds)
+                     else now() + interval '1 day' end
+              from conversations c where c.id = ${conversationId}::uuid
+              returning id`;
+            if (ar) await broadcast(conversationId, "message", await getMessage(ar.id));
+          }
+        }
+      } catch {}
+    }
+
+    // 3) AI
     if (!(conv?.kind === "ai" || wantsAi)) {
       await fanout;
       return;
@@ -126,7 +166,6 @@ export async function POST(req: Request) {
       where m.sender_id = ${uid} and m.created_at > now() - interval '1 minute'
         and (c.kind = 'ai' or ${AI_HANDLE} = any(m.mentions))`;
 
-    // Mulai panggil model sambil cek rate-limit (kecuali prompt kosong)
     const answerP =
       !prompt
         ? Promise.resolve("Halo! Aku Kev-Ai. Tulis pertanyaanmu setelah @kev-ai, contoh: @kev-ai apa itu Next.js?")

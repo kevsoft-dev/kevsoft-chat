@@ -15,14 +15,19 @@ export async function GET(req: Request) {
   const rows = await sql`
     select u.id, u.username, u.name, u.avatar_url, u.banner_url, u.bio,
       coalesce(u.role = 'owner' or u.verified, false) as verified,
-      case when u.role = 'owner' then 'owner' when u.role = 'admin' or cm.role = 'admin' then 'admin' else 'member' end as role,
+      case
+        when cm.role = 'owner' then 'owner'
+        when u.role = 'owner' then 'owner'
+        when u.role = 'admin' or cm.role = 'admin' then 'admin'
+        else 'member'
+      end as role,
       u.role as sys_role, cm.role as group_role,
       coalesce((select v.role in ('admin', 'owner') from users v where v.id = ${uid}), false) and u.banned_at is not null as banned,
       coalesce((select v.role in ('admin', 'owner') from users v where v.id = ${uid}), false) and u.muted_until > now() as muted
     from conversation_members cm join users u on u.id = cm.user_id
     where cm.conversation_id = ${cid.data}
       and exists (select 1 from conversation_members where conversation_id = ${cid.data} and user_id = ${uid})
-    order by (u.role = 'owner') desc, (u.role = 'admin' or cm.role = 'admin') desc, lower(u.username) limit 1000`;
+    order by (cm.role = 'owner') desc, (u.role = 'owner') desc, (cm.role = 'admin' or u.role = 'admin') desc, lower(u.username) limit 1000`;
   return Response.json(rows);
 }
 
@@ -45,9 +50,13 @@ export async function DELETE(req: Request) {
   if (!t) return Response.json({ error: "Pengguna tidak ditemukan" }, { status: 404 });
 
   let allowed = rank(me.role) >= 1 && canManage(me, { id: t.id, role: String(t.role), email: t.email ?? null });
-  if (!allowed && c.kind === "group" && me.id !== t.id && rank(t.role) === 0 && t.group_role !== "admin") {
+  if (!allowed && c.kind === "group" && me.id !== t.id) {
     const [mine] = await sql`select role from conversation_members where conversation_id = ${c.id} and user_id = ${me.id}`;
-    allowed = mine?.role === "admin";
+    const myG = String(mine?.role || "member");
+    const tg = String(t.group_role || "member");
+    // Owner grup: bisa kick admin & member (bukan owner lain). Admin grup: hanya member biasa.
+    if (myG === "owner" && tg !== "owner") allowed = true;
+    else if (myG === "admin" && tg === "member" && rank(t.role) === 0) allowed = true;
   }
   if (!allowed) return Response.json({ error: "Kamu tidak bisa mengeluarkan pengguna ini" }, { status: 403 });
 

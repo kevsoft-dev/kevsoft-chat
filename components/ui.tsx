@@ -2,10 +2,10 @@
 import { useRef } from "react";
 import { AI_HANDLE, LOGO, mentionRegex } from "@/lib/mentions";
 
-export type Me = { id: string; username: string; name: string; avatarUrl?: string | null; bannerUrl?: string | null; bio?: string | null; email?: string | null; role?: string; verified?: boolean };
+export type Me = { id: string; username: string; name: string; avatarUrl?: string | null; bannerUrl?: string | null; bio?: string | null; email?: string | null; role?: string; verified?: boolean; awayEnabled?: boolean; awayMessage?: string | null };
 export type Conv = {
   id: string; kind: "dm" | "group" | "community" | "ai"; title: string | null; description: string | null;
-  other_id: string | null; other_username: string | null; other_name: string | null; other_avatar: string | null; other_banner?: string | null; other_bio: string | null; other_verified?: boolean;
+  other_id: string | null; other_username: string | null; other_name: string | null; other_avatar: string | null; other_banner?: string | null; other_bio: string | null; other_verified?: boolean; created_by?: string | null; my_group_role?: string | null;
   member_count: number; last_body: string | null; last_at: string | null; last_kind: string | null;
   last_username: string | null; last_deleted: boolean; unread: number; unread_mention: boolean;
   disappear_seconds?: number;
@@ -153,9 +153,9 @@ export function Banner({ name, src, children, className = "" }: { name: string; 
 export function Avatar({ name, src, kind, size = 48 }: { name: string; src?: string | null; kind?: string; size?: number }) {
   const style = { width: size, height: size, fontSize: size * 0.4 };
   if (kind === "ai") return <span className="avatar ai" style={style}><Icon n="sparkle" size={size * 0.5} /></span>;
+  if (src) return <img className="avatar" style={style} src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />;
   if (kind === "community" || kind === "group")
     return <span className={`avatar ${kind}`} style={style}><Icon n="users" size={size * 0.48} /></span>;
-  if (src) return <img className="avatar" style={style} src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />;
   const h = hue(name);
   return (
     <span className="avatar" style={{ ...style, background: `linear-gradient(135deg, hsl(${h} 55% 38%), hsl(${(h + 40) % 360} 60% 28%))` }}>

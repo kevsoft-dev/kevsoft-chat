@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   if (mem.kind === "group" || mem.kind === "community") {
     const [u] = await sql`select role from users where id = ${uid}`;
     const isStaff = u?.role === "owner" || u?.role === "admin";
-    const isGroupAdmin = mem.member_role === "admin" || mem.created_by === uid;
+    const isGroupAdmin = mem.member_role === "owner" || mem.member_role === "admin" || mem.created_by === uid;
     if (!isStaff && !isGroupAdmin) {
       return Response.json({ error: "Hanya admin yang bisa mengatur pesan sementara di grup" }, { status: 403 });
     }

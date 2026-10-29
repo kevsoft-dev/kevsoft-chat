@@ -193,7 +193,17 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       mutate(d.conversation_id, (x) => x.map((y) => y.id === d.id ? { ...y, pinned_at: d.pinned ? new Date().toISOString() : null } : y));
     });
 
-    ch.bind("conversation", () => scheduleConvs());
+    ch.bind("conversation", (d?: { id?: string; title?: string; description?: string | null; avatar_url?: string | null }) => {
+      scheduleConvs();
+      if (d?.id && (d.title !== undefined || d.avatar_url !== undefined || d.description !== undefined)) {
+        setConvs((list) => (list ?? []).map((c) => c.id === d.id ? {
+          ...c,
+          title: d.title !== undefined ? d.title : c.title,
+          description: d.description !== undefined ? d.description : c.description,
+          other_avatar: d.avatar_url !== undefined ? d.avatar_url : c.other_avatar,
+        } : c));
+      }
+    });
     ch.bind("disappear", (d: { conversationId?: string; seconds?: number }) => {
       if (!d?.conversationId || typeof d.seconds !== "number") return;
       setConvs((list) => (list ?? []).map((c) => (c.id === d.conversationId ? { ...c, disappear_seconds: d.seconds } : c)));
@@ -617,8 +627,12 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     if (u.id === me.id || (c.kind !== "group" && c.kind !== "community")) return [];
     const tr = rk(u.sys_role);
     const staffCan = myRank === 2 ? tr < 2 : myRank === 1 ? tr === 0 : false;
-    const groupAdminCan = c.kind === "group" && all.find((x) => x.id === me.id)?.group_role === "admin" && tr === 0 && u.group_role !== "admin";
-    if (!staffCan && !groupAdminCan) return [];
+    const myG = all.find((x) => x.id === me.id)?.group_role || "";
+    const theirG = u.group_role || "member";
+    // Owner grup: kick admin/member. Admin grup: kick member biasa (bukan staf sistem).
+    const groupOwnerCan = c.kind === "group" && myG === "owner" && theirG !== "owner";
+    const groupAdminCan = c.kind === "group" && myG === "admin" && theirG === "member" && tr === 0;
+    if (!staffCan && !groupOwnerCan && !groupAdminCan) return [];
     const where = c.kind === "group" ? "grup" : "Komunitas";
     const confirm = (title: string, text: string, label: string, run: () => void, danger = true) =>
       setDialog({ title, text, actions: [{ label, danger, run }] });
@@ -641,6 +655,51 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     }
     return items;
   }, [me.id, myRank, kickMember, adminAct]);
+
+  const isGroupManager = (c: Conv | null) => {
+    if (!c || c.kind !== "group") return false;
+    const role = c.my_group_role || (c.created_by === me.id ? "owner" : "");
+    return role === "owner" || role === "admin" || c.created_by === me.id;
+  };
+
+  async function saveGroupInfo(c: Conv, title: string, description: string) {
+    try {
+      const r = await fetch("/api/conversations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: c.id, title: title.trim(), description: description.trim() || null }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.error || "Gagal menyimpan"); return; }
+      setConvs((list) => (list ?? []).map((x) => x.id === c.id ? { ...x, title: d.title, description: d.description } : x));
+      toast("Info grup disimpan");
+    } catch { toast("Jaringan bermasalah"); }
+  }
+
+  async function uploadGroupAvatar(c: Conv, file: File) {
+    try {
+      const buf = await file.arrayBuffer();
+      const r = await fetch(`/api/conversations/avatar?id=${c.id}`, {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/octet-stream", "x-conversation-id": c.id },
+        body: buf,
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.error || "Gagal unggah foto"); return; }
+      setConvs((list) => (list ?? []).map((x) => x.id === c.id ? { ...x, other_avatar: d.avatar_url } : x));
+      toast("Foto grup diperbarui");
+    } catch { toast("Jaringan bermasalah"); }
+  }
+
+  async function removeGroupAvatar(c: Conv) {
+    try {
+      const r = await fetch(`/api/conversations/avatar?id=${c.id}`, { method: "DELETE" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.error || "Gagal hapus foto"); return; }
+      setConvs((list) => (list ?? []).map((x) => x.id === c.id ? { ...x, other_avatar: null } : x));
+      toast("Foto grup dihapus");
+    } catch { toast("Jaringan bermasalah"); }
+  }
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
@@ -812,14 +871,36 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                 <header><button className="icon-btn" onClick={() => setInfo(false)} aria-label="Tutup"><Icon n="close" /></button><strong>Info</strong></header>
                 <div className={active.kind === "dm" ? "cover-hero" : "info-hero"}>
                   {active.kind === "dm" && <Banner name={convName(active)} src={active.other_banner} />}
-                  <button className="zoomable" disabled={!active.other_avatar || active.kind !== "dm"} onClick={() => active.other_avatar && setZoom(active.other_avatar)} aria-label="Perbesar foto">
-                    <Avatar name={convName(active)} src={active.other_avatar} kind={active.kind === "dm" ? undefined : active.kind} size={96} />
-                  </button>
+                  <div className="group-av-wrap">
+                    <button className="zoomable" disabled={!active.other_avatar} onClick={() => active.other_avatar && setZoom(active.other_avatar)} aria-label="Perbesar foto">
+                      <Avatar name={convName(active)} src={active.other_avatar} kind={active.kind === "dm" ? undefined : active.kind} size={96} />
+                    </button>
+                    {active.kind === "group" && isGroupManager(active) && (
+                      <label className="group-av-edit" title="Ganti foto grup">
+                        <Icon n="camera" size={16} />
+                        <input type="file" accept="image/jpeg,image/png,image/webp" hidden
+                          onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadGroupAvatar(active, f); }} />
+                      </label>
+                    )}
+                  </div>
                   <h2>{convName(active)}{(active.kind === "ai" || (active.kind === "dm" && active.other_verified)) && <VerifiedBadge title={active.kind === "ai" ? "Kev-Ai terverifikasi" : "Terverifikasi"} />}</h2>
                   <p className="muted">{active.kind === "dm" ? `@${active.other_username}` : subtitle(active)}</p>
                   {active.kind === "dm" && active.other_bio && <p className="desc">{active.other_bio}</p>}
-                  {active.description && <p className="desc">{active.description}</p>}
+                  {active.description && active.kind !== "group" && <p className="desc">{active.description}</p>}
                   {active.kind === "ai" && <p className="desc">Kev-Ai menjawab lewat kev-ai.vercel.app. Di grup, panggil dengan @kev-ai lalu tulis pertanyaannya.</p>}
+                  {active.kind === "group" && isGroupManager(active) && (
+                    <GroupEditForm
+                      key={active.id + String(active.title) + String(active.description)}
+                      title={active.title || ""}
+                      description={active.description || ""}
+                      hasAvatar={!!active.other_avatar}
+                      onSave={(title, desc) => saveGroupInfo(active, title, desc)}
+                      onRemoveAvatar={() => removeGroupAvatar(active)}
+                    />
+                  )}
+                  {active.kind === "group" && !isGroupManager(active) && active.description && (
+                    <p className="desc">{active.description}</p>
+                  )}
                 </div>
                 {/* Chat pribadi: tidak tampil daftar anggota — hanya profil lawan bicara + aksi */}
                 {active.kind === "dm" && active.other_id && (
@@ -962,6 +1043,41 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       {dialog && <Dialog title={dialog.title} text={dialog.text} actions={dialog.actions} onClose={() => setDialog(null)} />}
       {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
       {toastText && <div className="toast" role="status">{toastText}</div>}
+    </div>
+  );
+}
+
+function GroupEditForm({ title, description, hasAvatar, onSave, onRemoveAvatar }: {
+  title: string; description: string; hasAvatar: boolean;
+  onSave: (title: string, description: string) => void;
+  onRemoveAvatar: () => void;
+}) {
+  const [t, setT] = useState(title);
+  const [d, setD] = useState(description);
+  const [open, setOpen] = useState(false);
+  const dirty = t.trim() !== (title || "").trim() || d.trim() !== (description || "").trim();
+  if (!open) {
+    return (
+      <div className="group-edit-actions">
+        <button type="button" className="link" onClick={() => setOpen(true)}>Ubah nama & deskripsi</button>
+        {hasAvatar && <button type="button" className="link danger" onClick={onRemoveAvatar}>Hapus foto grup</button>}
+      </div>
+    );
+  }
+  return (
+    <div className="group-edit-form">
+      <label>
+        Nama grup
+        <input className="field" maxLength={60} value={t} onChange={(e) => setT(e.target.value)} />
+      </label>
+      <label>
+        Deskripsi
+        <textarea className="field" rows={2} maxLength={200} value={d} onChange={(e) => setD(e.target.value)} placeholder="Opsional" />
+      </label>
+      <div className="group-edit-actions">
+        <button type="button" className="link" onClick={() => { setOpen(false); setT(title); setD(description); }}>Batal</button>
+        <button type="button" className="primary group-save" disabled={!t.trim() || !dirty} onClick={() => { onSave(t, d); setOpen(false); }}>Simpan</button>
+      </div>
     </div>
   );
 }

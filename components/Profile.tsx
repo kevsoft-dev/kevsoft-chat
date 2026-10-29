@@ -123,14 +123,47 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   useEffect(() => () => { if (coverPreview) URL.revokeObjectURL(coverPreview); }, [coverPreview]);
 
-  async function patch(p: { name?: string; bio?: string }) {
+  const [awayOn, setAwayOn] = useState(!!me.awayEnabled);
+  const [awayMsg, setAwayMsg] = useState(
+    me.awayMessage ||
+      "Halo,\nTerima kasih sudah menghubungi Kevsoft. Saat ini saya sedang tidak di tempat.\nPesan kamu akan saya balas segera setelah kembali online."
+  );
+  const [awayBusy, setAwayBusy] = useState(false);
+  const [awayEdit, setAwayEdit] = useState(false);
+
+  async function patch(p: { name?: string; bio?: string; away_enabled?: boolean; away_message?: string }) {
     try {
       const r = await fetch("/api/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) return (d.error as string) || "Gagal menyimpan";
-      onUpdate({ name: d.name, bio: d.bio });
+      onUpdate({
+        name: d.name ?? me.name,
+        bio: d.bio ?? me.bio,
+        awayEnabled: d.away_enabled,
+        awayMessage: d.away_message,
+      });
+      if (typeof d.away_enabled === "boolean") setAwayOn(d.away_enabled);
+      if (d.away_message != null) setAwayMsg(d.away_message);
       return null;
     } catch { return "Jaringan bermasalah, coba lagi"; }
+  }
+
+  async function toggleAway(v: boolean) {
+    setAwayBusy(true);
+    const err = await patch({ away_enabled: v });
+    setAwayBusy(false);
+    if (err) onToast(err);
+    else onToast(v ? "Pesan tidak di tempat aktif" : "Pesan tidak di tempat dimatikan");
+  }
+
+  async function saveAwayMsg() {
+    const text = awayMsg.trim();
+    if (!text) { onToast("Pesan tidak boleh kosong"); return; }
+    setAwayBusy(true);
+    const err = await patch({ away_message: text });
+    setAwayBusy(false);
+    if (err) onToast(err);
+    else { setAwayEdit(false); onToast("Pesan tidak di tempat disimpan"); }
   }
 
   // Pilih file → editor potong (atur posisi/zoom) → Simpan mengunggah hasil potongan.
@@ -285,6 +318,37 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
           <div className="set"><Icon n="bell" size={20} /><span>Suara pesan<small>Bunyi saat ada pesan baru</small></span><Switch on={sound} onChange={setSound} label="Suara pesan" /></div>
           <div className="set"><Icon n="keyboard" size={20} /><span>Enter untuk kirim<small>Di komputer. Shift+Enter = baris baru</small></span><Switch on={enter} onChange={setEnter} label="Enter untuk kirim" /></div>
           <div className="set"><Icon n="bolt" size={20} /><span>Animasi<small>Matikan agar lebih hemat di HP lama</small></span><Switch on={motion} onChange={setMotion} label="Animasi" /></div>
+          <div className="set">
+            <Icon n="clock" size={20} />
+            <span>Tidak di tempat<small>Auto-balas DM saat kamu offline / sibuk</small></span>
+            <Switch on={awayOn} onChange={(v) => !awayBusy && toggleAway(v)} label="Tidak di tempat" />
+          </div>
+          {awayOn && (
+            <div className="away-box">
+              {!awayEdit ? (
+                <>
+                  <p className="away-preview">{awayMsg}</p>
+                  <button type="button" className="link" onClick={() => setAwayEdit(true)}>Ubah teks pesan</button>
+                </>
+              ) : (
+                <>
+                  <textarea
+                    className="away-input"
+                    rows={4}
+                    maxLength={500}
+                    value={awayMsg}
+                    onChange={(e) => setAwayMsg(e.target.value)}
+                    placeholder="Tulis pesan tidak di tempat…"
+                    aria-label="Pesan tidak di tempat"
+                  />
+                  <div className="away-actions">
+                    <button type="button" className="link" onClick={() => { setAwayEdit(false); setAwayMsg(me.awayMessage || awayMsg); }}>Batal</button>
+                    <button type="button" className="primary away-save" disabled={awayBusy} onClick={saveAwayMsg}>{awayBusy ? "Menyimpan…" : "Simpan pesan"}</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <button className="logout" onClick={onLogout}><Icon n="logout" size={20} />Keluar</button>

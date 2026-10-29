@@ -30,9 +30,24 @@ async function run() {
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'verified') as verified,
       to_regclass('public.user_banners') is not null as banners,
       to_regclass('public.rate_limits') is not null as ratelimits,
-      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'token_version') as tokenver`;
-  if (r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks && r.disappear && r.expires && r.pinned && r.media && r.settings && r.role_title && r.verified && r.banners && r.ratelimits && r.tokenver) return;
-  for (const s of SCHEMA.split(";").map((x) => x.trim()).filter(Boolean)) await runRaw(s);
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'token_version') as tokenver,
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'away_enabled') as away,
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'conversations' and column_name = 'avatar_url') as group_avatar`;
+  if (!(r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks && r.disappear && r.expires && r.pinned && r.media && r.settings && r.role_title && r.verified && r.banners && r.ratelimits && r.tokenver && r.away && r.group_avatar)) {
+    for (const s of SCHEMA.split(";").map((x) => x.trim()).filter(Boolean)) await runRaw(s);
+  }
+  // Pastikan pembuat grup = owner grup (bukan admin sistem)
+  try {
+    await sql`
+      update conversation_members cm
+      set role = 'owner'
+      from conversations c
+      where c.id = cm.conversation_id
+        and c.kind = 'group'
+        and c.created_by is not null
+        and c.created_by = cm.user_id
+        and cm.role is distinct from 'owner'`;
+  } catch {}
 }
 
 export function ensureSchema() {

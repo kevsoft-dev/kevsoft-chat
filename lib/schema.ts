@@ -35,6 +35,13 @@ create table if not exists conversations (
 alter table conversations add column if not exists kind text not null default 'dm';
 alter table conversations add column if not exists description text;
 alter table conversations add column if not exists created_by text;
+alter table conversations add column if not exists avatar_url text;
+create table if not exists conversation_avatars (
+  conversation_id uuid primary key references conversations(id) on delete cascade,
+  mime text not null,
+  data text not null,
+  updated_at timestamptz default now()
+);
 alter table conversations add column if not exists disappear_seconds int not null default 0;
 create unique index if not exists conversations_one_ai_per_user on conversations (created_by) where kind = 'ai';
 
@@ -126,6 +133,9 @@ alter table users add column if not exists role_title text;
 alter table users add column if not exists verified boolean not null default false;
 
 alter table users add column if not exists token_version int not null default 0;
+alter table users add column if not exists away_enabled boolean not null default false;
+alter table users add column if not exists away_message text;
+alter table users add column if not exists away_since timestamptz;
 create table if not exists rate_limits (
   key text primary key,
   count int not null default 0,
@@ -133,5 +143,15 @@ create table if not exists rate_limits (
 );
 create index if not exists rate_limits_reset_idx on rate_limits (reset_at);
 create index if not exists messages_sender_idx on messages (sender_id, created_at desc);
+
+-- Promosikan pembuat grup menjadi owner grup (sekali, idempotent).
+update conversation_members cm
+set role = 'owner'
+from conversations c
+where c.id = cm.conversation_id
+  and c.kind = 'group'
+  and c.created_by is not null
+  and c.created_by = cm.user_id
+  and cm.role is distinct from 'owner';
 
 `;

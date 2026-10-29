@@ -21,7 +21,7 @@ function Problem({ text }: { text: string }) {
   );
 }
 
-type Row = { id: string; username: string | null; name: string | null; avatar_url: string | null; banner_url?: string | null; bio: string | null; email: string | null; role: string; verified?: boolean | null; has_password: boolean };
+type Row = { id: string; username: string | null; name: string | null; avatar_url: string | null; banner_url?: string | null; bio: string | null; email: string | null; role: string; verified?: boolean | null; has_password: boolean; away_enabled?: boolean; away_message?: string | null };
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ reset?: string; dm?: string; news?: string }> }) {
   let uid: string | null = null;
@@ -35,7 +35,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
   try {
     await ensureSchema();
     [user] = (await sql`
-      select id, username, name, avatar_url, banner_url, bio, email, role, (role = 'owner' or verified) as verified, (password_hash is not null) as has_password
+      select id, username, name, avatar_url, banner_url, bio, email, role, (role = 'owner' or verified) as verified, (password_hash is not null) as has_password,
+        coalesce(away_enabled, false) as away_enabled, away_message
       from users where id = ${userId}`) as any;
     if (user?.username) await ensureDefaults(userId);
   } catch (e: any) {
@@ -56,7 +57,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
 
   return (
     <Chat
-      me={{ id: user.id, username: user.username as string, name: user.name ?? (user.username as string), avatarUrl: user.avatar_url || null, bannerUrl: user.banner_url || null, bio: user.bio, email: user.email, role: user.role, verified: !!user.verified }}
+      me={{ id: user.id, username: user.username as string, name: user.name ?? (user.username as string), avatarUrl: user.avatar_url || null, bannerUrl: user.banner_url || null, bio: user.bio, email: user.email, role: user.role, verified: !!user.verified, awayEnabled: !!user.away_enabled, awayMessage: user.away_message ?? null }}
       pusherKey={cfg.pusher.key}
       pusherCluster={cfg.pusher.cluster}
       openDm={openDm}

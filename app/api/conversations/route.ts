@@ -14,8 +14,12 @@ export async function GET() {
 
   const rows = await sql`
     select c.id, c.kind, c.title, c.description, coalesce(c.disappear_seconds, 0) as disappear_seconds,
-      o.id as other_id, o.username as other_username, o.name as other_name, o.avatar_url as other_avatar, o.banner_url as other_banner, o.bio as other_bio,
+      o.id as other_id, o.username as other_username, o.name as other_name,
+      case when c.kind in ('group', 'community') then c.avatar_url else o.avatar_url end as other_avatar,
+      o.banner_url as other_banner, o.bio as other_bio,
       coalesce(o.role = 'owner' or o.verified, false) as other_verified,
+      c.created_by,
+      (select cm.role from conversation_members cm where cm.conversation_id = c.id and cm.user_id = ${uid}) as my_group_role,
       (select count(*) from conversation_members where conversation_id = c.id)::int as member_count,
       lm.body as last_body, lm.created_at as last_at, lm.kind as last_kind, lu.username as last_username,
       (lm.deleted_at is not null) as last_deleted,
@@ -91,7 +95,7 @@ export async function POST(req: Request) {
   const [conv] = await sql`
     insert into conversations (kind, title, description, created_by)
     values ('group', ${d.title}, ${d.description ?? null}, ${uid}) returning id`;
-  await sql`insert into conversation_members (conversation_id, user_id, role) values (${conv.id}, ${uid}, 'admin')`;
+  await sql`insert into conversation_members (conversation_id, user_id, role) values (${conv.id}, ${uid}, 'owner')`;
   const ids = found.map((f) => f.id as string);
   await sql`insert into conversation_members (conversation_id, user_id)
             select ${conv.id}, x from unnest(${ids}::text[]) as x`;
@@ -134,4 +138,38 @@ export async function DELETE(req: Request) {
   }
   after(() => pushTo(uid, "conversation", { id: id.data }));
   return Response.json({ ok: true });
+}
+
+
+// Ubah nama/deskripsi grup — hanya owner grup (atau admin grup).
+export async function PATCH(req: Request) {
+  const uid = await getUserId();
+  if (!uid) return new Response("Unauthorized", { status: 401 });
+  const parsed = z.object({
+    id: z.string().uuid(),
+    title: z.string().trim().min(1).max(60).optional(),
+    description: z.string().trim().max(200).optional().nullable(),
+  }).safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: "Data tidak valid" }, { status: 400 });
+  const { id, title, description } = parsed.data;
+  if (title === undefined && description === undefined)
+    return Response.json({ error: "Tidak ada perubahan" }, { status: 400 });
+
+  const [mem] = await sql`
+    select cm.role as member_role, c.kind, c.created_by
+    from conversation_members cm
+    join conversations c on c.id = cm.conversation_id
+    where cm.conversation_id = ${id}::uuid and cm.user_id = ${uid}`;
+  if (!mem || mem.kind !== "group") return Response.json({ error: "Hanya untuk grup" }, { status: 400 });
+  const canEdit = mem.member_role === "owner" || mem.member_role === "admin" || mem.created_by === uid;
+  if (!canEdit) return Response.json({ error: "Hanya owner/admin grup yang bisa mengubah info grup" }, { status: 403 });
+
+  const [c] = await sql`
+    update conversations set
+      title = coalesce(${title ?? null}::text, title),
+      description = case when ${description === undefined} then description else ${description ?? null}::text end
+    where id = ${id}::uuid
+    returning id, title, description, avatar_url`;
+  await broadcast(id, "conversation", { id, title: c.title, description: c.description, avatar_url: c.avatar_url });
+  return Response.json(c);
 }
