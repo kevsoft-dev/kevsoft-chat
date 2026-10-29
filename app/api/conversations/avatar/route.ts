@@ -1,8 +1,9 @@
 import { clientIp, limit, tooMany } from "@/lib/ratelimit";
 import { z } from "zod";
 import { sql } from "@/lib/db";
-import { getUserId } from "@/lib/auth";
+import { getUserId, getActor } from "@/lib/auth";
 import { broadcast } from "@/lib/messages";
+import { isRootEmail } from "@/lib/roles";
 
 const MAX = 150_000;
 
@@ -19,7 +20,12 @@ async function canManageGroup(uid: string, conversationId: string) {
     from conversation_members cm
     join conversations c on c.id = cm.conversation_id
     where cm.conversation_id = ${conversationId}::uuid and cm.user_id = ${uid}`;
-  if (!mem || mem.kind !== "group") return false;
+  if (!mem) return false;
+  if (mem.kind === "community") {
+    const actor = await getActor();
+    return !!actor && isRootEmail(actor.email);
+  }
+  if (mem.kind !== "group") return false;
   return mem.member_role === "owner" || mem.member_role === "admin" || mem.created_by === uid;
 }
 

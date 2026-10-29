@@ -23,7 +23,7 @@ function Problem({ text }: { text: string }) {
 
 type Row = { id: string; username: string | null; name: string | null; avatar_url: string | null; banner_url?: string | null; bio: string | null; email: string | null; role: string; verified?: boolean | null; has_password: boolean; away_enabled?: boolean; away_message?: string | null };
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ reset?: string; dm?: string; news?: string }> }) {
+export default async function Home({ searchParams }: { searchParams: Promise<{ reset?: string; dm?: string; news?: string; open?: string }> }) {
   let uid: string | null = null;
   let authError = "";
   try { uid = (await getUserId()) ?? null; } catch (e: any) { authError = String(e?.message ?? e); }
@@ -61,6 +61,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
       pusherKey={cfg.pusher.key}
       pusherCluster={cfg.pusher.cluster}
       openDm={openDm}
+      openId={(sp.open || "").trim() || undefined}
     />
   );
 }

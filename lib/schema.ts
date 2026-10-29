@@ -36,6 +36,8 @@ alter table conversations add column if not exists kind text not null default 'd
 alter table conversations add column if not exists description text;
 alter table conversations add column if not exists created_by text;
 alter table conversations add column if not exists avatar_url text;
+alter table conversations add column if not exists handle text;
+create unique index if not exists conversations_handle_key on conversations (lower(handle)) where handle is not null;
 create table if not exists conversation_avatars (
   conversation_id uuid primary key references conversations(id) on delete cascade,
   mime text not null,
@@ -55,6 +57,7 @@ alter table conversation_members add column if not exists last_read_at timestamp
 alter table conversation_members add column if not exists joined_at timestamptz not null default now();
 alter table conversation_members add column if not exists cleared_at timestamptz;
 alter table conversation_members add column if not exists hidden_at timestamptz;
+alter table conversation_members add column if not exists muted_until timestamptz;
 create index if not exists members_user_idx on conversation_members (user_id);
 
 create table if not exists messages (

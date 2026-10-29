@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getUserId } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { ensureSchema } from "@/lib/migrate";
@@ -16,7 +16,14 @@ export default async function UserProfilePage({ params }: { params: Promise<{ us
   const [u] = await sql`
     select id, username, name, avatar_url, banner_url, bio, role, created_at, (role = 'owner' or verified) as verified
     from users where lower(username) = ${raw} and banned_at is null limit 1`;
-  if (!u) notFound();
+
+  // Bukan profil user? Coba handle grup → /g/{handle}
+  if (!u) {
+    const [g] = await sql`
+      select handle from conversations where kind = 'group' and lower(handle) = ${raw} limit 1`;
+    if (g?.handle) redirect(`/g/${g.handle}`);
+    notFound();
+  }
 
   let meUsername = "";
   if (uid) {

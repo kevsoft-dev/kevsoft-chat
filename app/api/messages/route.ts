@@ -85,6 +85,11 @@ export async function POST(req: Request) {
     where c.id = ${conversationId}::uuid
       and exists (select 1 from conversation_members where conversation_id = ${conversationId}::uuid and user_id = ${uid})
       and not exists (select 1 from users where id = ${uid} and muted_until > now())
+      and not exists (
+        select 1 from conversation_members cm
+        where cm.conversation_id = ${conversationId}::uuid and cm.user_id = ${uid}
+          and cm.muted_until is not null and cm.muted_until > now()
+      )
     on conflict (id) do nothing
     returning id, created_at, mentions`;
 
@@ -94,6 +99,11 @@ export async function POST(req: Request) {
     if (!ex) {
       const [mu] = await sql`select muted_until from users where id = ${uid} and muted_until > now()`;
       if (mu) return Response.json({ error: "Kamu sedang dibisukan oleh moderator", muted: true }, { status: 403 });
+      const [gm] = await sql`
+        select muted_until from conversation_members
+        where conversation_id = ${conversationId}::uuid and user_id = ${uid}
+          and muted_until is not null and muted_until > now()`;
+      if (gm) return Response.json({ error: "Kamu dibisukan di grup ini", muted: true, group: true }, { status: 403 });
       return new Response("Forbidden", { status: 403 });
     }
     return Response.json(ex);

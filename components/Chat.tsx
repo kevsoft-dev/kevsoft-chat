@@ -68,6 +68,10 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
   const [newBelow, setNewBelow] = useState(0);
   const [showConsole, setShowConsole] = useState(false);
   const [memberQ, setMemberQ] = useState("");
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [addQ, setAddQ] = useState("");
+  const [addHits, setAddHits] = useState<{ id: string; username: string; name: string | null; avatar_url: string | null }[]>([]);
+  const [addBusy, setAddBusy] = useState(false);
   const [viewUser, setViewUser] = useState<UserLite | null>(null);
   const [roleLabels, setRoleLabels] = useState<RoleLabels>(DEFAULT_ROLE_LABELS);
 
@@ -193,14 +197,20 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       mutate(d.conversation_id, (x) => x.map((y) => y.id === d.id ? { ...y, pinned_at: d.pinned ? new Date().toISOString() : null } : y));
     });
 
-    ch.bind("conversation", (d?: { id?: string; title?: string; description?: string | null; avatar_url?: string | null }) => {
+    ch.bind("conversation", (d?: { id?: string; title?: string; description?: string | null; avatar_url?: string | null; handle?: string | null; cleared?: boolean; destroyed?: boolean }) => {
       scheduleConvs();
-      if (d?.id && (d.title !== undefined || d.avatar_url !== undefined || d.description !== undefined)) {
+      if (d?.destroyed && d.id && activeRef.current === d.id) {
+        activeRef.current = null; setActiveId(null); setMsgs([]); setInfo(false);
+      } else if (d?.cleared && d.id && activeRef.current === d.id) {
+        setMsgs([]); if (cache.current[d.id]) cache.current[d.id] = [];
+      }
+      if (d?.id && (d.title !== undefined || d.avatar_url !== undefined || d.description !== undefined || d.handle !== undefined)) {
         setConvs((list) => (list ?? []).map((c) => c.id === d.id ? {
           ...c,
           title: d.title !== undefined ? d.title : c.title,
           description: d.description !== undefined ? d.description : c.description,
           other_avatar: d.avatar_url !== undefined ? d.avatar_url : c.other_avatar,
+          handle: d.handle !== undefined ? d.handle : c.handle,
         } : c));
       }
     });
@@ -308,7 +318,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     if (keys.length > 12) delete cache.current[keys[0]];
     activeRef.current = id; setActiveId(id); fresh.current.clear();
     positioned.current = null; stick.current = true; setAway(false); setNewBelow(0); setNoMore(false);
-    setReplyTo(null); setInfo(false); setMembers([]); setMenu(null); setViewUser(null);
+    setReplyTo(null); setInfo(false); setMembers([]); setMenu(null); setViewUser(null); setAddMemberOpen(false); setAddQ(""); setAddHits([]);
     const cached = cache.current[id];
     setMsgs(cached ?? []); setLoading(!cached);
     setConvs((l) => l && l.map((c) => (c.id === id ? { ...c, unread: 0, unread_mention: false } : c)));
@@ -623,6 +633,39 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     } catch { toast("Jaringan bermasalah, coba lagi"); }
   }, [toast, loadMembers, scheduleConvs]);
 
+  const searchAddMembers = useCallback(async (q: string, cid: string) => {
+    const s = q.trim().replace(/^@/, "").toLowerCase();
+    setAddQ(q);
+    if (s.length < 1) { setAddHits([]); return; }
+    try {
+      const r = await fetch(`/api/users?q=${encodeURIComponent(s)}`);
+      if (!r.ok) return;
+      const list = await r.json();
+      // sembunyikan yang sudah anggota
+      const inGroup = new Set(members.map((m) => m.id));
+      setAddHits((list as any[]).filter((u) => !inGroup.has(u.id)).slice(0, 8));
+    } catch { setAddHits([]); }
+  }, [members]);
+
+  const addMembersToGroup = useCallback(async (cid: string, usernames: string[]) => {
+    if (!usernames.length || addBusy) return;
+    setAddBusy(true);
+    try {
+      const r = await fetch("/api/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: cid, usernames }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.error || "Gagal menambah anggota"); return; }
+      const n = (d.added as string[] | undefined)?.length || 0;
+      toast(n === 1 ? `@${d.added[0]} ditambahkan` : `${n} anggota ditambahkan`);
+      setAddQ(""); setAddHits([]); setAddMemberOpen(false);
+      loadMembers(cid); scheduleConvs();
+    } catch { toast("Jaringan bermasalah"); }
+    finally { setAddBusy(false); }
+  }, [addBusy, toast, loadMembers, scheduleConvs]);
+
   const memberItems = useCallback((u: UserLite, c: Conv, all: UserLite[]): MenuItem[] => {
     if (u.id === me.id || (c.kind !== "group" && c.kind !== "community")) return [];
     const tr = rk(u.sys_role);
@@ -640,10 +683,25 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       { icon: "logout", label: `Keluarkan dari ${where}`, danger: true,
         run: () => confirm(`Keluarkan @${u.username}?`, `Dikeluarkan dari ${c.kind === "group" ? `“${convName(c)}”` : "Komunitas Kevsoft"}.`, "Kick", () => kickMember(c.id, u)) },
     ];
+    if (c.kind === "group" && (groupOwnerCan || groupAdminCan || staffCan)) {
+      const isGMuted = !!(u as any).group_muted;
+      items.push({
+        icon: "mute",
+        label: isGMuted ? "Buka bisu di grup" : "Bisukan di grup (1 jam)",
+        run: () => muteInGroup(c.id, u, isGMuted ? "unmute" : "mute"),
+      });
+      if (!isGMuted) {
+        items.push({
+          icon: "mute",
+          label: "Bisukan di grup (24 jam)",
+          run: () => muteInGroup(c.id, u, "mute", 24 * 60),
+        });
+      }
+    }
     if (staffCan) {
       items.push({ icon: "block", label: "Blokir akun (ban)", danger: true,
         run: () => confirm(`Blokir @${u.username}?`, "Akun langsung keluar dan tidak bisa masuk lagi sampai blokir dibuka di Console.", "Blokir akun", () => adminAct({ action: "ban", userId: u.id, reason: "Melanggar aturan komunitas" }, "Akun diblokir")) });
-      items.push({ icon: "mute", label: "Bisukan 1 jam", run: () => adminAct({ action: "mute", userId: u.id, minutes: 60 }, "Pengguna dibisukan 1 jam") });
+      items.push({ icon: "mute", label: "Bisukan global 1 jam", run: () => adminAct({ action: "mute", userId: u.id, minutes: 60 }, "Pengguna dibisukan 1 jam") });
       if (myRank === 2) {
         items.push({ icon: "check", label: u.verified ? "Cabut centang biru" : "Beri centang biru",
           run: () => adminAct({ action: "verify", userId: u.id, verified: !u.verified }, u.verified ? "Centang biru dicabut" : "Centang biru diberikan") });
@@ -654,7 +712,9 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       }
     }
     return items;
-  }, [me.id, myRank, kickMember, adminAct]);
+  }, [me.id, myRank, kickMember, adminAct, muteInGroup]);
+
+  const isMainOwner = () => (me.email || "").trim().toLowerCase() === "kevsoft.cs@gmail.com";
 
   const isGroupManager = (c: Conv | null) => {
     if (!c || c.kind !== "group") return false;
@@ -662,16 +722,18 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     return role === "owner" || role === "admin" || c.created_by === me.id;
   };
 
-  async function saveGroupInfo(c: Conv, title: string, description: string) {
+  async function saveGroupInfo(c: Conv, title: string, description: string, handle?: string) {
     try {
+      const body: Record<string, unknown> = { id: c.id, title: title.trim(), description: description.trim() || null };
+      if (handle !== undefined) body.handle = handle.trim().toLowerCase();
       const r = await fetch("/api/conversations", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: c.id, title: title.trim(), description: description.trim() || null }),
+        body: JSON.stringify(body),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { toast(d.error || "Gagal menyimpan"); return; }
-      setConvs((list) => (list ?? []).map((x) => x.id === c.id ? { ...x, title: d.title, description: d.description } : x));
+      setConvs((list) => (list ?? []).map((x) => x.id === c.id ? { ...x, title: d.title, description: d.description, handle: d.handle } : x));
       toast("Info grup disimpan");
     } catch { toast("Jaringan bermasalah"); }
   }
@@ -689,6 +751,16 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       setConvs((list) => (list ?? []).map((x) => x.id === c.id ? { ...x, other_avatar: d.avatar_url } : x));
       toast("Foto grup diperbarui");
     } catch { toast("Jaringan bermasalah"); }
+  }
+
+  async function shareGroupLink(c: Conv) {
+    const h = c.handle;
+    if (!h) { toast("Grup belum punya link. Atur handle dulu."); return; }
+    const url = `${window.location.origin}/${h}`;
+    try {
+      if (navigator.share) await navigator.share({ title: c.title || "Grup", url });
+      else { await navigator.clipboard.writeText(url); toast("Link grup disalin"); }
+    } catch { try { await navigator.clipboard.writeText(url); toast("Link grup disalin"); } catch { toast("Gagal membagikan"); } }
   }
 
   async function removeGroupAvatar(c: Conv) {
@@ -875,8 +947,8 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                     <button className="zoomable" disabled={!active.other_avatar} onClick={() => active.other_avatar && setZoom(active.other_avatar)} aria-label="Perbesar foto">
                       <Avatar name={convName(active)} src={active.other_avatar} kind={active.kind === "dm" ? undefined : active.kind} size={96} />
                     </button>
-                    {active.kind === "group" && isGroupManager(active) && (
-                      <label className="group-av-edit" title="Ganti foto grup">
+                    {((active.kind === "group" && isGroupManager(active)) || (active.kind === "community" && isMainOwner())) && (
+                      <label className="group-av-edit" title={active.kind === "community" ? "Ganti foto komunitas" : "Ganti foto grup"}>
                         <Icon n="camera" size={16} />
                         <input type="file" accept="image/jpeg,image/png,image/webp" hidden
                           onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadGroupAvatar(active, f); }} />
@@ -886,21 +958,57 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                   <h2>{convName(active)}{(active.kind === "ai" || (active.kind === "dm" && active.other_verified)) && <VerifiedBadge title={active.kind === "ai" ? "Kev-Ai terverifikasi" : "Terverifikasi"} />}</h2>
                   <p className="muted">{active.kind === "dm" ? `@${active.other_username}` : subtitle(active)}</p>
                   {active.kind === "dm" && active.other_bio && <p className="desc">{active.other_bio}</p>}
-                  {active.description && active.kind !== "group" && <p className="desc">{active.description}</p>}
+                  {active.description && active.kind !== "group" && active.kind !== "community" && <p className="desc">{active.description}</p>}
                   {active.kind === "ai" && <p className="desc">Kev-Ai menjawab lewat kev-ai.vercel.app. Di grup, panggil dengan @kev-ai lalu tulis pertanyaannya.</p>}
                   {active.kind === "group" && isGroupManager(active) && (
                     <GroupEditForm
-                      key={active.id + String(active.title) + String(active.description)}
+                      key={active.id + String(active.title) + String(active.description) + String(active.handle)}
                       title={active.title || ""}
                       description={active.description || ""}
+                      handle={active.handle || ""}
                       hasAvatar={!!active.other_avatar}
-                      onSave={(title, desc) => saveGroupInfo(active, title, desc)}
+                      onSave={(title, desc, handle) => saveGroupInfo(active, title, desc, handle)}
                       onRemoveAvatar={() => removeGroupAvatar(active)}
+                      onShare={() => shareGroupLink(active)}
                     />
                   )}
                   {active.kind === "group" && !isGroupManager(active) && active.description && (
                     <p className="desc">{active.description}</p>
                   )}
+                  {active.kind === "community" && isMainOwner() && (
+                    <CommunityEditForm
+                      key={active.id + String(active.title) + String(active.description)}
+                      title={active.title || "Komunitas Kevsoft"}
+                      description={active.description || ""}
+                      hasAvatar={!!active.other_avatar}
+                      onSave={async (title, desc) => {
+                        try {
+                          const r = await fetch("/api/conversations", {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ id: active.id, title: title.trim(), description: desc.trim() || null }),
+                          });
+                          const d = await r.json().catch(() => ({}));
+                          if (!r.ok) { toast(d.error || "Gagal menyimpan"); return; }
+                          setConvs((list) => (list ?? []).map((x) => x.id === active.id ? { ...x, title: d.title, description: d.description } : x));
+                          toast("Info komunitas disimpan");
+                        } catch { toast("Jaringan bermasalah"); }
+                      }}
+                      onRemoveAvatar={() => removeGroupAvatar(active)}
+                    />
+                  )}
+                  {active.kind === "community" && !isMainOwner() && active.description && (
+                    <p className="desc">{active.description}</p>
+                  )}
+                  {active.kind === "group" && active.handle && (
+                    <div className="group-edit-actions">
+                      <button type="button" className="link" onClick={() => shareGroupLink(active)}>
+                        <Icon n="share" size={14} /> Bagikan link grup
+                      </button>
+                      <span className="muted small">/{active.handle}</span>
+                    </div>
+                  )}
+
                 </div>
                 {/* Chat pribadi: tidak tampil daftar anggota — hanya profil lawan bicara + aksi */}
                 {active.kind === "dm" && active.other_id && (
@@ -920,7 +1028,48 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                 {/* Grup / komunitas: daftar anggota; ketuk = info lengkap */}
                 {(active.kind === "group" || active.kind === "community") && (
                   <>
-                    <h4>{members.length} anggota</h4>
+                    <h4>
+                      {members.length} anggota
+                      {active.kind === "group" && isGroupManager(active) && (
+                        <button type="button" className="link add-member-btn" onClick={() => setAddMemberOpen((o) => !o)}>
+                          {addMemberOpen ? "Tutup" : "Tambah"}
+                        </button>
+                      )}
+                    </h4>
+                    {addMemberOpen && active.kind === "group" && isGroupManager(active) && (
+                      <div className="add-member-box">
+                        <div className="search member-search">
+                          <Icon n="search" size={18} />
+                          <input
+                            placeholder="Cari username untuk ditambah"
+                            value={addQ}
+                            onChange={(e) => searchAddMembers(e.target.value, active.id)}
+                            aria-label="Cari pengguna"
+                            autoFocus
+                          />
+                        </div>
+                        {addHits.length > 0 && (
+                          <ul className="add-member-list">
+                            {addHits.map((u) => (
+                              <li key={u.id}>
+                                <button type="button" disabled={addBusy}
+                                  onClick={() => addMembersToGroup(active.id, [u.username])}>
+                                  <Avatar name={u.name || u.username} src={u.avatar_url} size={36} />
+                                  <span>
+                                    <b>{u.name || u.username}</b>
+                                    <small>@{u.username}</small>
+                                  </span>
+                                  <Icon n="plus" size={18} />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {addQ.trim() && addHits.length === 0 && (
+                          <p className="muted small" style={{ padding: "6px 4px" }}>Tidak ada hasil / sudah anggota</p>
+                        )}
+                      </div>
+                    )}
                     {members.length > 8 && (
                       <div className="search member-search"><Icon n="search" size={18} /><input placeholder="Cari anggota" value={memberQ} onChange={(e) => setMemberQ(e.target.value)} aria-label="Cari anggota" /></div>
                     )}
@@ -935,7 +1084,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                             <button type="button" className="member-main" onClick={() => setViewUser(u)} aria-label={`Info @${u.username}`}>
                               <Avatar name={u.name || u.username} src={u.avatar_url} size={38} />
                               <span>
-                                <b>{u.name || u.username}{u.verified && <VerifiedBadge />}{u.id === me.id && " (kamu)"}<RoleBadge role={u.role} labels={roleLabels} />{u.banned && <em className="badge warn">diblokir</em>}{u.muted && <em className="badge warn">bisu</em>}</b>
+                                <b>{u.name || u.username}{u.verified && <VerifiedBadge />}{u.id === me.id && " (kamu)"}<RoleBadge role={u.role} labels={roleLabels} />{u.banned && <em className="badge warn">diblokir</em>}{u.muted && <em className="badge warn">bisu</em>}{(u as any).group_muted && <em className="badge warn">bisu grup</em>}</b>
                                 <small>{u.bio || `@${u.username}`}</small>
                               </span>
                             </button>
@@ -967,8 +1116,64 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                   </div>
                 )}
                 <div className="info-actions">
-                  <button onClick={() => askConv(active, "clear")}><Icon n="trash" size={18} />Bersihkan chat</button>
+                  <button onClick={() => askConv(active, "clear")}><Icon n="trash" size={18} />Bersihkan chat (untuk saya)</button>
                   {active.kind === "dm" && <button className="danger" onClick={() => askConv(active, "delete")}><Icon n="trash" size={18} />Hapus chat</button>}
+                  {active.kind === "group" && isGroupManager(active) && (
+                    <>
+                      <button onClick={async () => {
+                        if (!confirm("Reset link grup? Link lama tidak bisa dipakai lagi.")) return;
+                        try {
+                          const r = await fetch("/api/conversations", {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ id: active.id, reset_handle: true }),
+                          });
+                          const d = await r.json().catch(() => ({}));
+                          if (!r.ok) { toast(d.error || "Gagal reset link"); return; }
+                          setConvs((list) => (list ?? []).map((x) => x.id === active.id ? { ...x, handle: d.handle } : x));
+                          toast(`Link baru: /${d.handle}`);
+                        } catch { toast("Jaringan bermasalah"); }
+                      }}><Icon n="link" size={18} />Reset link grup</button>
+                      <button className="danger" onClick={() => {
+                        setDialog({
+                          title: "Hapus semua chat grup?",
+                          text: "Semua pesan di grup ini akan dihapus untuk semua anggota. Tidak bisa dibatalkan.",
+                          actions: [{
+                            label: "Hapus semua chat", danger: true, run: async () => {
+                              try {
+                                const r = await fetch(`/api/conversations?id=${active.id}&mode=clear_all`, { method: "DELETE" });
+                                const d = await r.json().catch(() => ({}));
+                                if (!r.ok) { toast(d.error || "Gagal"); return; }
+                                setMsgs([]); setInfo(false);
+                                if (cache.current[active.id]) cache.current[active.id] = [];
+                                toast("Semua chat grup dihapus");
+                                scheduleConvs();
+                              } catch { toast("Jaringan bermasalah"); }
+                            },
+                          }],
+                        });
+                      }}><Icon n="trash" size={18} />Hapus semua chat grup</button>
+                    </>
+                  )}
+                  {active.kind === "group" && (active.my_group_role === "owner" || active.created_by === me.id) && (
+                    <button className="danger" onClick={() => {
+                      setDialog({
+                        title: "Hapus grup?",
+                        text: `Grup “${convName(active)}” beserta semua pesan dan anggota akan dihapus permanen.`,
+                        actions: [{
+                          label: "Hapus grup", danger: true, run: async () => {
+                            try {
+                              const r = await fetch(`/api/conversations?id=${active.id}&mode=destroy`, { method: "DELETE" });
+                              const d = await r.json().catch(() => ({}));
+                              if (!r.ok) { toast(d.error || "Gagal hapus grup"); return; }
+                              setInfo(false); closeChat(); scheduleConvs();
+                              toast("Grup dihapus");
+                            } catch { toast("Jaringan bermasalah"); }
+                          },
+                        }],
+                      });
+                    }}><Icon n="trash" size={18} />Hapus grup</button>
+                  )}
                   {active.kind === "group" && <button className="danger" onClick={() => askConv(active, "delete")}><Icon n="logout" size={18} />Keluar grup</button>}
                 </div>
               </aside>
@@ -1047,7 +1252,51 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
   );
 }
 
-function GroupEditForm({ title, description, hasAvatar, onSave, onRemoveAvatar }: {
+function GroupEditForm({ title, description, handle, hasAvatar, onSave, onRemoveAvatar, onShare }: {
+  title: string; description: string; handle: string; hasAvatar: boolean;
+  onSave: (title: string, description: string, handle: string) => void;
+  onRemoveAvatar: () => void;
+  onShare: () => void;
+}) {
+  const [t, setT] = useState(title);
+  const [d, setD] = useState(description);
+  const [h, setH] = useState(handle);
+  const [open, setOpen] = useState(false);
+  const dirty = t.trim() !== (title || "").trim() || d.trim() !== (description || "").trim() || h.trim().toLowerCase() !== (handle || "").trim().toLowerCase();
+  if (!open) {
+    return (
+      <div className="group-edit-actions">
+        <button type="button" className="link" onClick={() => setOpen(true)}>Ubah nama, handle & deskripsi</button>
+        {handle && <button type="button" className="link" onClick={onShare}>Bagikan link</button>}
+        {hasAvatar && <button type="button" className="link danger" onClick={onRemoveAvatar}>Hapus foto grup</button>}
+        {handle && <span className="muted small">Link: /{handle}</span>}
+      </div>
+    );
+  }
+  return (
+    <div className="group-edit-form">
+      <label>
+        Nama grup
+        <input className="field" maxLength={60} value={t} onChange={(e) => setT(e.target.value)} />
+      </label>
+      <label>
+        Handle link (pendek)
+        <input className="field" maxLength={20} value={h} onChange={(e) => setH(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ""))} placeholder="nama_grup" />
+        <small className="muted">Link: /{h || "…"} — boleh dibuka & dibagikan</small>
+      </label>
+      <label>
+        Deskripsi
+        <textarea className="field" rows={2} maxLength={200} value={d} onChange={(e) => setD(e.target.value)} placeholder="Opsional" />
+      </label>
+      <div className="group-edit-actions">
+        <button type="button" className="link" onClick={() => { setOpen(false); setT(title); setD(description); setH(handle); }}>Batal</button>
+        <button type="button" className="primary group-save" disabled={!t.trim() || !h.trim() || !dirty} onClick={() => { onSave(t, d, h); setOpen(false); }}>Simpan</button>
+      </div>
+    </div>
+  );
+}
+
+function CommunityEditForm({ title, description, hasAvatar, onSave, onRemoveAvatar }: {
   title: string; description: string; hasAvatar: boolean;
   onSave: (title: string, description: string) => void;
   onRemoveAvatar: () => void;
@@ -1059,20 +1308,20 @@ function GroupEditForm({ title, description, hasAvatar, onSave, onRemoveAvatar }
   if (!open) {
     return (
       <div className="group-edit-actions">
-        <button type="button" className="link" onClick={() => setOpen(true)}>Ubah nama & deskripsi</button>
-        {hasAvatar && <button type="button" className="link danger" onClick={onRemoveAvatar}>Hapus foto grup</button>}
+        <button type="button" className="link" onClick={() => setOpen(true)}>Ubah nama & deskripsi komunitas</button>
+        {hasAvatar && <button type="button" className="link danger" onClick={onRemoveAvatar}>Hapus foto komunitas</button>}
       </div>
     );
   }
   return (
     <div className="group-edit-form">
       <label>
-        Nama grup
+        Nama komunitas
         <input className="field" maxLength={60} value={t} onChange={(e) => setT(e.target.value)} />
       </label>
       <label>
         Deskripsi
-        <textarea className="field" rows={2} maxLength={200} value={d} onChange={(e) => setD(e.target.value)} placeholder="Opsional" />
+        <textarea className="field" rows={3} maxLength={200} value={d} onChange={(e) => setD(e.target.value)} placeholder="Deskripsi komunitas" />
       </label>
       <div className="group-edit-actions">
         <button type="button" className="link" onClick={() => { setOpen(false); setT(title); setD(description); }}>Batal</button>

@@ -23,7 +23,9 @@ export async function GET(req: Request) {
       end as role,
       u.role as sys_role, cm.role as group_role,
       coalesce((select v.role in ('admin', 'owner') from users v where v.id = ${uid}), false) and u.banned_at is not null as banned,
-      coalesce((select v.role in ('admin', 'owner') from users v where v.id = ${uid}), false) and u.muted_until > now() as muted
+      (cm.muted_until is not null and cm.muted_until > now()) as group_muted,
+      coalesce((select v.role in ('admin', 'owner') from users v where v.id = ${uid}), false) and u.muted_until > now() as muted,
+      cm.muted_until as group_muted_until
     from conversation_members cm join users u on u.id = cm.user_id
     where cm.conversation_id = ${cid.data}
       and exists (select 1 from conversation_members where conversation_id = ${cid.data} and user_id = ${uid})
@@ -31,8 +33,75 @@ export async function GET(req: Request) {
   return Response.json(rows);
 }
 
+// Tambah anggota ke grup. Boleh: owner/admin grup, atau staf sistem.
+export async function POST(req: Request) {
+  const me = await getActor();
+  if (!me) return new Response("Unauthorized", { status: 401 });
+
+  const parsed = z.object({
+    conversationId: z.string().uuid(),
+    username: z.string().trim().toLowerCase().min(3).max(20).optional(),
+    usernames: z.array(z.string().trim().toLowerCase().min(3).max(20)).max(30).optional(),
+  }).safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: "Data tidak valid" }, { status: 400 });
+
+  const names = [
+    ...(parsed.data.username ? [parsed.data.username] : []),
+    ...(parsed.data.usernames ?? []),
+  ].map((n) => n.replace(/^@/, ""));
+  if (names.length === 0) return Response.json({ error: "Pilih minimal 1 pengguna" }, { status: 400 });
+
+  const cid = parsed.data.conversationId;
+  const [c] = await sql`select id, kind, title from conversations where id = ${cid}::uuid and kind = 'group'`;
+  if (!c) return Response.json({ error: "Hanya bisa menambah anggota di grup" }, { status: 400 });
+
+  const [mine] = await sql`select role from conversation_members where conversation_id = ${c.id} and user_id = ${me.id}`;
+  const myG = String(mine?.role || "");
+  const staff = rank(me.role) >= 1;
+  const canAdd = staff || myG === "owner" || myG === "admin";
+  if (!canAdd) return Response.json({ error: "Hanya owner/admin grup yang bisa menambah anggota" }, { status: 403 });
+
+  const found = await sql`
+    select id, username, name from users
+    where lower(username) = any(${names}::text[])
+      and banned_at is null
+      and id <> ${me.id}`;
+  if (found.length === 0) return Response.json({ error: "Pengguna tidak ditemukan" }, { status: 404 });
+
+  const added: string[] = [];
+  const skipped: string[] = [];
+  for (const u of found) {
+    const [already] = await sql`select 1 from conversation_members where conversation_id = ${c.id} and user_id = ${u.id}`;
+    if (already) { skipped.push(String(u.username)); continue; }
+
+    // Hapus status kick lama supaya bisa diundang lagi
+    await sql`delete from conversation_kicks where conversation_id = ${c.id} and user_id = ${u.id}`;
+    await sql`
+      insert into conversation_members (conversation_id, user_id, role)
+      values (${c.id}, ${u.id}, 'member')
+      on conflict do nothing`;
+    added.push(String(u.username));
+    await pushTo(u.id as string, "conversation", { id: c.id });
+  }
+
+  if (added.length) {
+    await broadcast(c.id as string, "conversation", { id: c.id });
+    await logMod({
+      actorId: me.id,
+      actorName: me.name,
+      action: "add_member",
+      detail: `${added.join(", ")} → ${c.title || "grup"}`,
+    }).catch(() => {});
+  }
+
+  if (added.length === 0)
+    return Response.json({ error: skipped.length ? "Sudah menjadi anggota" : "Tidak ada yang ditambahkan", skipped }, { status: 409 });
+
+  return Response.json({ ok: true, added, skipped });
+}
+
 // Kick anggota dari grup / Komunitas.
-// Boleh: staf global (sesuai hierarki role) atau admin grup (hanya di grup biasa, terhadap anggota biasa).
+// Boleh: staf global (sesuai hierarki role) atau admin/owner grup.
 export async function DELETE(req: Request) {
   const me = await getActor();
   if (!me) return new Response("Unauthorized", { status: 401 });
@@ -54,7 +123,6 @@ export async function DELETE(req: Request) {
     const [mine] = await sql`select role from conversation_members where conversation_id = ${c.id} and user_id = ${me.id}`;
     const myG = String(mine?.role || "member");
     const tg = String(t.group_role || "member");
-    // Owner grup: bisa kick admin & member (bukan owner lain). Admin grup: hanya member biasa.
     if (myG === "owner" && tg !== "owner") allowed = true;
     else if (myG === "admin" && tg === "member" && rank(t.role) === 0) allowed = true;
   }
@@ -67,4 +135,70 @@ export async function DELETE(req: Request) {
   await logMod({ actorId: me.id, actorName: me.name, action: "kick", targetId: t.id, targetName: String(t.username || t.name || t.id), detail: String(c.title ?? c.kind) });
   await Promise.all([pushTo(t.id, "conversation", { id: c.id }), broadcast(c.id, "conversation", { id: c.id })]);
   return Response.json({ ok: true });
+}
+
+
+// Bisukan / buka bisu anggota di dalam grup (bukan mute global sistem).
+export async function PATCH(req: Request) {
+  const me = await getActor();
+  if (!me) return new Response("Unauthorized", { status: 401 });
+
+  const parsed = z.object({
+    conversationId: z.string().uuid(),
+    userId: z.string().min(1).max(64),
+    action: z.enum(["mute", "unmute"]),
+    minutes: z.number().int().min(1).max(60 * 24 * 30).optional(), // default 60
+  }).safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: "Data tidak valid" }, { status: 400 });
+
+  const { conversationId, userId, action } = parsed.data;
+  const minutes = parsed.data.minutes ?? 60;
+
+  const [c] = await sql`select id, kind, title from conversations where id = ${conversationId}::uuid and kind = 'group'`;
+  if (!c) return Response.json({ error: "Hanya untuk grup" }, { status: 400 });
+
+  const [mine] = await sql`select role from conversation_members where conversation_id = ${c.id} and user_id = ${me.id}`;
+  const myG = String(mine?.role || "");
+  const staff = rank(me.role) >= 1;
+  if (!staff && myG !== "owner" && myG !== "admin")
+    return Response.json({ error: "Hanya owner/admin grup" }, { status: 403 });
+
+  const [t] = await sql`
+    select u.id, u.username, u.name, u.role as sys_role, cm.role as group_role
+    from users u
+    join conversation_members cm on cm.user_id = u.id and cm.conversation_id = ${c.id}
+    where u.id = ${userId}`;
+  if (!t) return Response.json({ error: "Anggota tidak ditemukan" }, { status: 404 });
+  if (t.id === me.id) return Response.json({ error: "Tidak bisa bisukan diri sendiri" }, { status: 400 });
+
+  const tg = String(t.group_role || "member");
+  if (myG === "admin" && tg !== "member")
+    return Response.json({ error: "Admin hanya bisa bisukan member biasa" }, { status: 403 });
+  if (tg === "owner" && myG !== "owner" && !staff)
+    return Response.json({ error: "Tidak bisa bisukan owner grup" }, { status: 403 });
+
+  if (action === "mute") {
+    await sql`
+      update conversation_members
+      set muted_until = now() + make_interval(mins => ${minutes})
+      where conversation_id = ${c.id} and user_id = ${userId}`;
+    await logMod({
+      actorId: me.id, actorName: me.name, action: "group_mute",
+      targetId: t.id, targetName: String(t.username || t.name),
+      detail: `${c.title || "grup"} · ${minutes} mnt`,
+    });
+    await pushTo(userId, "conversation", { id: c.id, group_muted: true });
+    return Response.json({ ok: true, muted: true, minutes });
+  }
+
+  await sql`
+    update conversation_members set muted_until = null
+    where conversation_id = ${c.id} and user_id = ${userId}`;
+  await logMod({
+    actorId: me.id, actorName: me.name, action: "group_unmute",
+    targetId: t.id, targetName: String(t.username || t.name),
+    detail: String(c.title || "grup"),
+  });
+  await pushTo(userId, "conversation", { id: c.id, group_muted: false });
+  return Response.json({ ok: true, muted: false });
 }
