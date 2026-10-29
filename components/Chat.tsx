@@ -666,6 +666,20 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     finally { setAddBusy(false); }
   }, [addBusy, toast, loadMembers, scheduleConvs]);
 
+  const muteInGroup = useCallback(async (cid: string, u: UserLite, action: "mute" | "unmute", minutes = 60) => {
+    try {
+      const r = await fetch("/api/members", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: cid, userId: u.id, action, minutes }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.error || "Gagal"); return; }
+      toast(action === "mute" ? `@${u.username} dibisukan di grup` : `@${u.username} bisa kirim pesan lagi`);
+      loadMembers(cid);
+    } catch { toast("Jaringan bermasalah"); }
+  }, [toast, loadMembers]);
+
   const memberItems = useCallback((u: UserLite, c: Conv, all: UserLite[]): MenuItem[] => {
     if (u.id === me.id || (c.kind !== "group" && c.kind !== "community")) return [];
     const tr = rk(u.sys_role);
