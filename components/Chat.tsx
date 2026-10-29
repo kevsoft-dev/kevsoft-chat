@@ -69,6 +69,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
   const [showConsole, setShowConsole] = useState(false);
   const [memberQ, setMemberQ] = useState("");
   const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [addQ, setAddQ] = useState("");
   const [addHits, setAddHits] = useState<{ id: string; username: string; name: string | null; avatar_url: string | null }[]>([]);
   const [addBusy, setAddBusy] = useState(false);
@@ -197,18 +198,19 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       mutate(d.conversation_id, (x) => x.map((y) => y.id === d.id ? { ...y, pinned_at: d.pinned ? new Date().toISOString() : null } : y));
     });
 
-    ch.bind("conversation", (d?: { id?: string; title?: string; description?: string | null; avatar_url?: string | null; handle?: string | null; cleared?: boolean; destroyed?: boolean }) => {
+    ch.bind("conversation", (d?: { id?: string; title?: string; description?: string | null; rules?: string | null; avatar_url?: string | null; handle?: string | null; cleared?: boolean; destroyed?: boolean }) => {
       scheduleConvs();
       if (d?.destroyed && d.id && activeRef.current === d.id) {
         activeRef.current = null; setActiveId(null); setMsgs([]); setInfo(false);
       } else if (d?.cleared && d.id && activeRef.current === d.id) {
         setMsgs([]); if (cache.current[d.id]) cache.current[d.id] = [];
       }
-      if (d?.id && (d.title !== undefined || d.avatar_url !== undefined || d.description !== undefined || d.handle !== undefined)) {
+      if (d?.id && (d.title !== undefined || d.avatar_url !== undefined || d.description !== undefined || d.rules !== undefined || d.handle !== undefined)) {
         setConvs((list) => (list ?? []).map((c) => c.id === d.id ? {
           ...c,
           title: d.title !== undefined ? d.title : c.title,
           description: d.description !== undefined ? d.description : c.description,
+          rules: d.rules !== undefined ? d.rules : c.rules,
           other_avatar: d.avatar_url !== undefined ? d.avatar_url : c.other_avatar,
           handle: d.handle !== undefined ? d.handle : c.handle,
         } : c));
@@ -318,7 +320,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     if (keys.length > 12) delete cache.current[keys[0]];
     activeRef.current = id; setActiveId(id); fresh.current.clear();
     positioned.current = null; stick.current = true; setAway(false); setNewBelow(0); setNoMore(false);
-    setReplyTo(null); setInfo(false); setMembers([]); setMenu(null); setViewUser(null); setAddMemberOpen(false); setAddQ(""); setAddHits([]);
+    setReplyTo(null); setInfo(false); setMembers([]); setMenu(null); setViewUser(null); setAddMemberOpen(false); setRulesOpen(false); setAddQ(""); setAddHits([]);
     const cached = cache.current[id];
     setMsgs(cached ?? []); setLoading(!cached);
     setConvs((l) => l && l.map((c) => (c.id === id ? { ...c, unread: 0, unread_mention: false } : c)));
@@ -590,39 +592,12 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
         actions: [{ label: "Hapus chat", danger: true, run: () => runConvDelete(c, "delete") }] });
   }, [runConvDelete]);
 
-  const convItems = useCallback((c: Conv, opts?: { includeInfo?: boolean }): MenuItem[] => {
-    const items: MenuItem[] = [];
-    if (opts?.includeInfo) {
-      items.push({ icon: "info", label: c.kind === "group" || c.kind === "community" ? "Pengaturan & info" : "Info", run: showInfo });
-    }
-    if (c.kind === "group" && c.handle) {
-      items.push({
-        icon: "copy",
-        label: "Salin link grup",
-        run: async () => {
-          const url = `${window.location.origin}/${c.handle}`;
-          try {
-            await navigator.clipboard.writeText(url);
-            toast("Link grup disalin");
-          } catch {
-            try {
-              if (navigator.share) await navigator.share({ title: c.title || "Grup", url });
-              else toast("Gagal menyalin");
-            } catch { toast("Gagal menyalin"); }
-          }
-        },
-      });
-      items.push({
-        icon: "share",
-        label: "Bagikan link grup",
-        run: () => shareGroupLink(c),
-      });
-    }
-    items.push({ icon: "trash", label: "Bersihkan chat", run: () => askConv(c, "clear") });
+  const convItems = useCallback((c: Conv): MenuItem[] => {
+    const items: MenuItem[] = [{ icon: "trash", label: "Bersihkan chat", run: () => askConv(c, "clear") }];
     if (c.kind === "dm") items.push({ icon: "trash", label: "Hapus chat", danger: true, run: () => askConv(c, "delete") });
     if (c.kind === "group") items.push({ icon: "logout", label: "Keluar grup", danger: true, run: () => askConv(c, "delete") });
     return items;
-  }, [askConv, toast, showInfo]);
+  }, [askConv]);
 
   const openConvMenu = useCallback((c: Conv, x: number, y: number) => {
     const items = convItems(c);
@@ -779,6 +754,44 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     } catch { toast("Jaringan bermasalah"); }
   }
 
+  async function saveGroupRules(c: Conv, rules: string) {
+    try {
+      const r = await fetch("/api/conversations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: c.id, rules: rules.trim() || null }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.error || "Gagal menyimpan aturan"); return false; }
+      setConvs((list) => (list ?? []).map((x) => x.id === c.id ? { ...x, rules: d.rules } : x));
+      toast(d.rules ? "Aturan grup disimpan" : "Aturan grup dihapus");
+      return true;
+    } catch { toast("Jaringan bermasalah"); return false; }
+  }
+
+  const groupLink = (c: Conv) => (c.handle ? `${window.location.origin}/${c.handle}` : "");
+
+  // Teks lengkap grup (nama, deskripsi, aturan, link) untuk disalin / dibagikan.
+  const groupInfoText = (c: Conv) => [
+    c.title || "Grup",
+    c.description ? `\n${c.description}` : "",
+    c.rules ? `\nAturan grup:\n${c.rules}` : "",
+    c.handle ? `\n${groupLink(c)}` : "",
+  ].filter(Boolean).join("\n");
+
+  // Isi menu titik tiga di pojok kanan atas chat.
+  const headerItems = (c: Conv): MenuItem[] => {
+    const items: MenuItem[] = [{ icon: "info", label: "Info", run: showInfo }];
+    if (c.kind === "group") {
+      if (isGroupManager(c)) items.push({ icon: "shield", label: "Atur aturan grup", run: () => setRulesOpen(true) });
+      else if (c.rules) items.push({ icon: "shield", label: "Aturan grup", run: () => setRulesOpen(true) });
+      if (c.handle) items.push({ icon: "link", label: "Salin link grup", run: () => copyText(groupLink(c), "Link grup disalin") });
+      if (c.rules) items.push({ icon: "copy", label: "Salin aturan grup", run: () => copyText(c.rules || "", "Aturan grup disalin") });
+      items.push({ icon: "copy", label: "Salin info grup", run: () => copyText(groupInfoText(c), "Info grup disalin") });
+    }
+    return [...items, ...convItems(c)];
+  };
+
   async function uploadGroupAvatar(c: Conv, file: File) {
     try {
       const buf = await file.arrayBuffer();
@@ -898,11 +911,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                 <div><strong>{convName(active)}{(active.kind === "ai" || (active.kind === "dm" && active.other_verified)) && <VerifiedBadge title={active.kind === "ai" ? "Kev-Ai terverifikasi" : "Terverifikasi"} />}</strong><small>{waiting ? "sedang mengetik…" : subtitle(active)}</small></div>
               </button>
               <button className="icon-btn" aria-label="Menu chat"
-                onClick={(e) => {
-                  const r = e.currentTarget.getBoundingClientRect();
-                  const items = convItems(active, { includeInfo: true });
-                  setMenu({ ...placeMenu(r.right - 220, r.bottom + 6, items.length), items });
-                }}>
+                onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); const items = headerItems(active); setMenu({ ...placeMenu(r.right - 220, r.bottom + 6, items.length), items }); }}>
                 <Icon n="more" />
               </button>
             </header>
@@ -1289,6 +1298,16 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       )}
       {showConsole && <Console me={me} onClose={() => setShowConsole(false)} onToast={toast} onChanged={scheduleConvs} />}
       {showNew && <NewChat onClose={() => setShowNew(false)} onCreated={openById} />}
+      {rulesOpen && active?.kind === "group" && (
+        <RulesModal
+          key={active.id + String(active.rules)}
+          rules={active.rules || ""}
+          canEdit={isGroupManager(active)}
+          onSave={(txt) => saveGroupRules(active, txt)}
+          onCopy={(txt) => copyText(txt, "Aturan grup disalin")}
+          onClose={() => setRulesOpen(false)}
+        />
+      )}
       {menu && <Menu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
       {dialog && <Dialog title={dialog.title} text={dialog.text} actions={dialog.actions} onClose={() => setDialog(null)} />}
       {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
@@ -1371,6 +1390,67 @@ function CommunityEditForm({ title, description, hasAvatar, onSave, onRemoveAvat
       <div className="group-edit-actions">
         <button type="button" className="link" onClick={() => { setOpen(false); setT(title); setD(description); }}>Batal</button>
         <button type="button" className="primary group-save" disabled={!t.trim() || !dirty} onClick={() => { onSave(t, d); setOpen(false); }}>Simpan</button>
+      </div>
+    </div>
+  );
+}
+
+const RULES_MAX = 1000;
+const RULES_TEMPLATE = "1. Saling menghormati, tanpa kata kasar.\n2. Dilarang spam dan promosi tanpa izin.\n3. Dilarang konten SARA, porno, atau ilegal.\n4. Gunakan grup sesuai topiknya.";
+
+// Aturan grup: owner/admin grup bisa set & ubah, anggota lain hanya melihat & menyalin.
+function RulesModal({ rules, canEdit, onSave, onCopy, onClose }: {
+  rules: string; canEdit: boolean;
+  onSave: (rules: string) => Promise<boolean>;
+  onCopy: (rules: string) => void;
+  onClose: () => void;
+}) {
+  const [v, setV] = useState(rules);
+  const [busy, setBusy] = useState(false);
+  const dirty = v.trim() !== rules.trim();
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [onClose]);
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal rules-modal" role="dialog" aria-label="Aturan grup" onClick={(e) => e.stopPropagation()}>
+        <header>
+          <h2>Aturan grup</h2>
+          <button className="icon-btn" onClick={onClose} aria-label="Tutup"><Icon n="close" /></button>
+        </header>
+        {canEdit ? (
+          <>
+            <textarea className="field rules-input" rows={9} maxLength={RULES_MAX} value={v} autoFocus
+              onChange={(e) => setV(e.target.value)} placeholder="Tulis aturan grup, satu aturan per baris" />
+            <div className="rules-meta">
+              <button type="button" className="link" onClick={() => setV(RULES_TEMPLATE)}>Pakai contoh</button>
+              <span className="muted small">{v.length}/{RULES_MAX}</span>
+            </div>
+          </>
+        ) : (
+          <div className="rules-text">{rules || "Belum ada aturan."}</div>
+        )}
+        <div className="rules-actions">
+          {(canEdit ? v.trim() : rules) && (
+            <button type="button" className="link" onClick={() => onCopy(canEdit ? v.trim() : rules)}>
+              <Icon n="copy" size={14} /> Salin
+            </button>
+          )}
+          {canEdit && rules && (
+            <button type="button" className="link danger" disabled={busy}
+              onClick={async () => { setBusy(true); const ok = await onSave(""); setBusy(false); if (ok) onClose(); }}>
+              Hapus aturan
+            </button>
+          )}
+          {canEdit && (
+            <button type="button" className="primary" disabled={busy || !dirty}
+              onClick={async () => { setBusy(true); const ok = await onSave(v); setBusy(false); if (ok) onClose(); }}>
+              Simpan
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

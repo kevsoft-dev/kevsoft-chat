@@ -15,7 +15,7 @@ export async function GET() {
     after(async () => { try { await sql`delete from messages where expires_at < now() - interval '1 hour'`; } catch {} });
 
   const rows = await sql`
-    select c.id, c.kind, c.title, c.description, coalesce(c.disappear_seconds, 0) as disappear_seconds,
+    select c.id, c.kind, c.title, c.description, c.rules, coalesce(c.disappear_seconds, 0) as disappear_seconds,
       o.id as other_id, o.username as other_username, o.name as other_name,
       case when c.kind in ('group', 'community') then c.avatar_url else o.avatar_url end as other_avatar,
       o.banner_url as other_banner, o.bio as other_bio,
@@ -204,12 +204,15 @@ export async function PATCH(req: Request) {
     id: z.string().uuid(),
     title: z.string().trim().min(1).max(60).optional(),
     description: z.string().trim().max(200).optional().nullable(),
+    rules: z.string().max(1000).optional().nullable(),
     handle: z.string().trim().toLowerCase().max(20).optional(),
     reset_handle: z.boolean().optional(),
   }).safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Data tidak valid" }, { status: 400 });
   const { id, title, description, handle, reset_handle } = parsed.data;
-  if (title === undefined && description === undefined && handle === undefined && !reset_handle)
+  // Aturan grup: spasi di ujung dibuang, kosong = hapus aturan.
+  const rules = parsed.data.rules === undefined ? undefined : (parsed.data.rules?.trim() || null);
+  if (title === undefined && description === undefined && rules === undefined && handle === undefined && !reset_handle)
     return Response.json({ error: "Tidak ada perubahan" }, { status: 400 });
 
   const [mem] = await sql`
@@ -227,6 +230,8 @@ export async function PATCH(req: Request) {
     if (!root) return Response.json({ error: "Hanya owner utama yang bisa mengubah Komunitas" }, { status: 403 });
     if (handle !== undefined || reset_handle)
       return Response.json({ error: "Komunitas tidak memakai handle link" }, { status: 400 });
+    if (rules !== undefined)
+      return Response.json({ error: "Komunitas tidak memakai aturan grup" }, { status: 400 });
     const [c] = await sql`
       update conversations set
         title = coalesce(${title ?? null}::text, title),
@@ -261,10 +266,11 @@ export async function PATCH(req: Request) {
       update conversations set
         title = coalesce(${title ?? null}::text, title),
         description = case when ${description === undefined} then description else ${description ?? null}::text end,
+        rules = case when ${rules === undefined} then rules else ${rules ?? null}::text end,
         handle = coalesce(${newHandle ?? null}::text, handle)
       where id = ${id}::uuid
-      returning id, title, description, avatar_url, handle`;
-    await broadcast(id, "conversation", { id, title: c.title, description: c.description, avatar_url: c.avatar_url, handle: c.handle });
+      returning id, title, description, rules, avatar_url, handle`;
+    await broadcast(id, "conversation", { id, title: c.title, description: c.description, rules: c.rules, avatar_url: c.avatar_url, handle: c.handle });
     return Response.json(c);
   } catch {
     return Response.json({ error: "Handle grup sudah dipakai" }, { status: 409 });

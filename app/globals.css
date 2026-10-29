@@ -1206,3 +1206,195 @@ h1,h2,h3,h4{font-weight:600;letter-spacing:-.015em}
 .add-member-list b{font-size:14px;font-weight:600}
 .add-member-list small{color:var(--muted);font-size:12px}
 .add-member-list svg{color:var(--accent-text);flex-shrink:0}
+
+/* Aturan grup (menu titik tiga) */
+.rules-modal .rules-input{height:auto;min-height:160px;padding:12px 14px;resize:vertical;line-height:1.5}
+.rules-modal .rules-meta{display:flex;align-items:center;justify-content:space-between}
+.rules-modal .rules-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:52dvh;overflow-y:auto;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--fill);line-height:1.55;font-size:14.5px}
+.rules-modal .rules-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;justify-content:flex-end}
+.rules-modal .rules-actions .primary{margin-top:0;min-width:96px}
+.rules-modal .link{display:inline-flex;align-items:center;gap:6px}
+
+
+/* ================================================================
+   MOTION LAYER v13 — animasi "hidup": spring pop, stagger, glow,
+   hover/press feedback. Semua dimatikan otomatis oleh
+   prefers-reduced-motion (aturan global di atas).
+   ================================================================ */
+:root{--spring:cubic-bezier(.34,1.56,.64,1);--snap:cubic-bezier(.2,.9,.2,1)}
+
+@keyframes mo-pop{0%{opacity:0;transform:scale(.55)}60%{opacity:1;transform:scale(1.1)}100%{transform:scale(1)}}
+@keyframes mo-list{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes mo-drop{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+@keyframes mo-soft{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes mo-bub-l{0%{opacity:0;transform:translateX(-16px) scale(.82)}65%{opacity:1;transform:translateX(3px) scale(1.03)}100%{transform:none}}
+@keyframes mo-bub-r{0%{opacity:0;transform:translateX(16px) scale(.82)}65%{opacity:1;transform:translateX(-3px) scale(1.03)}100%{transform:none}}
+@keyframes mo-menu{0%{opacity:0;transform:scale(.8) translateY(-8px)}65%{opacity:1;transform:scale(1.03)}100%{transform:none}}
+@keyframes mo-sheet{0%{transform:translateY(100%)}70%{transform:translateY(-7px)}100%{transform:none}}
+@keyframes mo-item{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+@keyframes mo-modal{0%{opacity:0;transform:translateY(26px) scale(.9)}65%{opacity:1;transform:translateY(-4px) scale(1.012)}100%{transform:none}}
+@keyframes mo-info{0%{opacity:0;transform:translateX(44px)}70%{opacity:1;transform:translateX(-6px)}100%{transform:none}}
+@keyframes mo-screen{0%{opacity:0;transform:translateX(-30px) scale(.985)}70%{opacity:1;transform:translateX(4px)}100%{transform:none}}
+@keyframes mo-toast{0%{opacity:0;transform:translate(-50%,24px) scale(.88)}65%{opacity:1;transform:translate(-50%,-4px) scale(1.04)}100%{transform:translate(-50%,0)}}
+@keyframes mo-badge{0%{transform:scale(0)}55%{transform:scale(1.35)}100%{transform:scale(1)}}
+@keyframes mo-ring{0%{box-shadow:0 0 0 0 rgba(var(--accent-rgb),.55)}70%,100%{box-shadow:0 0 0 9px rgba(var(--accent-rgb),0)}}
+@keyframes mo-breathe{0%,100%{box-shadow:0 0 0 0 rgba(var(--accent-rgb),0),0 0 0 rgba(var(--accent-rgb),0)}50%{box-shadow:0 0 0 1px rgba(var(--accent-rgb),.2),0 6px 26px rgba(var(--accent-rgb),.22)}}
+@keyframes mo-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes mo-wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-14deg) scale(1.1)}60%{transform:rotate(10deg) scale(1.1)}}
+@keyframes mo-shine{from{transform:translateX(-130%)}to{transform:translateX(130%)}}
+@keyframes mo-send{0%{transform:scale(.6) rotate(-30deg)}60%{transform:scale(1.18) rotate(6deg)}100%{transform:scale(1)}}
+@keyframes mo-tick{0%{transform:scale(.3);opacity:0}60%{transform:scale(1.4);opacity:1}100%{transform:scale(1)}}
+@keyframes mo-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@keyframes mo-aurora{
+  0%{transform:translate3d(-4%,-3%,0) rotate(0deg) scale(1)}
+  50%{transform:translate3d(5%,4%,0) rotate(8deg) scale(1.12)}
+  100%{transform:translate3d(-2%,6%,0) rotate(-6deg) scale(1.05)}
+}
+
+/* ---- Latar yang "bernapas" di area chat ---- */
+.main{overflow:hidden}
+.main::after{content:"";position:absolute;inset:-25%;z-index:1;pointer-events:none;
+  background:
+    radial-gradient(38% 34% at 22% 26%,rgba(var(--accent-rgb),.12),transparent 70%),
+    radial-gradient(34% 38% at 80% 72%,rgba(130,177,255,.09),transparent 70%),
+    radial-gradient(26% 26% at 62% 14%,rgba(var(--accent-rgb),.07),transparent 70%);
+  animation:mo-aurora 24s ease-in-out infinite alternate;will-change:transform}
+
+/* ---- Daftar chat ---- */
+.convs>li:not(.leaving){animation:mo-list .55s var(--spring) backwards;animation-delay:calc(var(--i,0)*55ms)}
+.convs>li:nth-child(1){--i:0}
+.convs>li:nth-child(2){--i:1}
+.convs>li:nth-child(3){--i:2}
+.convs>li:nth-child(4){--i:3}
+.convs>li:nth-child(5){--i:4}
+.convs>li:nth-child(6){--i:5}
+.convs>li:nth-child(7){--i:6}
+.convs>li:nth-child(8){--i:7}
+.convs>li:nth-child(9){--i:8}
+.convs>li:nth-child(10){--i:9}
+.convs>li:nth-child(11){--i:10}
+.convs>li:nth-child(12){--i:11}
+.conv{transition:background .25s,border-color .25s,box-shadow .3s,transform .3s var(--spring)}
+.conv:hover{transform:translateX(4px)}
+.conv:active{transform:scale(.97)}
+.conv.on{box-shadow:0 8px 24px rgba(var(--accent-rgb),.16)}
+.conv .avatar{transition:transform .4s var(--spring)}
+.conv:hover .avatar{transform:scale(1.1) rotate(-5deg)}
+.conv.ai{animation:mo-breathe 4.2s ease-in-out infinite}
+.conv.ai .avatar{animation:mo-float 4s ease-in-out infinite}
+.count{animation:mo-badge .55s var(--spring) backwards,mo-ring 2.4s ease-out 1s infinite}
+.empty{animation:mo-float 4.5s ease-in-out infinite}
+.tabs button{transition:background .25s,color .25s,border-color .25s,transform .25s var(--spring)}
+.tabs button:hover{transform:translateY(-2px)}
+.tabs button:active{transform:scale(.92)}
+.tabs button.on{animation:mo-pop .45s var(--spring)}
+
+/* ---- Header chat & tombol ikon ---- */
+.bar{animation:mo-drop .5s var(--spring) backwards}
+.icon-btn{transition:background .2s,color .2s,border-color .2s,transform .3s var(--spring),box-shadow .3s}
+.icon-btn:hover{transform:translateY(-2px) scale(1.07);box-shadow:0 8px 20px rgba(var(--accent-rgb),.18)}
+.icon-btn:active{transform:scale(.88)}
+.icon-btn svg{transition:transform .4s var(--spring)}
+.icon-btn[aria-label="Menu chat"]:hover svg{transform:rotate(90deg)}
+.icon-btn.back:hover svg{transform:translateX(-4px)}
+.icon-btn[aria-label="Tutup"]:hover svg{transform:rotate(90deg) scale(1.1)}
+.who{transition:transform .3s var(--spring)}
+.who:active{transform:scale(.97)}
+.who .avatar{transition:transform .4s var(--spring)}
+.who:hover .avatar{transform:scale(1.08) rotate(-4deg)}
+
+/* ---- Pesan ---- */
+.msg .bubble{transition:transform .25s var(--spring),box-shadow .25s}
+.msg.fresh .bubble{animation:mo-bub-l .5s var(--spring) backwards;transform-origin:bottom left}
+.msg.mine.fresh .bubble{animation:mo-bub-r .5s var(--spring) backwards;transform-origin:bottom right}
+.msg .bubble:hover{transform:translateY(-1px);box-shadow:0 6px 18px var(--shadow)}
+.msg.mine .bubble:hover{box-shadow:0 6px 20px rgba(var(--accent-rgb),.35)}
+.msg-av .avatar,.msg-av button{transition:transform .35s var(--spring)}
+.msg-av .avatar:hover,.msg-av button:hover{transform:scale(1.15) rotate(-5deg)}
+.msg.fresh .msg-av .avatar{animation:mo-pop .5s var(--spring) backwards}
+.st.ok.read svg{animation:mo-tick .5s var(--spring)}
+.bubble.failed{animation:mo-shake .5s ease}
+.day span,.older{transition:transform .25s var(--spring),background .2s}
+.day span{animation:mo-pop .5s var(--spring) backwards}
+.older:hover{transform:translateY(-2px)}
+.older:active{transform:scale(.94)}
+.jump{animation:mo-pop .45s var(--spring) backwards;transition:transform .3s var(--spring),box-shadow .3s}
+.jump:hover{transform:translateY(-3px) scale(1.08);box-shadow:0 12px 28px rgba(var(--accent-rgb),.3)}
+.jump:active{transform:scale(.9)}
+.jump b{animation:mo-badge .5s var(--spring) backwards}
+.hero-note{animation:mo-modal .7s var(--spring) backwards}
+.hero-note svg{animation:mo-float 4s ease-in-out infinite;filter:drop-shadow(0 6px 14px rgba(var(--accent-rgb),.45))}
+
+/* ---- Kolom tulis & tombol kirim ---- */
+.composer{transition:border-color .3s,box-shadow .35s,transform .35s var(--spring)}
+.composer:focus-within{border-color:rgba(var(--accent-rgb),.55);box-shadow:0 0 0 4px rgba(var(--accent-rgb),.12),0 12px 34px rgba(var(--accent-rgb),.16);transform:translateY(-2px)}
+.send{transition:transform .3s var(--spring),opacity .2s,box-shadow .3s}
+.send.ready{box-shadow:0 6px 18px rgba(var(--accent-rgb),.45);animation:mo-send .5s var(--spring)}
+.send.ready:hover{transform:scale(1.12) rotate(-8deg);box-shadow:0 10px 26px rgba(var(--accent-rgb),.55)}
+.send.ready:active{transform:scale(.86)}
+.send svg{transition:transform .35s var(--spring)}
+.send.ready:hover svg{transform:translate(2px,-2px)}
+
+/* ---- Menu, modal, dialog, toast ---- */
+.modal-bg{backdrop-filter:blur(6px) saturate(1.1);-webkit-backdrop-filter:blur(6px) saturate(1.1)}
+.menu{animation:mo-menu .36s var(--spring) both}
+.menu button{animation:mo-item .38s var(--snap) backwards;animation-delay:calc(var(--n,0)*38ms + 60ms);transition:background .15s,transform .25s var(--spring),padding-left .25s var(--spring)}
+.menu button:nth-child(1){--n:0}
+.menu button:nth-child(2){--n:1}
+.menu button:nth-child(3){--n:2}
+.menu button:nth-child(4){--n:3}
+.menu button:nth-child(5){--n:4}
+.menu button:nth-child(6){--n:5}
+.menu button:nth-child(7){--n:6}
+.menu button:nth-child(8){--n:7}
+.menu button:nth-child(9){--n:8}
+.menu button:nth-child(10){--n:9}
+.menu button:nth-child(11){--n:10}
+.menu button:nth-child(12){--n:11}
+.menu button:hover{transform:translateX(5px)}
+.menu button:active{transform:scale(.96)}
+.menu button:hover svg{animation:mo-wiggle .5s ease}
+.modal{animation:mo-modal .5s var(--spring) both}
+.dialog{animation:mo-modal .5s var(--spring) both}
+.dialog .acts button{transition:background .2s,transform .25s var(--spring)}
+.dialog .acts button:hover{transform:translateY(-2px)}
+.dialog .acts button:active{transform:scale(.96)}
+.toast{animation:mo-toast .5s var(--spring) both}
+.rules-modal .rules-input,.group-edit-form .field,.modal .field{transition:border-color .25s,box-shadow .3s,transform .3s var(--spring)}
+.rules-modal .rules-input:focus,.group-edit-form .field:focus,.modal .field:focus{outline:none;border-color:rgba(var(--accent-rgb),.6);box-shadow:0 0 0 4px rgba(var(--accent-rgb),.13)}
+.rules-modal .rules-text{animation:mo-soft .5s var(--snap) .1s backwards}
+
+/* ---- Panel info, profil, console ---- */
+.info{animation:mo-info .5s var(--spring) both}
+.info-hero .zoomable{animation:mo-float 5s ease-in-out infinite;transition:transform .3s var(--spring)}
+.info-hero .zoomable:hover{animation-play-state:paused;transform:scale(1.06)}
+.group-av-edit{transition:transform .3s var(--spring)}
+.group-av-edit:hover{transform:scale(1.18) rotate(-8deg)}
+.profile,.console{animation:mo-screen .5s var(--spring) both}
+.auth-card{animation:mo-modal .7s var(--spring) backwards}
+
+/* ---- Tombol umum ---- */
+.primary{position:relative;overflow:hidden;transition:transform .25s var(--spring),box-shadow .25s,opacity .2s,background .2s}
+.primary::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.38) 50%,transparent 70%);transform:translateX(-130%)}
+.primary:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 24px var(--shadow)}
+.primary:hover:not(:disabled)::after{animation:mo-shine .8s ease}
+.primary:active:not(:disabled){transform:scale(.94)}
+.link{transition:background .2s,transform .25s var(--spring)}
+.link:hover{transform:translateY(-1px)}
+.link:active{transform:scale(.93)}
+
+/* HP / layar sentuh: tanpa efek hover yang menggantung, animasi latar lebih pelan */
+@media (hover:none){
+  .conv:hover,.msg .bubble:hover,.icon-btn:hover,.menu button:hover,.tabs button:hover,.jump:hover{transform:none;box-shadow:none}
+}
+@media (max-width:760px){
+  .menu{animation:mo-sheet .42s var(--spring) both}
+  .modal{animation:mo-sheet .45s var(--spring) both}
+  .menu-bg,.modal-bg{backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+  .modal-bg.center .dialog{animation-name:mo-modal}
+  .main::after{animation-duration:36s}
+}
+@media (prefers-reduced-motion:reduce){
+  .main::after{display:none}
+  .conv.ai,.conv.ai .avatar,.hero-note svg,.info-hero .zoomable,.empty{animation:none!important}
+}

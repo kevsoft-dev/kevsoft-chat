@@ -34,6 +34,7 @@ create table if not exists conversations (
 );
 alter table conversations add column if not exists kind text not null default 'dm';
 alter table conversations add column if not exists description text;
+alter table conversations add column if not exists rules text;
 alter table conversations add column if not exists created_by text;
 alter table conversations add column if not exists avatar_url text;
 alter table conversations add column if not exists handle text;
