@@ -11,7 +11,7 @@ const PUBLIC = [
 ];
 
 const RESERVED_PATH = new Set([
-  "sign-in", "api", "u", "dm", "g", "news", "_next", "favicon.ico", "robots.txt",
+  "sign-in", "api", "u", "dm", "g", "join", "news", "_next", "favicon.ico", "robots.txt",
   "health", "console", "admin", "static", "assets",
 ]);
 
@@ -61,7 +61,8 @@ export default async function middleware(req: NextRequest) {
   if (pathname.startsWith("/api/")) return new NextResponse("Unauthorized", { status: 401 });
   const url = req.nextUrl.clone();
   url.pathname = "/sign-in";
-  url.search = "";
+  // Link undangan grup: setelah login kembali ke halaman join.
+  url.search = path.startsWith("/join/") ? `?next=${encodeURIComponent(pathname)}` : "";
   return NextResponse.redirect(url);
 }
 

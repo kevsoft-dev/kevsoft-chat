@@ -34,8 +34,10 @@ async function run() {
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'users' and column_name = 'away_enabled') as away,
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'conversations' and column_name = 'avatar_url') as group_avatar,
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'conversations' and column_name = 'handle') as group_handle,
-      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'conversation_members' and column_name = 'muted_until') as cm_muted`;
-  if (!(r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks && r.disappear && r.expires && r.pinned && r.media && r.settings && r.role_title && r.verified && r.banners && r.ratelimits && r.tokenver && r.away && r.group_avatar && r.group_handle && r.cm_muted)) {
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'conversation_members' and column_name = 'muted_until') as cm_muted,
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'conversations' and column_name = 'rules') as rules_col,
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'conversations' and column_name = 'invite_code') as invite_col`;
+  if (!(r.otp && r.mentions && r.username && r.lastread && r.deleted && r.cleared && r.avatars && r.roles && r.pw && r.modlogs && r.kicks && r.disappear && r.expires && r.pinned && r.media && r.settings && r.role_title && r.verified && r.banners && r.ratelimits && r.tokenver && r.away && r.group_avatar && r.group_handle && r.cm_muted && r.rules_col && r.invite_col)) {
     for (const s of SCHEMA.split(";").map((x) => x.trim()).filter(Boolean)) await runRaw(s);
   }
   // Pastikan pembuat grup = owner grup (bukan admin sistem)

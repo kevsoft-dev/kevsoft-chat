@@ -4,7 +4,7 @@ import { AI_HANDLE, LOGO, mentionRegex } from "@/lib/mentions";
 
 export type Me = { id: string; username: string; name: string; avatarUrl?: string | null; bannerUrl?: string | null; bio?: string | null; email?: string | null; role?: string; verified?: boolean; awayEnabled?: boolean; awayMessage?: string | null };
 export type Conv = {
-  id: string; kind: "dm" | "group" | "community" | "ai"; title: string | null; description: string | null; rules?: string | null;
+  id: string; kind: "dm" | "group" | "community" | "ai"; title: string | null; description: string | null; rules?: string | null; invite_code?: string | null;
   other_id: string | null; other_username: string | null; other_name: string | null; other_avatar: string | null; other_banner?: string | null; other_bio: string | null; other_verified?: boolean; created_by?: string | null; my_group_role?: string | null; handle?: string | null;
   member_count: number; last_body: string | null; last_at: string | null; last_kind: string | null;
   last_username: string | null; last_deleted: boolean; unread: number; unread_mention: boolean;

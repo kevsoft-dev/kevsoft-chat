@@ -1398,3 +1398,19 @@ h1,h2,h3,h4{font-weight:600;letter-spacing:-.015em}
   .main::after{display:none}
   .conv.ai,.conv.ai .avatar,.hero-note svg,.info-hero .zoomable,.empty{animation:none!important}
 }
+
+/* Link & username grup, halaman join */
+.link-modal .lm-sec{display:flex;flex-direction:column;gap:8px;padding:12px 0;border-top:1px solid var(--line)}
+.link-modal .lm-sec:first-of-type{border-top:0;padding-top:4px}
+.link-modal h4{margin:0;font-size:13px;font-weight:600}
+.link-modal h4 em{font-style:normal;font-weight:400;color:var(--muted)}
+.link-modal .small{margin:0}
+.link-box{padding:11px 14px;border:1px solid var(--line);border-radius:14px;background:var(--fill);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;overflow-x:auto;white-space:nowrap;user-select:all}
+.lm-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;justify-content:flex-end}
+.lm-actions .link{display:inline-flex;align-items:center;gap:6px}
+.lm-actions .primary{margin-top:0;min-width:96px}
+.lm-actions .link.armed{background:rgba(255,123,123,.14);font-weight:600}
+.join-card{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.join-card h1{font-size:26px;letter-spacing:-.03em;margin:4px 0 0}
+.join-card .primary{width:100%;margin-top:12px}
+.join-card .desc{max-width:32ch}

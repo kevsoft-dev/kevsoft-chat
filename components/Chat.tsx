@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Pusher from "pusher-js";
-import { AI_HANDLE, parseMentions } from "@/lib/mentions";
+import { AI_HANDLE, USERNAME_RE, parseMentions } from "@/lib/mentions";
 import { readPref } from "@/lib/prefs";
 import { blip, unlockAudio } from "@/lib/sound";
 import Composer from "./Composer";
@@ -70,6 +70,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
   const [memberQ, setMemberQ] = useState("");
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
   const [addQ, setAddQ] = useState("");
   const [addHits, setAddHits] = useState<{ id: string; username: string; name: string | null; avatar_url: string | null }[]>([]);
   const [addBusy, setAddBusy] = useState(false);
@@ -320,7 +321,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     if (keys.length > 12) delete cache.current[keys[0]];
     activeRef.current = id; setActiveId(id); fresh.current.clear();
     positioned.current = null; stick.current = true; setAway(false); setNewBelow(0); setNoMore(false);
-    setReplyTo(null); setInfo(false); setMembers([]); setMenu(null); setViewUser(null); setAddMemberOpen(false); setRulesOpen(false); setAddQ(""); setAddHits([]);
+    setReplyTo(null); setInfo(false); setMembers([]); setMenu(null); setViewUser(null); setAddMemberOpen(false); setRulesOpen(false); setLinkOpen(false); setAddQ(""); setAddHits([]);
     const cached = cache.current[id];
     setMsgs(cached ?? []); setLoading(!cached);
     setConvs((l) => l && l.map((c) => (c.id === id ? { ...c, unread: 0, unread_mention: false } : c)));
@@ -738,10 +739,9 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     return role === "owner" || role === "admin" || c.created_by === me.id;
   };
 
-  async function saveGroupInfo(c: Conv, title: string, description: string, handle?: string) {
+  async function saveGroupInfo(c: Conv, title: string, description: string) {
     try {
       const body: Record<string, unknown> = { id: c.id, title: title.trim(), description: description.trim() || null };
-      if (handle !== undefined) body.handle = handle.trim().toLowerCase();
       const r = await fetch("/api/conversations", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -749,7 +749,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { toast(d.error || "Gagal menyimpan"); return; }
-      setConvs((list) => (list ?? []).map((x) => x.id === c.id ? { ...x, title: d.title, description: d.description, handle: d.handle } : x));
+      setConvs((list) => (list ?? []).map((x) => x.id === c.id ? { ...x, title: d.title, description: d.description } : x));
       toast("Info grup disimpan");
     } catch { toast("Jaringan bermasalah"); }
   }
@@ -769,14 +769,15 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     } catch { toast("Jaringan bermasalah"); return false; }
   }
 
-  const groupLink = (c: Conv) => (c.handle ? `${window.location.origin}/${c.handle}` : "");
+  // Link undangan privat (kode acak). Hanya owner/admin grup yang menerima kodenya.
+  const inviteLink = (c: Conv) => (c.invite_code ? `${window.location.origin}/join/${c.invite_code}` : "");
 
   // Teks lengkap grup (nama, deskripsi, aturan, link) untuk disalin / dibagikan.
   const groupInfoText = (c: Conv) => [
     c.title || "Grup",
     c.description ? `\n${c.description}` : "",
     c.rules ? `\nAturan grup:\n${c.rules}` : "",
-    c.handle ? `\n${groupLink(c)}` : "",
+    inviteLink(c) ? `\n${inviteLink(c)}` : c.handle ? `\n@${c.handle}` : "",
   ].filter(Boolean).join("\n");
 
   // Isi menu titik tiga di pojok kanan atas chat.
@@ -785,7 +786,8 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     if (c.kind === "group") {
       if (isGroupManager(c)) items.push({ icon: "shield", label: "Atur aturan grup", run: () => setRulesOpen(true) });
       else if (c.rules) items.push({ icon: "shield", label: "Aturan grup", run: () => setRulesOpen(true) });
-      if (c.handle) items.push({ icon: "link", label: "Salin link grup", run: () => copyText(groupLink(c), "Link grup disalin") });
+      if (isGroupManager(c)) items.push({ icon: "link", label: "Link & username grup", run: () => setLinkOpen(true) });
+      else if (c.handle) items.push({ icon: "at", label: "Salin username grup", run: () => copyText("@" + c.handle, "Username grup disalin") });
       if (c.rules) items.push({ icon: "copy", label: "Salin aturan grup", run: () => copyText(c.rules || "", "Aturan grup disalin") });
       items.push({ icon: "copy", label: "Salin info grup", run: () => copyText(groupInfoText(c), "Info grup disalin") });
     }
@@ -807,14 +809,51 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     } catch { toast("Jaringan bermasalah"); }
   }
 
-  async function shareGroupLink(c: Conv) {
-    const h = c.handle;
-    if (!h) { toast("Grup belum punya link. Atur handle dulu."); return; }
-    const url = `${window.location.origin}/${h}`;
+  async function patchGroup(c: Conv, body: Record<string, unknown>) {
     try {
-      if (navigator.share) await navigator.share({ title: c.title || "Grup", url });
-      else { await navigator.clipboard.writeText(url); toast("Link grup disalin"); }
-    } catch { try { await navigator.clipboard.writeText(url); toast("Link grup disalin"); } catch { toast("Gagal membagikan"); } }
+      const r = await fetch("/api/conversations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: c.id, ...body }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.error || "Gagal menyimpan"); return null; }
+      return d as { handle?: string | null; invite_code?: string | null };
+    } catch { toast("Jaringan bermasalah"); return null; }
+  }
+
+  // Reset link: kode acak baru, link lama langsung mati.
+  async function resetInvite(c: Conv) {
+    const d = await patchGroup(c, { reset_invite: true });
+    if (!d) return false;
+    setConvs((list) => (list ?? []).map((x) => x.id === c.id ? { ...x, invite_code: d.invite_code } : x));
+    toast("Link diganti kode baru. Link lama tidak berlaku lagi");
+    return true;
+  }
+
+  async function saveGroupHandle(c: Conv, h: string) {
+    const d = await patchGroup(c, { handle: h.trim().toLowerCase() });
+    if (!d) return false;
+    setConvs((list) => (list ?? []).map((x) => x.id === c.id ? { ...x, handle: d.handle } : x));
+    toast("Username grup disimpan. Grup kini bisa dicari");
+    return true;
+  }
+
+  async function removeGroupHandle(c: Conv) {
+    const d = await patchGroup(c, { remove_handle: true });
+    if (!d) return false;
+    setConvs((list) => (list ?? []).map((x) => x.id === c.id ? { ...x, handle: null } : x));
+    toast("Username dihapus. Grup kini privat");
+    return true;
+  }
+
+  async function shareInvite(c: Conv) {
+    const url = inviteLink(c);
+    if (!url) { toast("Link belum dibuat"); return; }
+    try {
+      if (navigator.share) { await navigator.share({ title: c.title || "Grup", text: "Gabung grup", url }); return; }
+    } catch (e) { if ((e as { name?: string })?.name === "AbortError") return; }
+    copyText(url, "Link undangan disalin");
   }
 
   async function removeGroupAvatar(c: Conv) {
@@ -1016,14 +1055,12 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                   {active.kind === "ai" && <p className="desc">Kev-Ai menjawab lewat kev-ai.vercel.app. Di grup, panggil dengan @kev-ai lalu tulis pertanyaannya.</p>}
                   {active.kind === "group" && isGroupManager(active) && (
                     <GroupEditForm
-                      key={active.id + String(active.title) + String(active.description) + String(active.handle)}
+                      key={active.id + String(active.title) + String(active.description)}
                       title={active.title || ""}
                       description={active.description || ""}
-                      handle={active.handle || ""}
                       hasAvatar={!!active.other_avatar}
-                      onSave={(title, desc, handle) => saveGroupInfo(active, title, desc, handle)}
+                      onSave={(title, desc) => saveGroupInfo(active, title, desc)}
                       onRemoveAvatar={() => removeGroupAvatar(active)}
-                      onShare={() => shareGroupLink(active)}
                     />
                   )}
                   {active.kind === "group" && !isGroupManager(active) && active.description && (
@@ -1054,12 +1091,14 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                   {active.kind === "community" && !isMainOwner() && active.description && (
                     <p className="desc">{active.description}</p>
                   )}
-                  {active.kind === "group" && active.handle && (
+                  {active.kind === "group" && (
                     <div className="group-edit-actions">
-                      <button type="button" className="link" onClick={() => shareGroupLink(active)}>
-                        <Icon n="share" size={14} /> Bagikan link grup
-                      </button>
-                      <span className="muted small">/{active.handle}</span>
+                      {isGroupManager(active) && (
+                        <button type="button" className="link" onClick={() => setLinkOpen(true)}>
+                          <Icon n="link" size={14} /> Link &amp; username grup
+                        </button>
+                      )}
+                      <span className="muted small">{active.handle ? `@${active.handle} · publik, bisa dicari` : "Privat · hanya lewat link undangan"}</span>
                     </div>
                   )}
 
@@ -1174,20 +1213,11 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                   {active.kind === "dm" && <button className="danger" onClick={() => askConv(active, "delete")}><Icon n="trash" size={18} />Hapus chat</button>}
                   {active.kind === "group" && isGroupManager(active) && (
                     <>
-                      <button onClick={async () => {
-                        if (!confirm("Reset link grup? Link lama tidak bisa dipakai lagi.")) return;
-                        try {
-                          const r = await fetch("/api/conversations", {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ id: active.id, reset_handle: true }),
-                          });
-                          const d = await r.json().catch(() => ({}));
-                          if (!r.ok) { toast(d.error || "Gagal reset link"); return; }
-                          setConvs((list) => (list ?? []).map((x) => x.id === active.id ? { ...x, handle: d.handle } : x));
-                          toast(`Link baru: /${d.handle}`);
-                        } catch { toast("Jaringan bermasalah"); }
-                      }}><Icon n="link" size={18} />Reset link grup</button>
+                      <button onClick={() => setDialog({
+                        title: "Reset link grup?",
+                        text: "Kode link diganti acak. Link lama tidak bisa dipakai lagi, jadi bagikan link baru ke orang yang ingin kamu undang.",
+                        actions: [{ label: "Reset link", danger: true, run: () => { resetInvite(active); } }],
+                      })}><Icon n="link" size={18} />Reset link grup</button>
                       <button className="danger" onClick={() => {
                         setDialog({
                           title: "Hapus semua chat grup?",
@@ -1298,6 +1328,19 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       )}
       {showConsole && <Console me={me} onClose={() => setShowConsole(false)} onToast={toast} onChanged={scheduleConvs} />}
       {showNew && <NewChat onClose={() => setShowNew(false)} onCreated={openById} />}
+      {linkOpen && active?.kind === "group" && isGroupManager(active) && (
+        <GroupLinkModal
+          key={active.id}
+          link={inviteLink(active)}
+          handle={active.handle || ""}
+          onCopy={copyText}
+          onShare={() => shareInvite(active)}
+          onReset={() => resetInvite(active)}
+          onSaveHandle={(h) => saveGroupHandle(active, h)}
+          onRemoveHandle={() => removeGroupHandle(active)}
+          onClose={() => setLinkOpen(false)}
+        />
+      )}
       {rulesOpen && active?.kind === "group" && (
         <RulesModal
           key={active.id + String(active.rules)}
@@ -1316,24 +1359,20 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
   );
 }
 
-function GroupEditForm({ title, description, handle, hasAvatar, onSave, onRemoveAvatar, onShare }: {
-  title: string; description: string; handle: string; hasAvatar: boolean;
-  onSave: (title: string, description: string, handle: string) => void;
+function GroupEditForm({ title, description, hasAvatar, onSave, onRemoveAvatar }: {
+  title: string; description: string; hasAvatar: boolean;
+  onSave: (title: string, description: string) => void;
   onRemoveAvatar: () => void;
-  onShare: () => void;
 }) {
   const [t, setT] = useState(title);
   const [d, setD] = useState(description);
-  const [h, setH] = useState(handle);
   const [open, setOpen] = useState(false);
-  const dirty = t.trim() !== (title || "").trim() || d.trim() !== (description || "").trim() || h.trim().toLowerCase() !== (handle || "").trim().toLowerCase();
+  const dirty = t.trim() !== (title || "").trim() || d.trim() !== (description || "").trim();
   if (!open) {
     return (
       <div className="group-edit-actions">
-        <button type="button" className="link" onClick={() => setOpen(true)}>Ubah nama, handle & deskripsi</button>
-        {handle && <button type="button" className="link" onClick={onShare}>Bagikan link</button>}
+        <button type="button" className="link" onClick={() => setOpen(true)}>Ubah nama &amp; deskripsi</button>
         {hasAvatar && <button type="button" className="link danger" onClick={onRemoveAvatar}>Hapus foto grup</button>}
-        {handle && <span className="muted small">Link: /{handle}</span>}
       </div>
     );
   }
@@ -1344,17 +1383,12 @@ function GroupEditForm({ title, description, handle, hasAvatar, onSave, onRemove
         <input className="field" maxLength={60} value={t} onChange={(e) => setT(e.target.value)} />
       </label>
       <label>
-        Handle link (pendek)
-        <input className="field" maxLength={20} value={h} onChange={(e) => setH(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ""))} placeholder="nama_grup" />
-        <small className="muted">Link: /{h || "…"} — boleh dibuka & dibagikan</small>
-      </label>
-      <label>
         Deskripsi
         <textarea className="field" rows={2} maxLength={200} value={d} onChange={(e) => setD(e.target.value)} placeholder="Opsional" />
       </label>
       <div className="group-edit-actions">
-        <button type="button" className="link" onClick={() => { setOpen(false); setT(title); setD(description); setH(handle); }}>Batal</button>
-        <button type="button" className="primary group-save" disabled={!t.trim() || !h.trim() || !dirty} onClick={() => { onSave(t, d, h); setOpen(false); }}>Simpan</button>
+        <button type="button" className="link" onClick={() => { setOpen(false); setT(title); setD(description); }}>Batal</button>
+        <button type="button" className="primary group-save" disabled={!t.trim() || !dirty} onClick={() => { onSave(t, d); setOpen(false); }}>Simpan</button>
       </div>
     </div>
   );
@@ -1451,6 +1485,81 @@ function RulesModal({ rules, canEdit, onSave, onCopy, onClose }: {
             </button>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Link undangan privat (kode acak) + username grup opsional. Hanya untuk owner/admin grup.
+function GroupLinkModal({ link, handle, onCopy, onShare, onReset, onSaveHandle, onRemoveHandle, onClose }: {
+  link: string; handle: string;
+  onCopy: (text: string, msg: string) => void;
+  onShare: () => void;
+  onReset: () => Promise<boolean>;
+  onSaveHandle: (h: string) => Promise<boolean>;
+  onRemoveHandle: () => Promise<boolean>;
+  onClose: () => void;
+}) {
+  const [h, setH] = useState(handle);
+  const [busy, setBusy] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [onClose]);
+  useEffect(() => {
+    if (!confirmReset) return;
+    const t = setTimeout(() => setConfirmReset(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirmReset]);
+  const clean = h.trim().toLowerCase();
+  const valid = USERNAME_RE.test(clean);
+  const dirty = clean !== handle;
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const run = async (fn: () => Promise<boolean>) => { setBusy(true); await fn(); setBusy(false); };
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal link-modal" role="dialog" aria-label="Link dan username grup" onClick={(e) => e.stopPropagation()}>
+        <header>
+          <h2>Link grup</h2>
+          <button className="icon-btn" onClick={onClose} aria-label="Tutup"><Icon n="close" /></button>
+        </header>
+
+        <section className="lm-sec">
+          <h4>Link undangan</h4>
+          {link ? <div className="link-box" title={link}>{link}</div> : <p className="muted small">Belum ada link undangan.</p>}
+          <p className="muted small">Hanya orang yang punya link ini yang bisa masuk. Kodenya acak dan tidak bisa ditebak.</p>
+          <div className="lm-actions">
+            {link && <button type="button" className="link" onClick={() => onCopy(link, "Link undangan disalin")}><Icon n="copy" size={14} /> Salin</button>}
+            {link && canShare && <button type="button" className="link" onClick={onShare}><Icon n="share" size={14} /> Bagikan</button>}
+            {link ? (
+              <button type="button" className={`link danger${confirmReset ? " armed" : ""}`} disabled={busy}
+                onClick={() => { if (!confirmReset) { setConfirmReset(true); return; } setConfirmReset(false); run(onReset); }}>
+                <Icon n="link" size={14} /> {confirmReset ? "Yakin? Link lama mati" : "Reset link"}
+              </button>
+            ) : (
+              <button type="button" className="primary" disabled={busy} onClick={() => run(onReset)}>Buat link</button>
+            )}
+          </div>
+        </section>
+
+        <section className="lm-sec">
+          <h4>Username grup <em>(opsional)</em></h4>
+          <input className="field" maxLength={20} value={h} placeholder="nama_grup"
+            onChange={(e) => setH(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ""))} />
+          <p className="muted small">
+            {handle
+              ? `Grup publik: siapa pun bisa menemukan dan masuk lewat @${handle}.`
+              : "Tanpa username, grup privat dan hanya bisa dimasuki lewat link undangan. Dengan username, grup muncul di pencarian dan bisa dibuka lewat /username."}
+          </p>
+          {dirty && clean && !valid && <p className="error small">3-20 karakter: huruf kecil, angka, _ . -</p>}
+          <div className="lm-actions">
+            {handle && <button type="button" className="link" onClick={() => onCopy("@" + handle, "Username grup disalin")}><Icon n="copy" size={14} /> Salin</button>}
+            {handle && <button type="button" className="link danger" disabled={busy} onClick={() => run(async () => { const ok = await onRemoveHandle(); if (ok) setH(""); return ok; })}>Hapus username</button>}
+            <button type="button" className="primary" disabled={busy || !dirty || !valid} onClick={() => run(() => onSaveHandle(clean))}>Simpan</button>
+          </div>
+        </section>
       </div>
     </div>
   );

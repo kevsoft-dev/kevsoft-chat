@@ -5,6 +5,7 @@ import { getUserId, getActor } from "@/lib/auth";
 import { broadcast, pushTo } from "@/lib/messages";
 import { handleProblem, uniqueGroupHandle, slugifyTitle } from "@/lib/groupHandle";
 import { isRootEmail } from "@/lib/roles";
+import { newInviteCode } from "@/lib/inviteCode";
 
 export async function GET() {
   const uid = await getUserId();
@@ -21,6 +22,7 @@ export async function GET() {
       o.banner_url as other_banner, o.bio as other_bio,
       coalesce(o.role = 'owner' or o.verified, false) as other_verified,
       c.created_by, c.handle,
+      case when c.kind = 'group' and (me.role in ('owner', 'admin') or c.created_by = ${uid}) then c.invite_code end as invite_code,
       (select cm.role from conversation_members cm where cm.conversation_id = c.id and cm.user_id = ${uid}) as my_group_role,
       (select count(*) from conversation_members where conversation_id = c.id)::int as member_count,
       lm.body as last_body, lm.created_at as last_at, lm.kind as last_kind, lu.username as last_username,
@@ -94,10 +96,10 @@ export async function POST(req: Request) {
 
   const found = await sql`select id from users where lower(username) = any(${d.usernames}) and id <> ${uid}`;
   if (found.length === 0) return Response.json({ error: "Pilih minimal 1 anggota yang valid" }, { status: 400 });
-  const handle = await uniqueGroupHandle(slugifyTitle(d.title));
+  // Grup baru PRIVAT: tanpa username, hanya bisa dimasuki lewat link undangan berkode acak.
   const [conv] = await sql`
-    insert into conversations (kind, title, description, created_by, handle)
-    values ('group', ${d.title}, ${d.description ?? null}, ${uid}, ${handle}) returning id, handle`;
+    insert into conversations (kind, title, description, created_by, invite_code)
+    values ('group', ${d.title}, ${d.description ?? null}, ${uid}, ${newInviteCode()}) returning id`;
   await sql`insert into conversation_members (conversation_id, user_id, role) values (${conv.id}, ${uid}, 'owner')`;
   const ids = found.map((f) => f.id as string);
   await sql`insert into conversation_members (conversation_id, user_id)
@@ -207,12 +209,14 @@ export async function PATCH(req: Request) {
     rules: z.string().max(1000).optional().nullable(),
     handle: z.string().trim().toLowerCase().max(20).optional(),
     reset_handle: z.boolean().optional(),
+    reset_invite: z.boolean().optional(),
+    remove_handle: z.boolean().optional(),
   }).safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Data tidak valid" }, { status: 400 });
-  const { id, title, description, handle, reset_handle } = parsed.data;
+  const { id, title, description, handle, reset_handle, reset_invite, remove_handle } = parsed.data;
   // Aturan grup: spasi di ujung dibuang, kosong = hapus aturan.
   const rules = parsed.data.rules === undefined ? undefined : (parsed.data.rules?.trim() || null);
-  if (title === undefined && description === undefined && rules === undefined && handle === undefined && !reset_handle)
+  if (title === undefined && description === undefined && rules === undefined && handle === undefined && !reset_handle && !reset_invite && !remove_handle)
     return Response.json({ error: "Tidak ada perubahan" }, { status: 400 });
 
   const [mem] = await sql`
@@ -228,8 +232,8 @@ export async function PATCH(req: Request) {
   // Komunitas publik: hanya owner utama sistem
   if (mem.kind === "community") {
     if (!root) return Response.json({ error: "Hanya owner utama yang bisa mengubah Komunitas" }, { status: 403 });
-    if (handle !== undefined || reset_handle)
-      return Response.json({ error: "Komunitas tidak memakai handle link" }, { status: 400 });
+    if (handle !== undefined || reset_handle || reset_invite || remove_handle)
+      return Response.json({ error: "Komunitas tidak memakai link grup" }, { status: 400 });
     if (rules !== undefined)
       return Response.json({ error: "Komunitas tidak memakai aturan grup" }, { status: 400 });
     const [c] = await sql`
@@ -261,15 +265,20 @@ export async function PATCH(req: Request) {
     if (takenGrp) return Response.json({ error: "Handle grup sudah dipakai" }, { status: 409 });
   }
 
+  // Reset link = kode acak baru; link lama langsung tidak berlaku.
+  const newCode = reset_invite ? newInviteCode() : null;
+
   try {
     const [c] = await sql`
       update conversations set
         title = coalesce(${title ?? null}::text, title),
         description = case when ${description === undefined} then description else ${description ?? null}::text end,
         rules = case when ${rules === undefined} then rules else ${rules ?? null}::text end,
-        handle = coalesce(${newHandle ?? null}::text, handle)
+        handle = case when ${!!remove_handle} then null else coalesce(${newHandle ?? null}::text, handle) end,
+        invite_code = case when ${!!reset_invite} then ${newCode}::text else invite_code end
       where id = ${id}::uuid
-      returning id, title, description, rules, avatar_url, handle`;
+      returning id, title, description, rules, avatar_url, handle, invite_code`;
+    // Kode undangan sengaja TIDAK ikut di-broadcast (hanya owner/admin yang menerimanya lewat daftar chat).
     await broadcast(id, "conversation", { id, title: c.title, description: c.description, rules: c.rules, avatar_url: c.avatar_url, handle: c.handle });
     return Response.json(c);
   } catch {

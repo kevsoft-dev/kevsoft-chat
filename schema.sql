@@ -33,6 +33,9 @@ create table if not exists conversations (
 alter table conversations add column if not exists kind text not null default 'dm';
 alter table conversations add column if not exists description text;
 alter table conversations add column if not exists rules text;
+alter table conversations add column if not exists invite_code text;
+update conversations set invite_code = translate(encode(gen_random_bytes(12), 'base64'), '+/', '-_') where kind = 'group' and invite_code is null;
+create unique index if not exists conversations_invite_code_key on conversations (invite_code) where invite_code is not null;
 alter table conversations add column if not exists created_by text;
 alter table conversations add column if not exists disappear_seconds int not null default 0;
 create unique index if not exists conversations_one_ai_per_user on conversations (created_by) where kind = 'ai';
