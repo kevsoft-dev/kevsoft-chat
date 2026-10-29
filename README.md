@@ -150,3 +150,31 @@ Carousel berita di atas daftar chat (auto-slide 6 detik, bisa digeser). Klik kar
 ### Setup Firebase (sekali saja)
 1. Firebase Console > Realtime Database > **Rules**, isi lalu Publish: `{ "rules": { ".read": false, ".write": false } }`. Server memakai kredensial admin sehingga tetap bisa baca/tulis; orang luar tidak bisa.
 2. Project settings > Service accounts > **Generate new private key**, lalu jalankan `node scripts/firebase-config.mjs file-kunci.json`. Kunci masuk ke `config.json` (`firebaseDb.serviceAccount`). Hapus file JSON aslinya setelahnya.
+
+## API publik (berita + komentar + kritik & saran)
+
+API **read-only** di `/api/v1`. Dokumentasi singkat: `GET /api/v1`.
+
+Aktifkan dengan mengisi `config.json`:
+
+```json
+"api": { "keys": ["KUNCI_ACAK_MIN_16_KARAKTER"], "public": false }
+```
+
+- `keys`: satu atau lebih API key (min. 16 karakter, pakai string acak panjang). Kirim lewat header `x-api-key: <key>` (atau `Authorization: Bearer <key>`).
+- `public: true` membuka API tanpa key (tetap hanya baca, dibatasi 120 permintaan/menit per IP).
+- Tanpa `keys` dan `public: false`, API menjawab 503 "belum diaktifkan".
+
+| Endpoint | Isi |
+| --- | --- |
+| `GET /api/v1/news?limit=&before=&q=` | Daftar berita (halaman berikutnya: `before=<next_cursor>`) |
+| `GET /api/v1/news/{id}` | Satu berita |
+| `GET /api/v1/news/{id}/comments?tree=1` | Komentar berita (datar, atau bersarang dengan `tree=1`) |
+| `GET /api/v1/cas?type=&status=&sort=&limit=` | Komentar Kritik & Saran yang lolos peninjauan AI (LIKE paling atas) |
+| `GET /api/v1/cas/{id}` | Satu komentar Kritik & Saran |
+
+```bash
+curl -H "x-api-key: KUNCI_KAMU" https://domainmu.com/api/v1/news?limit=5
+```
+
+Keamanan: tidak ada id internal user atau email di respons (hanya username, nama, foto, centang), komentar yang masih ditinjau tidak pernah keluar, CORS terbuka untuk GET, dan percobaan key salah dibatasi per IP.

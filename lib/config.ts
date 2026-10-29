@@ -34,6 +34,12 @@ export const cfg = {
     serviceAccount: serviceAccount(),
     secret: String(f.firebaseDb?.secret ?? "").trim(),
   },
+  // API publik read-only (/api/v1): berita + komentarnya + komentar /cas.
+  // Akses butuh API key (api.keys). api.public=true membuka tanpa key (hanya baca, dibatasi per IP).
+  api: {
+    keys: ((f.api?.keys as unknown[] | undefined) ?? []).map((k) => String(k).trim()).filter((k) => k.length >= 16),
+    public: f.api?.public === true,
+  },
   pusher: {
     appId: String(f.pusher?.appId ?? ""),
     key: String(f.pusher?.key ?? ""),

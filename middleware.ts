@@ -8,10 +8,11 @@ const PUBLIC = [
   /^\/api\/health$/,
   /^\/api\/avatar\//, // foto profil publik
   /^\/api\/banner\//, // foto sampul publik
+  /^\/api\/v1(\/|$)/, // API publik read-only (dijaga API key di handler)
 ];
 
 const RESERVED_PATH = new Set([
-  "sign-in", "api", "u", "dm", "g", "join", "news", "_next", "favicon.ico", "robots.txt",
+  "sign-in", "api", "u", "dm", "g", "join", "cas", "news", "_next", "favicon.ico", "robots.txt",
   "health", "console", "admin", "static", "assets",
 ]);
 
@@ -62,7 +63,7 @@ export default async function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
   url.pathname = "/sign-in";
   // Link undangan grup: setelah login kembali ke halaman join.
-  url.search = path.startsWith("/join/") ? `?next=${encodeURIComponent(pathname)}` : "";
+  url.search = path.startsWith("/join/") || path === "/cas" ? `?next=${encodeURIComponent(pathname)}` : "";
   return NextResponse.redirect(url);
 }
 
