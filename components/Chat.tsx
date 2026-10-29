@@ -590,12 +590,39 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
         actions: [{ label: "Hapus chat", danger: true, run: () => runConvDelete(c, "delete") }] });
   }, [runConvDelete]);
 
-  const convItems = useCallback((c: Conv): MenuItem[] => {
-    const items: MenuItem[] = [{ icon: "trash", label: "Bersihkan chat", run: () => askConv(c, "clear") }];
+  const convItems = useCallback((c: Conv, opts?: { includeInfo?: boolean }): MenuItem[] => {
+    const items: MenuItem[] = [];
+    if (opts?.includeInfo) {
+      items.push({ icon: "info", label: c.kind === "group" || c.kind === "community" ? "Pengaturan & info" : "Info", run: showInfo });
+    }
+    if (c.kind === "group" && c.handle) {
+      items.push({
+        icon: "copy",
+        label: "Salin link grup",
+        run: async () => {
+          const url = `${window.location.origin}/${c.handle}`;
+          try {
+            await navigator.clipboard.writeText(url);
+            toast("Link grup disalin");
+          } catch {
+            try {
+              if (navigator.share) await navigator.share({ title: c.title || "Grup", url });
+              else toast("Gagal menyalin");
+            } catch { toast("Gagal menyalin"); }
+          }
+        },
+      });
+      items.push({
+        icon: "share",
+        label: "Bagikan link grup",
+        run: () => shareGroupLink(c),
+      });
+    }
+    items.push({ icon: "trash", label: "Bersihkan chat", run: () => askConv(c, "clear") });
     if (c.kind === "dm") items.push({ icon: "trash", label: "Hapus chat", danger: true, run: () => askConv(c, "delete") });
     if (c.kind === "group") items.push({ icon: "logout", label: "Keluar grup", danger: true, run: () => askConv(c, "delete") });
     return items;
-  }, [askConv]);
+  }, [askConv, toast, showInfo]);
 
   const openConvMenu = useCallback((c: Conv, x: number, y: number) => {
     const items = convItems(c);
@@ -871,7 +898,11 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                 <div><strong>{convName(active)}{(active.kind === "ai" || (active.kind === "dm" && active.other_verified)) && <VerifiedBadge title={active.kind === "ai" ? "Kev-Ai terverifikasi" : "Terverifikasi"} />}</strong><small>{waiting ? "sedang mengetik…" : subtitle(active)}</small></div>
               </button>
               <button className="icon-btn" aria-label="Menu chat"
-                onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); const items: MenuItem[] = [{ icon: "info", label: "Info", run: showInfo }, ...convItems(active)]; setMenu({ ...placeMenu(r.right - 220, r.bottom + 6, items.length), items }); }}>
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  const items = convItems(active, { includeInfo: true });
+                  setMenu({ ...placeMenu(r.right - 220, r.bottom + 6, items.length), items });
+                }}>
                 <Icon n="more" />
               </button>
             </header>
