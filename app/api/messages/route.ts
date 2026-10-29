@@ -23,7 +23,8 @@ export async function GET(req: Request) {
   const beforeTs = before && !Number.isNaN(Date.parse(before)) ? new Date(before).toISOString() : null;
 
   // Cek keanggotaan, filter "bersihkan chat" dan "hapus untuk saya" dalam satu query.
-  const readMark = !beforeTs
+  // peek=1: dipakai prefetch di klien, jadi chat yang belum dibuka TIDAK ditandai sudah dibaca.
+  const readMark = !beforeTs && sp.get("peek") !== "1"
     ? sql`update conversation_members set last_read_at = now() where conversation_id = ${cid.data} and user_id = ${uid}`
     : null;
   const [rows] = await Promise.all([

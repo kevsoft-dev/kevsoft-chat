@@ -10,13 +10,14 @@ function previewOf(c: Conv, meUsername: string) {
   return c.kind === "dm" || c.kind === "ai" ? (mine ? `Kamu: ${c.last_body}` : c.last_body) : `${who}: ${c.last_body}`;
 }
 
-export default memo(function ConvItem({ c, on, leaving, meUsername, onOpen, onMenu }: {
+export default memo(function ConvItem({ c, on, leaving, meUsername, onOpen, onMenu, onPrefetch }: {
   c: Conv; on: boolean; leaving: boolean; meUsername: string;
   onOpen: (id: string) => void; onMenu: (c: Conv, x: number, y: number) => void;
+  onPrefetch?: (id: string) => void;
 }) {
   const lp = useLongPress((x, y) => onMenu(c, x, y));
   return (
-    <li className={leaving ? "leaving" : ""}>
+    <li className={leaving ? "leaving" : ""} onPointerEnter={() => onPrefetch?.(c.id)} onPointerDown={() => onPrefetch?.(c.id)}>
       <button className={`conv${on ? " on" : ""}${c.kind === "ai" ? " ai" : ""}`} {...lp.bind}
         onClick={() => { if (lp.wasLong()) return; onOpen(c.id); }}>
         <Avatar name={convName(c)} src={c.other_avatar} kind={c.kind === "dm" ? undefined : c.kind} />

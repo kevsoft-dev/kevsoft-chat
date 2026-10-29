@@ -35,9 +35,9 @@ const mergePending = (list: Msg[], cur: Msg[]) => {
   return pend.length ? [...list, ...pend] : list;
 };
 
-async function fetchMsgs(id: string): Promise<Msg[] | null> {
+async function fetchMsgs(id: string, peek = false): Promise<Msg[] | null> {
   try {
-    const r = await fetch(`/api/messages?conversationId=${id}`, { cache: "no-store" });
+    const r = await fetch(`/api/messages?conversationId=${id}${peek ? "&peek=1" : ""}`, { cache: "no-store", priority: peek ? "low" : "high" } as RequestInit);
     if (r.status === 401) { window.location.assign("/sign-in"); return null; }
     return r.ok ? await r.json() : null;
   } catch { return null; }
@@ -84,6 +84,9 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
   const replyRef = useRef<Msg | null>(null); replyRef.current = replyTo;
   const cache = useRef<Record<string, Msg[]>>({});
   const fresh = useRef(new Set<string>());
+  const inflight = useRef<Record<string, boolean>>({});
+  const serverLoaded = useRef(false);
+  const warmed = useRef(false);
   const thread = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
@@ -106,7 +109,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     try {
       const r = await fetch("/api/conversations");
       if (r.status === 401) { window.location.assign("/sign-in"); return; }
-      if (r.ok) setConvs(await r.json());
+      if (r.ok) { const d = await r.json(); serverLoaded.current = true; setConvs(d); }
     } catch {}
   }, []);
   // Muat ulang daftar dengan jeda singkat supaya beberapa event beruntun hanya memicu satu query.
@@ -150,6 +153,41 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     if (id) cache.current[id] = msgsRef.current;
     activeRef.current = null; setActiveId(null); setInfo(false); setReplyTo(null);
   }, []);
+
+  // Prefetch pesan chat (tanpa menandai dibaca) supaya saat dibuka langsung tampil dari cache.
+  const prefetch = useCallback((id: string) => {
+    if (cache.current[id] || inflight.current[id] || activeRef.current === id) return;
+    inflight.current[id] = true;
+    fetchMsgs(id, true).then((list) => {
+      delete inflight.current[id];
+      if (list && !cache.current[id] && activeRef.current !== id) cache.current[id] = list;
+    });
+  }, []);
+
+  // Pemanasan: setelah daftar chat dari server tiba, muat diam-diam beberapa chat teratas.
+  useEffect(() => {
+    if (!convs || !serverLoaded.current || warmed.current) return;
+    warmed.current = true;
+    const ids = convs.slice(0, 5).map((c) => c.id);
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    const run = () => ids.forEach((id, i) => setTimeout(() => prefetch(id), i * 200));
+    if (w.requestIdleCallback) w.requestIdleCallback(run, { timeout: 1500 }); else setTimeout(run, 500);
+  }, [convs, prefetch]);
+
+  // Daftar chat tersimpan di sessionStorage (per tab, dihapus saat keluar) -> tampil seketika, lalu diperbarui dari server.
+  const convsKey = `kc:convs:${me0.id}`;
+  useLayoutEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(convsKey);
+      const saved = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(saved)) setConvs((cur) => cur ?? saved);
+    } catch {}
+  }, [convsKey]);
+  useEffect(() => {
+    if (!convs) return;
+    const t = setTimeout(() => { try { sessionStorage.setItem(convsKey, JSON.stringify(convs)); } catch {} }, 600);
+    return () => clearTimeout(t);
+  }, [convs, convsKey]);
 
   useEffect(() => {
     fetch("/api/settings").then(r => r.ok ? r.json() : null).then(d => {
@@ -867,6 +905,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
   }
 
   async function logout() {
+    try { sessionStorage.removeItem(convsKey); } catch {}
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     window.location.assign("/sign-in");
   }
@@ -935,7 +974,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
           ))}
           {convs !== null && list.length === 0 && <li className="empty">Tidak ada chat. Tekan ✎ untuk mulai chat atau buat grup.</li>}
           {list.map((c) => (
-            <ConvItem key={c.id} c={c} on={activeId === c.id} leaving={leaving.includes(c.id)} meUsername={me.username} onOpen={open} onMenu={openConvMenu} />
+            <ConvItem key={c.id} c={c} on={activeId === c.id} leaving={leaving.includes(c.id)} meUsername={me.username} onOpen={open} onMenu={openConvMenu} onPrefetch={prefetch} />
           ))}
         </ul>
       </aside>

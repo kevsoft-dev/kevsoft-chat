@@ -1414,3 +1414,38 @@ h1,h2,h3,h4{font-weight:600;letter-spacing:-.015em}
 .join-card h1{font-size:26px;letter-spacing:-.03em;margin:4px 0 0}
 .join-card .primary{width:100%;margin-top:12px}
 .join-card .desc{max-width:32ch}
+
+
+/* ================================================================
+   LOAD KILAT + BUBBLE LEMBUT
+   - skeleton baru muncul kalau load > 150ms (load cepat = tanpa kedip)
+   - 10 bubble terbawah muncul berurutan dari bawah ke atas, lembut
+   - bubble baru (kirim/terima) memakai gerak yang lebih halus
+   ================================================================ */
+@keyframes mo-skel-in{from{opacity:0}to{opacity:1}}
+@keyframes mo-soft-in{
+  from{opacity:0;transform:translateY(12px) scale(.965)}
+  to{opacity:1;transform:none}
+}
+/* versi lebih halus dari animasi bubble baru (menimpa keyframes sebelumnya) */
+@keyframes mo-bub-l{0%{opacity:0;transform:translate(-10px,8px) scale(.9)}60%{opacity:1;transform:translate(1px,0) scale(1.015)}100%{transform:none}}
+@keyframes mo-bub-r{0%{opacity:0;transform:translate(10px,8px) scale(.9)}60%{opacity:1;transform:translate(-1px,0) scale(1.015)}100%{transform:none}}
+.msg.fresh .bubble,.msg.mine.fresh .bubble{animation-duration:.46s}
+
+.thread-skel{animation:mo-skel-in .25s ease .15s backwards}
+.thread .row-wrap:nth-last-child(1){--k:0}
+.thread .row-wrap:nth-last-child(2){--k:1}
+.thread .row-wrap:nth-last-child(3){--k:2}
+.thread .row-wrap:nth-last-child(4){--k:3}
+.thread .row-wrap:nth-last-child(5){--k:4}
+.thread .row-wrap:nth-last-child(6){--k:5}
+.thread .row-wrap:nth-last-child(7){--k:6}
+.thread .row-wrap:nth-last-child(8){--k:7}
+.thread .row-wrap:nth-last-child(9){--k:8}
+.thread .row-wrap:nth-last-child(10){--k:9}
+.thread .row-wrap:nth-last-child(-n+10) .msg:not(.fresh){
+  animation:mo-soft-in .5s var(--ease) backwards;
+  animation-delay:calc(var(--k,0)*34ms);
+  transform-origin:bottom left;
+}
+.thread .row-wrap:nth-last-child(-n+10) .msg.mine:not(.fresh){transform-origin:bottom right}
