@@ -38,12 +38,13 @@ export function promptFor(c: Pick<CasRow, "body" | "type">): string {
   ].join("\n");
 }
 
-// Ambil verdict dari balasan AI. Hanya jawaban satu kata yang diterima; selain itu dicoba lagi.
+// Ambil verdict dari balasan AI. Terima satu kata, atau jawaban pendek (<= 12 kata, mis. "Jawaban: ACC")
+// selama hanya satu jenis verdict yang muncul sebagai kata utuh. Selain itu dicoba lagi.
 export function verdictFrom(answer: string): "RM" | "ACC" | "LIKE" | null {
   const words = answer.trim().toUpperCase().replace(/[^A-Z ]/g, " ").trim().split(/\s+/).filter(Boolean);
-  if (!words.length || words.length > 3) return null;
-  const w = words[0];
-  return w === "RM" || w === "ACC" || w === "LIKE" ? w : null;
+  if (!words.length || words.length > 12) return null;
+  const found = new Set(words.filter((w) => w === "RM" || w === "ACC" || w === "LIKE"));
+  return found.size === 1 ? ([...found][0] as "RM" | "ACC" | "LIKE") : null;
 }
 
 // Pra-saring spam yang jelas (banyak tautan) tanpa memanggil AI.

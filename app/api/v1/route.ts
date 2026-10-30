@@ -20,6 +20,7 @@ export async function GET(req: Request) {
       { method: "GET", path: "/api/v1/cas", query: "type (kritik|saran|lainnya), status (like|acc), sort (best|new), limit (1-100, default 50)", desc: "Komentar Kritik & Saran yang lolos peninjauan AI" },
       { method: "GET", path: "/api/v1/cas/{id}", desc: "Satu komentar Kritik & Saran" },
     ],
+    docs: `${origin}/docs`,
     example: `curl -H "x-api-key: KUNCI_KAMU" ${origin}/api/v1/news?limit=5`,
   });
 }

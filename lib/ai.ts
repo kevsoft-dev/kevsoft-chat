@@ -1,4 +1,4 @@
-// Kev-Ai: GET https://kev-ai.vercel.app/ai?text=
+// Kev-Ai: GET https://kev-ai.vercel.app/ai?text=  (dipakai chat @kev-ai DAN peninjau AI di /cas lewat lib/cas.ts)
 const ENDPOINT = "https://kev-ai.vercel.app/ai?text=";
 const KEYS = ["result", "response", "answer", "reply", "message", "text", "output", "content", "data"];
 

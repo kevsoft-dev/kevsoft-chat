@@ -153,7 +153,7 @@ Carousel berita di atas daftar chat (auto-slide 6 detik, bisa digeser). Klik kar
 
 ## API publik (berita + komentar + kritik & saran)
 
-API **read-only** di `/api/v1`. Dokumentasi singkat: `GET /api/v1`.
+API **read-only** di `/api/v1`. Dokumentasi lengkap (dengan contoh respons dan "Coba langsung") ada di halaman **`/docs`** (publik, tanpa login). Daftar endpoint-nya diatur di `lib/apiDocs.ts`; ringkasan JSON: `GET /api/v1`.
 
 Aktifkan dengan mengisi `config.json`:
 
@@ -178,3 +178,14 @@ curl -H "x-api-key: KUNCI_KAMU" https://domainmu.com/api/v1/news?limit=5
 ```
 
 Keamanan: tidak ada id internal user atau email di respons (hanya username, nama, foto, centang), komentar yang masih ditinjau tidak pernah keluar, CORS terbuka untuk GET, dan percobaan key salah dibatasi per IP.
+
+## KEVSOFT-CHAT (`/ghosh`) dan Console (`/console`)
+
+Ruang privat bergaya terminal, terpisah dari chat biasa. Tidak ada tautan ke sana di aplikasi (kecuali tombol "console" bagi owner utama di dalam ruang). Tabel dibuat otomatis saat pertama dipakai.
+
+- **Anonim**: semua pesan tampil `Unknown`. API tidak mengirim username, nama, email, atau foto. Pengirim di database hanya HMAC; isi pesan dienkripsi AES-256-GCM (kunci diturunkan dari `databaseUrl`, jadi mengganti password database membuat pesan lama tidak terbaca).
+- **Akses**: hanya email yang berstatus `approved`. Orang lain melihat layar "ACCESS RESTRICTED" dan bisa **minta akses** (status `pending` sampai di-ACC). Ditolak/dicabut tidak bisa mengajukan ulang kecuali owner menghapusnya dari daftar. Status dicek ke database di setiap permintaan, jadi pencabutan langsung berlaku.
+- **Owner utama** (`kevsoft.cs@gmail.com`): satu-satunya yang bisa membuat room, meng-ACC, mencabut, dan membuka `/console`. Akun lain mendapat 404.
+- **Console** (`/console`): ringkasan, permintaan, daftar akses (tambah email langsung, cabut, hapus), room (buat, kunci, TTL pesan hilang, kosongkan, hapus), audit, tombol **lockdown** (blokir semua selain owner), dan hapus semua pesan.
+- Pengerasan: rate limit, noindex/no-store/no-referrer, layar disamarkan saat tab tidak aktif, pesan hilang otomatis per room.
+- Di dalam ruang: ketik `/help` (`/rooms`, `/room <nama>`, `/who`, `/clear`, `/exit`). Owner bisa menghapus pesan dengan tombol × saat kursor di atas pesan.
