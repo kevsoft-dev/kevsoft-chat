@@ -1847,70 +1847,257 @@ h1,h2,h3,h4{font-weight:600;letter-spacing:-.015em}
 }
 
 /* ================================================================
-   /home — ART PASS: garis tepi tegas ala ilustrasi + bayangan arsiran.
-   Warna & tema tetap sama; hanya outline dan bayangan yang berubah.
+   /home — ART PASS: garis tepi tegas ala ilustrasi, tanpa arsiran.
+   Responsif: HP (<=620), tablet (621-980), desktop (>980).
    ================================================================ */
-.hm{--h-edge:#2b2a27;--h-hatch:repeating-linear-gradient(135deg,var(--h-edge) 0 1.4px,transparent 1.4px 4.6px);--off:6px}
-:root[data-theme="dark"] .hm{--h-edge:rgba(236,235,231,.88)}
+.hm{--h-edge:#2b2a27;--h-lift:0 10px 24px rgba(43,42,39,.10);overflow-x:hidden}
+:root[data-theme="dark"] .hm{--h-edge:rgba(236,235,231,.88);--h-lift:0 10px 24px rgba(0,0,0,.35)}
 
-/* semua elemen berbayang arsiran */
-.hm-btn,.hm-card,.hm-preview,.hm-quote,.hm-cas,.hm-menu-p,.hm-pill{position:relative;isolation:isolate}
-.hm-btn::after,.hm-card::after,.hm-preview::after,.hm-quote::after,.hm-cas::after,.hm-menu-p::after{
-  content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;
-  background:var(--h-hatch);-webkit-mask:linear-gradient(135deg,transparent 0,#000 55%);mask:linear-gradient(135deg,transparent 0,#000 55%);
-  transform:translate(var(--off),var(--off));transition:transform .22s var(--ease)
-}
-/* bayangan arsiran punya garis tepi tipis juga */
-.hm-card::before,.hm-preview::before,.hm-cas::before{content:none}
+/* nav (aman untuk notch) */
+.hm-nav{border-bottom:2px solid var(--h-edge);padding-left:max(18px,env(safe-area-inset-left),calc((100% - 1080px)/2));padding-right:max(18px,env(safe-area-inset-right),calc((100% - 1080px)/2))}
+.hm main{padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right))}
 
 /* tombol */
-.hm-btn{--off:4px;border:2px solid var(--h-edge);color:#fff;transition:transform .22s var(--ease),background .15s}
-.hm-btn.big{--off:5px;padding:13px 22px}
-.hm-btn:hover{transform:translate(-2px,-2px)}
-.hm-btn:hover::after{transform:translate(calc(var(--off) + 4px),calc(var(--off) + 4px))}
-.hm-btn:active{transform:translate(2px,2px)}
-.hm-btn:active::after{transform:translate(calc(var(--off) - 2px),calc(var(--off) - 2px))}
+.hm-btn{min-height:42px;border:2px solid var(--h-edge);color:#fff;text-align:center;transition:transform .2s var(--ease),box-shadow .2s var(--ease),background .15s}
+.hm-btn.big{min-height:52px;padding:12px 24px}
 .hm-btn.soft{color:var(--h-blue-t)}
 :root[data-theme="dark"] .hm-btn{color:#0f1420}
 :root[data-theme="dark"] .hm-btn.soft{color:var(--h-blue-t)}
+.hm-btn:active{transform:scale(.97)}
+.hm-icon{border:2px solid transparent}
 
 /* kartu */
-.hm-card{--off:6px;border:2px solid var(--h-edge);border-radius:20px}
+.hm-card{border:2px solid var(--h-edge);border-radius:20px;box-shadow:none}
 .hm-card[class*="t-"]{border-color:var(--h-edge)}
-.hm-card:hover{transform:translate(-2px,-2px);box-shadow:none}
-.hm-card:hover::after{transform:translate(8px,8px)}
 .hm-ico{border:2px solid var(--h-edge);box-shadow:none;border-radius:50%}
+.hm-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.hm-news{grid-template-columns:repeat(3,minmax(0,1fr))}
 
 /* preview chat */
-.hm-preview{--off:8px;border:2px solid var(--h-edge);border-radius:22px;overflow:visible;box-shadow:none}
+.hm-preview{border:2px solid var(--h-edge);border-radius:22px;box-shadow:none;overflow:hidden;width:100%;max-width:520px;justify-self:end}
 .hm-pv-bar{border-bottom:2px solid var(--h-edge)}
 .hm-pv-bar i{background:transparent;border:1.5px solid var(--h-edge)}
-.hm-b{border:1.5px solid var(--h-edge);background:var(--h-card)}
-.hm-b.r{background:var(--h-blue);border-color:var(--h-edge)}
+.hm-b{border:1.5px solid var(--h-edge);background:var(--h-card);overflow-wrap:anywhere}
+.hm-b.r{background:var(--h-blue)}
 .hm-b.ai{background:var(--h-blue-s)}
 :root[data-theme="dark"] .hm-b.r{color:#0f1420}
 
 /* pil judul */
-.hm-pill{border:.045em solid var(--h-edge);border-radius:.55em;padding:.0em .28em .04em .2em;box-shadow:.06em .06em 0 var(--h-edge)}
+.hm-pill{border:.045em solid var(--h-edge);border-radius:.55em;padding:0 .28em .04em .2em}
 
-/* blok kritik & saran + kutipan */
-.hm-cas{--off:10px;border:2px solid var(--h-edge);border-radius:28px}
-.hm-quote{--off:4px;border:2px solid var(--h-edge);border-radius:16px}
-.hm-quote:hover{transform:translate(-2px,-2px)}
-.hm-quote:hover::after{transform:translate(6px,6px)}
+/* kritik & saran */
+.hm-cas{border:2px solid var(--h-edge);border-radius:28px;padding:clamp(22px,4vw,44px)}
+.hm-quote{border:2px solid var(--h-edge);border-radius:16px;overflow-wrap:anywhere}
 
-/* nav, menu, footer, avatar */
-.hm-nav{border-bottom:2px solid var(--h-edge)}
-.hm-menu-p{--off:5px;border:2px solid var(--h-edge);border-radius:14px}
+/* menu HP */
+.hm-menu-p{border:2px solid var(--h-edge);border-radius:14px}
 .hm-foot{border-top:2px solid var(--h-edge)}
-.hm-faces img{box-shadow:0 0 0 3px var(--h-bg)}
-.hm-icon{border:2px solid transparent}
-.hm-icon:hover{border-color:var(--h-edge);background:transparent}
-.hm-trust{border-bottom:0}
 .hm-marq{padding:6px 0}
+.hm-card h3,.hm-card p,.hm-big,.hm-lead{overflow-wrap:anywhere}
 
+/* hover hanya di perangkat yang punya kursor */
+@media (hover:hover){
+  .hm-btn:hover{transform:translateY(-2px);box-shadow:var(--h-lift)}
+  .hm-btn:active{transform:scale(.97)}
+  .hm-card:hover,.hm-quote:hover{transform:translateY(-3px);box-shadow:var(--h-lift)}
+}
+@media (hover:none){
+  .hm-card:hover,.hm-quote:hover,.hm-faces img:hover{transform:none;box-shadow:none}
+}
+
+/* avatar: ukuran mengikuti lebar layar, tidak pernah meluber */
+.hm-faces{--s:clamp(40px,11.5vw,68px);max-width:100%}
+.hm-faces img{width:var(--s);height:var(--s);margin-left:calc(var(--s)*-.15)}
+.hm-faces img:first-child{margin-left:0}
+
+/* ---------- Desktop lebar ---------- */
+@media (min-width:1200px){
+  .hm main,.hm-foot{max-width:1160px}
+  .hm-nav{padding-left:max(18px,calc((100% - 1160px)/2));padding-right:max(18px,calc((100% - 1160px)/2))}
+}
+
+/* ---------- Tablet (621-980) ---------- */
+@media (max-width:980px){
+  .hm-hero{padding:52px 0 36px}
+  .hm-hero h1{max-width:16ch}
+  .hm-split{grid-template-columns:1fr;gap:32px}
+  .hm-split>div:first-child{text-align:center}
+  .hm-split .hm-lead{margin-left:auto;margin-right:auto}
+  .hm-preview{justify-self:center;max-width:560px}
+  .hm-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hm-news{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  .hm-cas{grid-template-columns:1fr;gap:24px}
+  .hm-sec{padding:52px 0 16px}
+}
+
+/* ---------- HP (<=620) ---------- */
 @media (max-width:620px){
-  .hm-card,.hm-cas{--off:5px}
-  .hm-cas{--off:7px}
-  .hm-preview{--off:6px}
+  .hm-nav{gap:8px;padding-top:10px;padding-bottom:10px}
+  .hm-nav-r .hm-btn{padding:8px 14px;min-height:40px}
+  .hm-hero{padding:36px 0 28px}
+  .hm-faces{margin-bottom:26px}
+  .hm-hero h1{font-size:clamp(34px,10.4vw,46px);letter-spacing:-.04em;max-width:11.5ch}
+  .hm-hero p{font-size:16.5px;margin-bottom:24px}
+  .hm-cta{flex-direction:column;align-items:stretch}
+  .hm-cta .hm-btn{width:100%}
+  .hm-trust{padding:22px 0 8px}
+  .hm-track{gap:30px}
+  .hm-sec{padding:44px 0 12px}
+  .hm-big{font-size:clamp(28px,8.6vw,38px)}
+  .hm-big.sm{font-size:clamp(24px,7.4vw,32px);margin-bottom:18px}
+  .hm-lead{font-size:16.5px}
+  .hm-split .hm-btn{width:100%}
+  .hm-grid,.hm-news{grid-template-columns:1fr;gap:12px}
+  .hm-card{padding:20px}
+  .hm-b{max-width:90%;font-size:14px}
+  .hm-cas{border-radius:22px}
+  .hm-cas .hm-btn{width:100%}
+  .hm-sec-h{flex-direction:column;align-items:flex-start;gap:2px}
+  .hm-foot{flex-direction:column;gap:12px;margin-top:36px}
+}
+
+/* layar sangat kecil */
+@media (max-width:360px){
+  .hm-brand strong{font-size:15px}
+  .hm-brand img{width:26px;height:26px}
+  .hm-nav-r .hm-btn{padding:7px 11px;font-size:13.5px}
+}
+
+/* ================================================================
+   TEMA TERPADU — semua halaman (/home, /sign-in, /chat, /dm, /g, /u,
+   /news, /cas, /docs, /join) memakai satu bahasa visual yang sama:
+   kanvas krem hangat, aksen biru lembut, garis tepi tegas ala ilustrasi.
+   Blok ini sengaja di paling akhir agar menjadi sumber kebenaran tunggal.
+   ================================================================ */
+:root,:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#fbfaf7;--bg-soft:#ffffff;--surface:#ffffff;--surface2:#f6f4ee;
+  --ink:#2b2a27;--muted:#6f6c66;--dim:#9a968e;
+  --line:rgba(43,42,39,.12);--fill:rgba(43,42,39,.045);--fill2:rgba(43,42,39,.08);
+  --acid:#3b82f0;--violet:#2f6fd6;--violet-deep:#2f6fd6;--cyan:#2f6fd6;--accent-text:#2f6fd6;--tag:#2f6fd6;
+  --accent-rgb:59,130,240;--on-accent:#ffffff;--err:#d4483f;
+  --glass:rgba(255,255,255,.88);--glass2:#ffffff;--main-a:#fbfaf7;--main-b:#fbfaf7;
+  --scrim:rgba(43,42,39,.38);--code:rgba(43,42,39,.06);--shadow:rgba(43,42,39,.12);--tag-bg:rgba(59,130,240,.12);
+  --hero-soft:#6f6c66;--hero-p:#6f6c66;--grad-a:#2b2a27;--grad-b:#2b2a27;--grad-c:#2b2a27;
+  --elev-1:0 1px 2px rgba(43,42,39,.05);--elev-2:0 8px 24px rgba(43,42,39,.08);
+  --elev-bubble:none;--elev-mine:none;
+  --font-body:Inter,Geist,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-display:var(--font-body);
+  --h-bg:#fbfaf7;--h-ink:#2b2a27;--h-mute:#6f6c66;--h-dim:#9a968e;--h-card:#ffffff;
+  --h-edge:#2b2a27;--h-blue:#3b82f0;--h-blue-d:#2f6fd6;--h-blue-s:#e8f0fd;--h-blue-t:#2f6fd6;
+  --h-lift:0 10px 24px rgba(43,42,39,.10);
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#161615;--bg-soft:#1d1d1b;--surface:#1d1d1b;--surface2:#232321;
+  --ink:#ecebe7;--muted:#a19e97;--dim:#76736d;
+  --line:rgba(236,235,231,.13);--fill:rgba(236,235,231,.06);--fill2:rgba(236,235,231,.10);
+  --acid:#5b9af5;--violet:#8db9f9;--violet-deep:#5b9af5;--cyan:#8db9f9;--accent-text:#8db9f9;--tag:#8db9f9;
+  --accent-rgb:91,154,245;--on-accent:#0f1420;--err:#ff8a80;
+  --glass:rgba(29,29,27,.9);--glass2:#1d1d1b;--main-a:#161615;--main-b:#161615;
+  --scrim:rgba(0,0,0,.6);--code:rgba(0,0,0,.35);--shadow:rgba(0,0,0,.4);--tag-bg:rgba(91,154,245,.16);
+  --hero-soft:#a19e97;--hero-p:#a19e97;--grad-a:#ecebe7;--grad-b:#ecebe7;--grad-c:#ecebe7;
+  --elev-1:0 1px 2px rgba(0,0,0,.3);--elev-2:0 8px 24px rgba(0,0,0,.35);
+  --elev-bubble:none;--elev-mine:none;
+  --h-bg:#161615;--h-ink:#ecebe7;--h-mute:#a19e97;--h-dim:#76736d;--h-card:#1d1d1b;
+  --h-edge:rgba(236,235,231,.88);--h-blue:#5b9af5;--h-blue-d:#78acf7;--h-blue-s:rgba(91,154,245,.16);--h-blue-t:#8db9f9;
+  --h-lift:0 10px 24px rgba(0,0,0,.35);
+}
+:root{--radius-bubble:18px;--radius-soft:16px}
+
+/* kanvas & tipografi */
+:root[data-theme] body,:root[data-theme] .app,:root[data-theme] .main,:root[data-theme] .auth,:root[data-theme] .login{background:var(--bg)}
+:root[data-theme] body{font-family:var(--font-body)}
+:root[data-theme] h1,:root[data-theme] h2,:root[data-theme] h3{font-family:var(--font-body)}
+:root[data-theme] .auth-card h1,:root[data-theme] .login-hero h1,:root[data-theme] .login-card h2,
+:root[data-theme] .modal h2,:root[data-theme] .blank h2{font-weight:800;letter-spacing:-.04em}
+:root[data-theme] .login-hero .bright{background:none;color:var(--ink);-webkit-text-fill-color:currentColor}
+:root[data-theme] .login-bg,:root[data-theme] .glow{display:none}
+:root[data-theme] .login::before{display:none}
+:root[data-theme] :focus-visible{outline:2px solid var(--h-blue);outline-offset:2px}
+::selection{background:var(--acid);color:var(--on-accent)}
+
+/* garis struktur */
+:root[data-theme] .side{background:var(--bg-soft);border-right:2px solid var(--h-edge);box-shadow:none}
+:root[data-theme] .bar,:root[data-theme] .np-bar,:root[data-theme] .cas-bar,:root[data-theme] .dc-top,:root[data-theme] .pub-bar{
+  border-bottom:2px solid var(--h-edge);background:color-mix(in srgb,var(--bg) 86%,transparent);box-shadow:none}
+:root[data-theme] .nw-sheet header,:root[data-theme] .nw-sheet footer{border-color:var(--h-edge)}
+
+/* permukaan: kartu, modal, menu, sheet */
+:root[data-theme] .auth-card,:root[data-theme] .login-card,:root[data-theme] .join-card,
+:root[data-theme] .modal,:root[data-theme] .dialog,:root[data-theme] .menu,:root[data-theme] .account-menu,
+:root[data-theme] .nw-sheet,:root[data-theme] .nw-modal,:root[data-theme] .np-sheet,:root[data-theme] .np-modal,
+:root[data-theme] .link-modal,:root[data-theme] .crop-modal,:root[data-theme] .rules-modal,
+:root[data-theme] .attach-sheet,:root[data-theme] .contact-sheet,:root[data-theme] .poll-sheet,
+:root[data-theme] .cas-card,:root[data-theme] .cas-compose,:root[data-theme] .np-card,:root[data-theme] .profile,
+:root[data-theme] .pf,:root[data-theme] .console,:root[data-theme] .sys-panel{
+  border:2px solid var(--h-edge);background:var(--bg-soft);box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+:root[data-theme] .auth-card,:root[data-theme] .login-card,:root[data-theme] .join-card{border-radius:24px}
+:root[data-theme] .modal,:root[data-theme] .nw-sheet,:root[data-theme] .np-sheet,:root[data-theme] .rules-modal{border-radius:22px}
+:root[data-theme] .menu,:root[data-theme] .account-menu{border-radius:14px}
+:root[data-theme] .cas-card.pick{box-shadow:none;background:var(--h-blue-s)}
+:root[data-theme] .np-card:hover,:root[data-theme] .cas-card:hover{border-color:var(--h-edge)}
+
+/* input */
+:root[data-theme] .auth-card input,:root[data-theme] .field,:root[data-theme] .input-prefix,
+:root[data-theme] .modal .field,:root[data-theme] .composer textarea,:root[data-theme] .nw-input,
+:root[data-theme] .cas-input,:root[data-theme] .away-input,:root[data-theme] .rules-input{
+  border:2px solid var(--h-edge);border-radius:12px;background:var(--bg-soft)}
+:root[data-theme] .input-prefix input,:root[data-theme] .auth-card .input-prefix input{border:0;background:transparent}
+:root[data-theme] .auth-card input:focus,:root[data-theme] .field:focus,:root[data-theme] .input-prefix:focus-within,
+:root[data-theme] .composer textarea:focus,:root[data-theme] .nw-input:focus,:root[data-theme] .cas-input:focus{
+  border-color:var(--h-blue);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.18)}
+:root[data-theme] .composer:focus-within{border-color:var(--h-blue);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.14);transform:none}
+
+/* tombol */
+:root[data-theme] .primary,:root[data-theme] .auth-card button:not(.ghost),:root[data-theme] .nw-btn,
+:root[data-theme] .np-cta,:root[data-theme] .group-save{
+  background:var(--acid);color:var(--on-accent);border:2px solid var(--h-edge);border-radius:12px;font-weight:600;box-shadow:none}
+:root[data-theme] .auth-card button.ghost,:root[data-theme] .ghost{
+  background:var(--h-blue-s);color:var(--h-blue-t);border:2px solid var(--h-edge);border-radius:12px}
+:root[data-theme] .send.ready{background:var(--acid);color:var(--on-accent);border:2px solid var(--h-edge)}
+:root[data-theme] .icon-btn{border:2px solid transparent}
+:root[data-theme] .icon-btn:hover{background:transparent;border-color:var(--h-edge)}
+:root[data-theme] .menu button:hover,:root[data-theme] .account-menu button:hover{background:var(--h-blue-s)}
+
+/* tab, segmen, chip, badge */
+:root[data-theme] .tabs button.on,:root[data-theme] .seg button.on,:root[data-theme] .seg2 button.on{
+  background:var(--h-blue-s);color:var(--h-blue-t);border:2px solid var(--h-edge)}
+:root[data-theme] .tabs button,:root[data-theme] .seg button{border:2px solid transparent;border-radius:999px}
+:root[data-theme] .chip{border:1.5px solid var(--h-edge);background:var(--h-blue-s);color:var(--h-blue-t)}
+:root[data-theme] .badge{border:1.5px solid var(--h-edge);background:var(--bg-soft);color:var(--ink);border-radius:999px}
+:root[data-theme] .badge.owner,:root[data-theme] .badge.owner .role-ico{background:#f2cf6a;color:#2a1f00}
+:root[data-theme] .toast{background:var(--ink);color:var(--bg);border:2px solid var(--h-edge)}
+
+/* daftar percakapan */
+:root[data-theme] .conv{border:2px solid transparent;border-radius:14px}
+:root[data-theme] .conv.on{background:var(--h-blue-s);border-color:var(--h-edge);box-shadow:none}
+:root[data-theme] .conv.ai{background:transparent;border-color:transparent}
+:root[data-theme] .conv:hover:not(.on){background:var(--fill)}
+:root[data-theme] .day span{border:1.5px solid var(--h-edge);background:var(--bg-soft);box-shadow:none;backdrop-filter:none}
+
+/* gelembung chat */
+:root[data-theme] .bubble,:root[data-theme] .msg:not(.mine) .bubble{
+  border:2px solid var(--h-edge);background:var(--bg-soft);box-shadow:none;color:var(--ink)}
+:root[data-theme] .msg.mine .bubble{background:var(--acid);color:var(--on-accent);border:2px solid var(--h-edge);box-shadow:none}
+:root[data-theme] .msg.ai .bubble{background:var(--h-blue-s);border:2px solid var(--h-edge);box-shadow:none}
+:root[data-theme] .avatar{outline:2px solid var(--h-edge);outline-offset:-2px}
+:root[data-theme] .msg .avatar,:root[data-theme] .msg-av .avatar{box-shadow:none}
+:root[data-theme] .account-btn{box-shadow:none}
+
+/* slider berita & kartu kecil */
+:root[data-theme] .nw-card{border:2px solid var(--h-edge);background:var(--acid);box-shadow:none}
+:root[data-theme] .blank-orb,:root[data-theme] .blank .brand-logo{background:var(--h-blue-s);color:var(--h-blue-t);border:2px solid var(--h-edge);box-shadow:none}
+:root[data-theme] .brand-mark{border:2px solid var(--h-edge)}
+
+/* docs */
+:root[data-theme] .dc-sec{border-bottom:2px solid var(--h-edge)}
+:root[data-theme] .dc-code,:root[data-theme] .dc-res,:root[data-theme] .dc-table{border:2px solid var(--h-edge);border-radius:12px}
+
+/* sentuhan hover hanya di perangkat berkursor */
+@media (hover:hover){
+  :root[data-theme] .np-card:hover,:root[data-theme] .cas-card:hover{transform:translateY(-3px);box-shadow:var(--h-lift)}
+  :root[data-theme] .primary:hover:not(:disabled),:root[data-theme] .auth-card button:not(.ghost):hover:not(:disabled){opacity:1;transform:translateY(-2px);box-shadow:var(--h-lift)}
+}
+@media (hover:none){
+  :root[data-theme] .np-card:hover,:root[data-theme] .cas-card:hover{transform:none;box-shadow:none}
 }

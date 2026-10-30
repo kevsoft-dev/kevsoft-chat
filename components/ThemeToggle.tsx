@@ -10,7 +10,7 @@ export function useTheme() {
   const set = (t: Theme) => {
     document.documentElement.dataset.theme = t;
     try { localStorage.setItem("kc_theme", t); } catch {}
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t === "light" ? "#f1f1eb" : "#090a0e");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t === "light" ? "#fbfaf7" : "#161615");
     setTheme(t);
   };
   return [theme, set] as const;
