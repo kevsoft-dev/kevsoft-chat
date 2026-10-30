@@ -151,6 +151,36 @@ create table if not exists rate_limits (
 create index if not exists rate_limits_reset_idx on rate_limits (reset_at);
 create index if not exists messages_sender_idx on messages (sender_id, created_at desc);
 
+-- Linked devices / multi-session
+alter table users add column if not exists developer_mode boolean not null default false;
+
+create table if not exists linked_devices (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null references users(id) on delete cascade,
+  session_jti text,
+  device_name text not null default 'Perangkat',
+  device_type text not null default 'web',
+  user_agent text,
+  ip text,
+  last_active timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  current boolean not null default false
+);
+create index if not exists linked_devices_user_idx on linked_devices (user_id, last_active desc);
+
+create table if not exists api_keys (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null references users(id) on delete cascade,
+  name text not null default 'Default',
+  key_prefix text not null,
+  key_hash text not null,
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz,
+  revoked_at timestamptz
+);
+create unique index if not exists api_keys_hash_idx on api_keys (key_hash) where revoked_at is null;
+create index if not exists api_keys_user_idx on api_keys (user_id) where revoked_at is null;
+
 -- Promosikan pembuat grup menjadi owner grup (sekali, idempotent).
 update conversation_members cm
 set role = 'owner'

@@ -4,6 +4,7 @@ import { casPublic } from "@/lib/publicApi";
 import { LOGO } from "@/lib/mentions";
 import { Icon } from "@/components/ui";
 import ThemeToggle from "@/components/ThemeToggle";
+import { HomeFx, PillWord, Tips, Glossary, HomeApps } from "@/components/HomeLive";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -50,6 +51,7 @@ export default async function HomeRoute() {
 
   return (
     <div className="hm">
+      <HomeFx />
       <header className="hm-nav">
         <a href="/home" className="hm-brand"><img src={LOGO} alt="" width={30} height={30} /><strong>kevsoft</strong></a>
         <nav className="hm-links" aria-label="Halaman">
@@ -73,7 +75,7 @@ export default async function HomeRoute() {
             {[1, 2, 3, 7, 4, 5, 6].map((n) => <img key={n} src={`/home/pile-${n}.webp`} alt="" width={64} height={64} />)}
           </div>
           <h1 className="hm-in" style={{ animationDelay: ".06s" }}>
-            Tempat teman dan Kev-Ai <span className="hm-pill"><i />Ngobrol</span> bersama.
+            Tempat teman dan Kev-Ai <span className="hm-pill"><i /><PillWord /></span> bersama.
           </h1>
           <p className="hm-in" style={{ animationDelay: ".12s" }}>Chat pribadi dan grup, berita dari tim, serta asisten AI yang siap membantu, semuanya di satu ruang yang tenang.</p>
           <div className="hm-cta hm-in" style={{ animationDelay: ".18s" }}>
@@ -89,6 +91,36 @@ export default async function HomeRoute() {
               {[...MARQUEE, ...MARQUEE].map((m, i) => <span key={i}>{m}</span>)}
             </div>
           </div>
+        </section>
+
+        <section className="hm-sec hm-dock-sec">
+          <span className="hm-eyebrow">Coba di sini</span>
+          <h2 className="hm-big sm">Tekan dikit, aplikasinya muncul.</h2>
+          <p className="hm-lead">Tidak perlu daftar dulu untuk mengintip. Tekan salah satu ikon, jendelanya terbuka, lalu ketik, klik, dan geser sesukamu. Semua yang ada di panggung ini cuma contoh, jadi tidak ada yang tersimpan.</p>
+          <Tips />
+          <HomeApps news={news} />
+        </section>
+
+        <section className="hm-sec">
+          <span className="hm-eyebrow">Dari nol sampai ngobrol</span>
+          <h2 className="hm-big sm">Empat langkah, tanpa ribet</h2>
+          <ol className="hm-steps">
+            {[
+              ["Daftar", "Pakai email, nanti ada kode OTP yang dikirim ke kotak masukmu. Bisa juga lewat akun Google kalau mau lebih singkat."],
+              ["Rapikan profil", "Pasang foto, banner, nama, dan username. Username inilah yang dipakai orang untuk mencarimu dan men-tag kamu."],
+              ["Masuk komunitas", "Kamu otomatis masuk ke ruang bersama Komunitas Kevsoft. Sapa dulu orang-orang di sana, atau buka obrolan pribadi."],
+              ["Bikin grup sendiri", "Beri nama, tulis rules, lalu bagikan link berkode acak. Kalau kode bocor, reset saja dari info grup."],
+            ].map(([t, d], i) => (
+              <li key={t} className="hm-step"><span>{i + 1}</span><div><h3>{t}</h3><p>{d}</p></div></li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="hm-sec">
+          <span className="hm-eyebrow">Kamus kecil</span>
+          <h2 className="hm-big sm">Istilah yang bakal sering kamu lihat</h2>
+          <p className="hm-lead">Tekan kartunya untuk membalik.</p>
+          <Glossary />
         </section>
 
         <section className="hm-sec hm-split">
@@ -135,6 +167,25 @@ export default async function HomeRoute() {
             </div>
           </section>
         )}
+
+        <section className="hm-sec">
+          <span className="hm-eyebrow">Sering ditanyakan</span>
+          <h2 className="hm-big sm">Pertanyaan yang biasa muncul</h2>
+          <div className="hm-faq">
+            {[
+              ["Perlu bayar?", "Tidak. Tombol “Mulai gratis” di atas memang begitu adanya: daftar, lalu langsung bisa dipakai."],
+              ["Bagaimana cara memanggil Kev-Ai?", "Di grup, tulis @kev-ai diikuti pertanyaanmu. Misalnya “@kev-ai rangkum obrolan tadi”. Jawabannya muncul sebagai pesan di grup yang sama."],
+              ["Pesan sementara itu apa?", "Fitur yang membuat pesan hilang sendiri setelah waktu yang dipilih. Dinyalakan per obrolan, jadi tidak memengaruhi obrolan lain."],
+              ["Link grup saya bocor, bagaimana?", "Buka info grup lalu reset link. Kodenya diganti dengan kode acak baru, dan kode lama tidak bisa dipakai lagi."],
+              ["Apa arti RM, ACC, dan LIKE?", "Itu tiga kata yang dipakai AI saat memilah komentar di Kritik & Saran. RM berarti dihapus, ACC diterima, LIKE komentar baik yang ditaruh paling atas. Kritik kasar tanpa isi dibuang, kritik yang mengandung saran tetap dipertimbangkan."],
+              ["Siapa yang membaca kritik saya?", "AI memilah lebih dulu. Pemilik utama kevsoft juga bisa menghapus komentar yang tidak pantas."],
+              ["Bisa ambil data berita ke aplikasi saya sendiri?", "Bisa. Berita, komentar, dan kritik & saran tersedia lewat API read-only. Contoh request dan bentuk balasannya ada di halaman dokumentasi."],
+              ["Ganti tema terang dan gelap di mana?", "Tombol matahari/bulan di pojok kanan atas. Pilihanmu diingat di perangkat itu."],
+            ].map(([q, a]) => (
+              <details key={q}><summary>{q}<Icon n="down" size={18} /></summary><div><p>{a}</p></div></details>
+            ))}
+          </div>
+        </section>
 
         <section className="hm-sec">
           <div className="hm-cas">

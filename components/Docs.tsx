@@ -105,9 +105,14 @@ export default function Docs({ open }: { open: boolean }) {
   const saveKey = (v: string) => { setKeyVal(v); try { sessionStorage.setItem("kc_docs_key", v); } catch {} };
 
   const nav = useMemo(() => [
-    { id: "start", t: "Mulai" }, { id: "auth", t: "Autentikasi" },
+    { id: "start", t: "Mulai" },
+    { id: "architecture", t: "Arsitektur sistem" },
+    { id: "auth", t: "Autentikasi" },
+    { id: "developer", t: "Mode Developer" },
+    { id: "devices", t: "Perangkat tertaut" },
     ...ENDPOINTS.map((e) => ({ id: e.id, t: e.title })),
-    { id: "errors", t: "Kode error" }, { id: "kevai", t: "Kev-Ai" },
+    { id: "errors", t: "Kode error" },
+    { id: "kevai", t: "Kev-Ai" },
   ], []);
 
   useEffect(() => {
@@ -120,52 +125,142 @@ export default function Docs({ open }: { open: boolean }) {
     return () => io.disconnect();
   }, [nav]);
 
-  const keyHeader = open ? "" : `-H "x-api-key: KUNCI_KAMU" `;
-
   return (
     <div className="dc">
       <header className="dc-top">
-        <a href="/home" className="dc-brand"><span className="brand-mark">k</span><strong>kevsoft</strong><span className="muted">/ docs</span></a>
-        <ThemeToggle />
+        <a className="dc-brand" href="/">
+          <strong>kevsoft</strong>
+          <span className="muted"> / docs</span>
+        </a>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <a href="/chat" className="muted" style={{ fontSize: 13, textDecoration: "none" }}>Buka chat</a>
+          <ThemeToggle />
+        </div>
       </header>
 
       <div className="dc-wrap">
-        <nav className="dc-nav" aria-label="Isi dokumentasi">
-          {nav.map((n) => <a key={n.id} href={`#${n.id}`} className={active === n.id ? "on" : ""}>{n.t}</a>)}
+        <nav className="dc-nav" aria-label="Navigasi dokumentasi">
+          {nav.map((n) => (
+            <a key={n.id} href={`#${n.id}`} className={active === n.id ? "on" : ""} onClick={() => setActive(n.id)}>
+              {n.t}
+            </a>
+          ))}
         </nav>
 
         <main className="dc-main">
           <section className="dc-sec" id="start">
-            <span className="eyebrow">API v1</span>
-            <h1>Dokumentasi API</h1>
-            <p className="muted">API publik kevsoft bersifat <b>read-only</b> (hanya GET) dan mengembalikan JSON. Isinya: berita, komentar berita, dan komentar Kritik &amp; Saran yang lolos peninjauan.</p>
-            <h4>Base URL</h4>
-            <Code>{base + "/api/v1"}</Code>
-            <h4>Permintaan pertama</h4>
-            <Code>{`curl ${keyHeader}"${base}/api/v1/news?limit=5"`}</Code>
-            <h4>Dari JavaScript</h4>
-            <Code>{`const r = await fetch("${base}/api/v1/cas?sort=best&limit=10"${open ? "" : `, {\n  headers: { "x-api-key": "KUNCI_KAMU" },\n}`});
-const { data } = await r.json();`}</Code>
+            <p className="eyebrow">API Reference</p>
+            <h1 style={{ fontSize: 28, marginBottom: 8 }}>Dokumentasi API kevsoft</h1>
+            <p className="muted" style={{ fontSize: 16, lineHeight: 1.6, maxWidth: 640 }}>
+              API publik read-only untuk berita, komentar, dan Kritik &amp; Saran.
+              Dirancang untuk integrasi pihak ketiga, bot, dan dashboard internal.
+              Semua endpoint memakai JSON, CORS terbuka, dan tidak pernah membocorkan data sensitif pengguna.
+            </p>
+            <div style={{ marginTop: 20, display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <div className="dc-table" style={{ flex: "1 1 200px", margin: 0 }}>
+                <div className="dc-tr two"><code>Domain</code><span><code>{base}</code> <span className="muted">(otomatis)</span></span></div>
+                <div className="dc-tr two"><code>Base API</code><span><code>{base}/api/v1</code></span></div>
+                <div className="dc-tr two"><code>Versi</code><span>v1</span></div>
+                <div className="dc-tr two"><code>Format</code><span>JSON · UTF-8</span></div>
+                <div className="dc-tr two"><code>News limit</code><span>180 req / menit / IP</span></div>
+              </div>
+            </div>
+            <p className="muted" style={{ marginTop: 14 }}>
+              Domain terdeteksi otomatis dari URL yang sedang dibuka. Server juga membaca
+              header <code>Host</code> / <code>X-Forwarded-Host</code> agar avatar &amp; link absolut
+              selalu mengarah ke domain yang benar (termasuk di belakang proxy/CDN).
+            </p>
+            <h4 style={{ marginTop: 28 }}>Base URL</h4>
+            <Code>{base}/api/v1</Code>
+            <label className="dc-label" htmlFor="dc-base" style={{ marginTop: 16, display: "block" }}>Override base (opsional, untuk uji)</label>
+            <input id="dc-base" className="dc-in grow" style={{ maxWidth: 420 }} value={base} onChange={(e) => setBase(e.target.value.replace(/\/+$/, ""))} />
+          </section>
+
+          <section className="dc-sec" id="architecture">
+            <h2>Arsitektur &amp; strategi sistem</h2>
+            <p className="muted">
+              kevsoft-chat dibangun sebagai platform chat multi-perangkat yang meniru pola keamanan dan sesi WhatsApp,
+              bukan sekadar demo UI. Setiap keputusan teknis diarahkan agar sistem terasa matang, dapat diaudit, dan siap produksi.
+            </p>
             <ul className="dc-list">
-              <li>CORS terbuka untuk GET, jadi bisa dipanggil dari browser.</li>
-              <li>Respons tidak berisi id internal user atau email. Hanya username, nama, foto, dan centang.</li>
-              <li>Waktu memakai format ISO 8601 (UTC).</li>
+              <li><b>Sesi bertanda tangan</b> — JWT httpOnly dengan versi token. Logout dari semua perangkat menaikkan <code>token_version</code> sehingga semua cookie lama langsung invalid.</li>
+              <li><b>Perangkat tertaut</b> — Setiap login dicatat di tabel <code>linked_devices</code> (nama perangkat, tipe, IP, last active). Pengguna dapat mencabut perangkat tertentu dari Profil.</li>
+              <li><b>Realtime</b> — Pusher private channel; otorisasi server memastikan user hanya subscribe percakapan yang diikutinya.</li>
+              <li><b>Database</b> — Neon (Postgres) untuk chat &amp; pengguna; Firebase Realtime Database terpisah khusus berita &amp; CAS, diakses hanya dari server.</li>
+              <li><b>API publik</b> — Read-only, rate-limited, key-based. Key master di config atau key pribadi yang dibuat setelah mengaktifkan Mode Developer.</li>
+              <li><b>Keamanan input</b> — Zod di setiap route, query parameterized, pesan dirender sebagai teks (anti-XSS), OTP di-hash HMAC + constant-time compare.</li>
             </ul>
+            <p className="muted" style={{ marginTop: 16 }}>
+              Model ini sengaja dipilih agar perilaku sistem dapat diprediksi: satu akun, banyak perangkat, kontrol penuh dari sisi pengguna, dan API yang tidak bisa disalahgunakan tanpa key.
+            </p>
           </section>
 
           <section className="dc-sec" id="auth">
-            <h2>Autentikasi dan batas</h2>
-            {open ? (
-              <p className="muted">API saat ini <b>terbuka</b>: tidak perlu key. Batas <b>120 permintaan/menit per IP</b>.</p>
-            ) : (
-              <p className="muted">API butuh <b>API key</b>. Kirim lewat header <code>x-api-key: KUNCI</code> atau <code>Authorization: Bearer KUNCI</code>. Batas <b>120 permintaan/menit per key</b>. Key diminta ke pemilik kevsoft.</p>
-            )}
+            <h2>Autentikasi API</h2>
+            <p className="muted">
+              <b>Berita &amp; komentar berita</b> selalu <b>publik 100%</b> — tanpa API key.
+              Rate limit: <b>180 permintaan/menit per IP</b>.
+            </p>
+            <p className="muted">
+              Endpoint <b>Kritik &amp; Saran (/cas)</b>
+              {open
+                ? <> juga terbuka tanpa key (batas 120/menit per IP).</>
+                : <> membutuhkan <b>API key</b> (header <code>x-api-key</code> atau <code>Authorization: Bearer</code>). Batas 120/menit per key. Aktifkan Mode Developer di Profil untuk membuat key.</>}
+            </p>
             {!open && (
               <>
-                <label className="dc-label" htmlFor="dc-key">API key untuk “Coba langsung” (hanya disimpan di tab ini)</label>
-                <input id="dc-key" className="dc-in" type="password" autoComplete="off" placeholder="Tempel API key" value={keyVal} onChange={(e) => saveKey(e.target.value)} />
+                <label className="dc-label" htmlFor="dc-key">API key untuk “Coba langsung” (hanya untuk CAS; disimpan di tab ini)</label>
+                <input id="dc-key" className="dc-in" type="password" autoComplete="off" placeholder="Tempel API key (kc_…)" value={keyVal} onChange={(e) => saveKey(e.target.value)} style={{ maxWidth: 420 }} />
               </>
             )}
+            <h4 style={{ marginTop: 20 }}>Contoh — semua berita + komentar (tanpa key)</h4>
+            <Code>{`curl "${base}/api/v1/news?all=1"`}</Code>
+            <Code>{`const r = await fetch("${base}/api/v1/news?all=1");
+const { data } = await r.json();
+// data[] = setiap berita + field comments (lengkap)`}</Code>
+            <h4 style={{ marginTop: 16 }}>Contoh — CAS{open ? "" : " (butuh key)"}</h4>
+            <Code>{`curl ${open ? "" : '-H "x-api-key: KUNCI_KAMU" '}"${base}/api/v1/cas?sort=best&limit=10"`}</Code>
+            <ul className="dc-list">
+              <li>CORS terbuka untuk GET, bisa dipanggil dari browser.</li>
+              <li>Respons tidak berisi id internal user atau email. Hanya username, nama, foto, dan status verified.</li>
+              <li>Waktu memakai format ISO 8601 (UTC).</li>
+              <li><code>all=1</code> pada <code>/api/v1/news</code> mengembalikan seluruh berita beserta komentarnya dalam satu response.</li>
+            </ul>
+          </section>
+
+          <section className="dc-sec" id="developer">
+            <h2>Mode Developer &amp; API Account</h2>
+            <p className="muted">
+              Untuk mendapatkan API key pribadi, aktifkan <b>Mode Developer</b> di Profil akun kamu.
+              Fitur ini sengaja dipisahkan agar hanya pengguna yang sadar risiko yang membuat key.
+            </p>
+            <ol className="dc-list" style={{ listStyle: "decimal" }}>
+              <li>Buka chat → ikon profil → aktifkan <b>Mode Developer</b>.</li>
+              <li>Di bagian yang muncul, buat API key baru (maks. 5 key aktif).</li>
+              <li>Key ditampilkan <b>sekali saja</b> dalam bentuk <code>kc_…</code>. Simpan di tempat aman.</li>
+              <li>Gunakan key tersebut di header <code>x-api-key</code> untuk semua endpoint /api/v1.</li>
+              <li>Cabut key kapan saja dari Profil jika bocor atau tidak dipakai lagi.</li>
+            </ol>
+            <p className="muted" style={{ marginTop: 12 }}>
+              Key master (dari <code>config.json</code>) tetap berfungsi untuk admin. Key user hanya valid selama Mode Developer aktif dan key belum dicabut.
+            </p>
+          </section>
+
+          <section className="dc-sec" id="devices">
+            <h2>Perangkat tertaut</h2>
+            <p className="muted">
+              Seperti WhatsApp Linked Devices, setiap sesi login dicatat sebagai perangkat.
+              Kamu bisa melihat daftar perangkat aktif, waktu terakhir aktif, dan mencabut akses dari perangkat lain.
+            </p>
+            <ul className="dc-list">
+              <li><b>Lihat daftar</b> — Profil → Perangkat tertaut, atau lewat menu akun.</li>
+              <li><b>Cabut satu perangkat</b> — Hapus sesi perangkat tersebut tanpa mempengaruhi yang lain.</li>
+              <li><b>Keluar dari semua perangkat</b> — Menaikkan versi token; semua cookie lama langsung tidak berlaku, termasuk yang dicuri.</li>
+            </ul>
+            <p className="muted" style={{ marginTop: 12 }}>
+              Endpoint internal: <code>GET /api/me/sessions</code>, <code>PATCH /api/me/sessions</code> (cabut), <code>DELETE /api/me/sessions</code> (semua).
+              Endpoint ini membutuhkan sesi login, bukan API key publik.
+            </p>
           </section>
 
           {ENDPOINTS.map((ep) => <Section key={ep.id} ep={ep} base={base} keyVal={keyVal} open={open} />)}

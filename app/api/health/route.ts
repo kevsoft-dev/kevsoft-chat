@@ -1,3 +1,4 @@
+import { getRequestOrigin } from "@/lib/origin";
 import { getActor } from "@/lib/auth";
 import { cfg } from "@/lib/config";
 import { sql } from "@/lib/db";
@@ -6,7 +7,7 @@ import { ensureSchema } from "@/lib/migrate";
 export const dynamic = "force-dynamic";
 
 // Diagnosis: buka /api/health untuk melihat bagian mana yang bermasalah (tanpa menampilkan rahasia).
-export async function GET() {
+export async function GET(req: Request) {
   // Publik hanya tahu hidup/tidak. Detail diagnosis khusus owner (tidak membocorkan konfigurasi/error ke orang luar).
   let actor = null;
   try { actor = await getActor(); } catch {}
@@ -18,6 +19,7 @@ export async function GET() {
     try { out[name] = (await fn()) ?? "ok"; }
     catch (e: any) { out[name] = "ERROR: " + String(e?.message ?? e).slice(0, 240); }
   };
+  await step("domain", () => getRequestOrigin(req));
   await step("config", () => ({
     firebaseProjectId: cfg.firebase.projectId,
     firebaseApiKey: !!cfg.firebase.apiKey,
