@@ -183,9 +183,13 @@ Keamanan: tidak ada id internal user atau email di respons (hanya username, nama
 
 Ruang privat bergaya terminal, terpisah dari chat biasa. Tidak ada tautan ke sana di aplikasi (kecuali tombol "console" bagi owner utama di dalam ruang). Tabel dibuat otomatis saat pertama dipakai.
 
-- **Anonim**: semua pesan tampil `Unknown`. API tidak mengirim username, nama, email, atau foto. Pengirim di database hanya HMAC; isi pesan dienkripsi AES-256-GCM (kunci diturunkan dari `databaseUrl`, jadi mengganti password database membuat pesan lama tidak terbaca).
+- **Anonim**: setiap anggota mendapat alias tetap `Unknown{nomor}` (mis. `Unknown4821`). API tidak mengirim username, nama, email, atau foto. Pengirim dan alias di database dikaitkan ke HMAC (bukan id user); isi pesan dienkripsi AES-256-GCM (kunci diturunkan dari `databaseUrl`, jadi mengganti password database membuat pesan lama tidak terbaca).
+- **Tampilan**: bubble chat biasa. Room grup untuk semua anggota, plus **chat pribadi**: ketuk nama `Unknown…` di room untuk memulai. Chat pribadi hanya bisa dibaca dua pesertanya (owner pun tidak).
+- **Kenalkan diri**: di chat pribadi, tombol "kenalkan diri" membuat lawan bicara melihat nama asli dan @username kamu menggantikan `Unknown{nomor}` (di sisinya saja, di semua room dan chat). Bisa dicabut kapan saja, tetapi yang sudah dilihat tidak bisa ditarik. Dari @username itu dia bisa mencari kamu di chat biasa.
+- **Tag**: tulis `@unknown4821` di pesan (tidak peka huruf besar/kecil). Saat mengetik `@` muncul saran dari orang yang pernah bicara di room itu dan kontak tersimpan. Yang di-tag melihat pesannya ditandai, dan room-nya diberi lencana `@` di daftar.
+- **Kontak lokal**: ketuk nama `Unknown…` (atau tag) untuk menu: chat pribadi, simpan/ubah nama kontak, hapus, tag. Nama kontak disimpan di `localStorage` perangkat itu saja (per akun), tidak dikirim ke server dan tidak terlihat orang lain; nama ini menggantikan `Unknown{nomor}` di bubble, daftar chat, dan tag.
 - **Akses**: hanya email yang berstatus `approved`. Orang lain melihat layar "ACCESS RESTRICTED" dan bisa **minta akses** (status `pending` sampai di-ACC). Ditolak/dicabut tidak bisa mengajukan ulang kecuali owner menghapusnya dari daftar. Status dicek ke database di setiap permintaan, jadi pencabutan langsung berlaku.
 - **Owner utama** (`kevsoft.cs@gmail.com`): satu-satunya yang bisa membuat room, meng-ACC, mencabut, dan membuka `/console`. Akun lain mendapat 404.
 - **Console** (`/console`): ringkasan, permintaan, daftar akses (tambah email langsung, cabut, hapus), room (buat, kunci, TTL pesan hilang, kosongkan, hapus), audit, tombol **lockdown** (blokir semua selain owner), dan hapus semua pesan.
 - Pengerasan: rate limit, noindex/no-store/no-referrer, layar disamarkan saat tab tidak aktif, pesan hilang otomatis per room.
-- Di dalam ruang: ketik `/help` (`/rooms`, `/room <nama>`, `/who`, `/clear`, `/exit`). Owner bisa menghapus pesan dengan tombol × saat kursor di atas pesan.
+- Owner bisa menghapus pesan di room grup dengan tombol × saat kursor di atas pesan.

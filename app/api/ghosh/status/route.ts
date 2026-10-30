@@ -1,4 +1,4 @@
-import { gate, out, onlineCount } from "@/lib/ghosh";
+import { aliasName, ensureAlias, gate, onlineCount, out, senderTag } from "@/lib/ghosh";
 
 export const dynamic = "force-dynamic";
 
@@ -11,5 +11,6 @@ export async function GET() {
     state: g.root ? "root" : g.lockdown && g.status === "approved" ? "lockdown" : g.status,
     root: g.root,
     online: inside ? await onlineCount() : null,
+    alias: inside ? aliasName(await ensureAlias(senderTag(g.actor.id))) : null,
   });
 }

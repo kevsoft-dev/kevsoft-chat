@@ -13,7 +13,7 @@ export async function GET() {
     sql`select email, status, note, requested_at, decided_at, decided_by from ghosh_access order by (status = 'pending') desc, requested_at desc limit 500`,
     sql`select r.id, r.name, r.topic, r.locked, r.ttl_seconds, r.created_at,
           (select count(*)::int from ghosh_messages m where m.room_id = r.id and (m.expires_at is null or m.expires_at > now())) as messages
-        from ghosh_rooms r order by r.created_at asc`,
+        from ghosh_rooms r where r.kind = 'group' order by r.created_at asc`,
     sql`select id, actor, action, target, detail, at from ghosh_audit order by id desc limit 150`,
     sql`select (select count(*)::int from ghosh_messages where expires_at is null or expires_at > now()) as messages,
                (select count(*)::int from ghosh_messages where created_at > now() - interval '24 hours') as messages_24h`,
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       if (name.length < 2) return bad("Nama room minimal 2 karakter (a-z, 0-9, -, _)");
       const ttl = Number(b.ttl ?? 0);
       if (!TTLS.has(ttl)) return bad("TTL tidak valid");
-      const [{ n }] = await sql`select count(*)::int as n from ghosh_rooms`;
+      const [{ n }] = await sql`select count(*)::int as n from ghosh_rooms where kind = 'group'`;
       if (n >= MAX_ROOMS) return bad(`Maksimal ${MAX_ROOMS} room`);
       const [r] = await sql`insert into ghosh_rooms (name, topic, ttl_seconds) values (${name}, ${cleanText(b.topic, 80) || null}, ${ttl || null}) returning id`;
       await audit(who, "room_create", name);
@@ -79,16 +79,16 @@ export async function POST(req: Request) {
     case "room_update": {
       if (!ID_UUID.test(String(b.id))) return bad("ID tidak valid");
       if (b.ttl !== undefined && !TTLS.has(Number(b.ttl))) return bad("TTL tidak valid");
-      if (b.locked !== undefined) await sql`update ghosh_rooms set locked = ${!!b.locked} where id = ${b.id}::uuid`;
-      if (b.ttl !== undefined) await sql`update ghosh_rooms set ttl_seconds = ${Number(b.ttl) || null} where id = ${b.id}::uuid`;
-      if (b.topic !== undefined) await sql`update ghosh_rooms set topic = ${cleanText(b.topic, 80) || null} where id = ${b.id}::uuid`;
+      if (b.locked !== undefined) await sql`update ghosh_rooms set locked = ${!!b.locked} where id = ${b.id}::uuid and kind = 'group'`;
+      if (b.ttl !== undefined) await sql`update ghosh_rooms set ttl_seconds = ${Number(b.ttl) || null} where id = ${b.id}::uuid and kind = 'group'`;
+      if (b.topic !== undefined) await sql`update ghosh_rooms set topic = ${cleanText(b.topic, 80) || null} where id = ${b.id}::uuid and kind = 'group'`;
       await audit(who, "room_update", String(b.id), JSON.stringify({ locked: b.locked, ttl: b.ttl, topic: b.topic !== undefined }));
       return out({ ok: true });
     }
     case "room_purge": case "room_delete": {
       if (!ID_UUID.test(String(b.id))) return bad("ID tidak valid");
-      if (b.action === "room_purge") await sql`delete from ghosh_messages where room_id = ${b.id}::uuid`;
-      else await sql`delete from ghosh_rooms where id = ${b.id}::uuid`;
+      if (b.action === "room_purge") await sql`delete from ghosh_messages where room_id = ${b.id}::uuid and exists (select 1 from ghosh_rooms where id = ${b.id}::uuid and kind = 'group')`;
+      else await sql`delete from ghosh_rooms where id = ${b.id}::uuid and kind = 'group'`;
       await audit(who, b.action, String(b.id));
       return out({ ok: true });
     }
