@@ -29,13 +29,15 @@ async function topFeedback() {
 }
 
 const FEATURES = [
-  { icon: "chat", title: "Chat & grup", text: "Ngobrol pribadi atau bareng grup, lengkap dengan balasan, tag @username, dan pesan sementara.", href: "/chat" },
-  { icon: "sparkle", title: "Kev-Ai", text: "Asisten AI yang siap menjawab. Di grup, panggil dengan @kev-ai lalu tulis pertanyaanmu.", href: "/chat" },
-  { icon: "news", title: "Berita Kevsoft", text: "Kabar terbaru dari tim. Bisa di-like, dibagikan, dan dikomentari.", href: "/news" },
-  { icon: "heart", title: "Kritik & Saran", text: "Tulis masukanmu. AI meninjau, dan komentar yang bagus tampil paling atas.", href: "/cas" },
-  { icon: "key", title: "API publik", text: "Ambil berita, komentar, dan kritik & saran lewat API read-only dengan dokumentasi lengkap.", href: "/docs" },
-  { icon: "users", title: "Komunitas", text: "Satu ruang bersama untuk semua anggota kevsoft. Langsung masuk saat mendaftar.", href: "/chat" },
+  { icon: "chat", tone: "blue", title: "Chat & grup", text: "Ngobrol pribadi atau bareng grup, lengkap dengan balasan, tag @username, dan pesan sementara.", href: "/chat" },
+  { icon: "sparkle", tone: "peach", title: "Kev-Ai", text: "Asisten AI yang siap menjawab. Di grup, panggil dengan @kev-ai lalu tulis pertanyaanmu.", href: "/chat" },
+  { icon: "news", tone: "sand", title: "Berita Kevsoft", text: "Kabar terbaru dari tim. Bisa di-like, dibagikan, dan dikomentari.", href: "/news" },
+  { icon: "heart", tone: "rose", title: "Kritik & Saran", text: "Tulis masukanmu. AI meninjau, dan komentar yang bagus tampil paling atas.", href: "/cas" },
+  { icon: "key", tone: "mint", title: "API publik", text: "Ambil berita, komentar, dan kritik & saran lewat API read-only dengan dokumentasi lengkap.", href: "/docs" },
+  { icon: "users", tone: "lilac", title: "Komunitas", text: "Satu ruang bersama untuk semua anggota kevsoft. Langsung masuk saat mendaftar.", href: "/chat" },
 ] as const;
+
+const MARQUEE = ["Chat pribadi", "Grup", "Kev-Ai", "Berita", "Kritik & Saran", "API publik", "Pesan sementara", "Tag @username"];
 
 const fmt = (ms: number) => (ms ? new Date(ms).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "");
 
@@ -44,33 +46,58 @@ export default async function HomeRoute() {
   try { authed = !!(await getUserId()); } catch {}
   const [news, feedback] = await Promise.all([latestNews(), topFeedback()]);
   const cta = authed ? { href: "/chat", label: "Buka chat" } : { href: "/sign-in?next=/chat", label: "Masuk" };
+  const ctaFree = authed ? { href: "/chat", label: "Buka chat" } : { href: "/sign-in?next=/chat", label: "Mulai gratis" };
 
   return (
     <div className="hm">
       <header className="hm-nav">
-        <a href="/home" className="hm-brand"><img src={LOGO} alt="" width={28} height={28} /><strong>kevsoft</strong></a>
+        <a href="/home" className="hm-brand"><img src={LOGO} alt="" width={30} height={30} /><strong>kevsoft</strong></a>
         <nav className="hm-links" aria-label="Halaman">
           <a href="/chat">Chat</a><a href="/news">Berita</a><a href="/cas">Kritik &amp; Saran</a><a href="/docs">API</a>
         </nav>
         <div className="hm-nav-r">
-          <ThemeToggle />
+          <ThemeToggle className="hm-icon" />
           <a className="hm-btn" href={cta.href}>{cta.label}</a>
+          <details className="hm-menu">
+            <summary aria-label="Menu"><i /><i /><i /></summary>
+            <nav className="hm-menu-p" aria-label="Menu seluler">
+              <a href="/chat">Chat</a><a href="/news">Berita</a><a href="/cas">Kritik &amp; Saran</a><a href="/docs">API</a>
+            </nav>
+          </details>
         </div>
       </header>
 
       <main>
         <section className="hm-hero">
-          <div className="hm-hero-text hm-in">
-            <span className="hm-eyebrow">kevsoft · komunitas</span>
-            <h1>Ngobrol, kabar terbaru, dan API. <span>Satu tempat.</span></h1>
-            <p>Chat pribadi dan grup, asisten AI Kev-Ai, berita dari tim, dan API publik untuk kamu pakai sendiri.</p>
-            <div className="hm-cta">
-              <a className="hm-btn big" href={cta.href}>{cta.label} <Icon n="send" size={16} /></a>
-              <a className="hm-btn ghost big" href="/cas">Tulis kritik &amp; saran</a>
+          <div className="hm-faces hm-in" aria-hidden>
+            {[1, 2, 3, 7, 4, 5, 6].map((n) => <img key={n} src={`/home/pile-${n}.webp`} alt="" width={64} height={64} />)}
+          </div>
+          <h1 className="hm-in" style={{ animationDelay: ".06s" }}>
+            Tempat teman dan Kev-Ai <span className="hm-pill"><i />Ngobrol</span> bersama.
+          </h1>
+          <p className="hm-in" style={{ animationDelay: ".12s" }}>Chat pribadi dan grup, berita dari tim, serta asisten AI yang siap membantu, semuanya di satu ruang yang tenang.</p>
+          <div className="hm-cta hm-in" style={{ animationDelay: ".18s" }}>
+            <a className="hm-btn big" href={ctaFree.href}>{ctaFree.label}</a>
+            <a className="hm-btn soft big" href="/cas">Tulis kritik &amp; saran</a>
+          </div>
+        </section>
+
+        <section className="hm-trust hm-in" style={{ animationDelay: ".24s" }}>
+          <p>Semua yang kamu butuh untuk ngobrol, ada di kevsoft.</p>
+          <div className="hm-marq" aria-hidden>
+            <div className="hm-track">
+              {[...MARQUEE, ...MARQUEE].map((m, i) => <span key={i}>{m}</span>)}
             </div>
           </div>
+        </section>
 
-          <div className="hm-preview hm-in" style={{ animationDelay: ".12s" }} aria-hidden>
+        <section className="hm-sec hm-split">
+          <div>
+            <h2 className="hm-big">Kev-Ai ada di tempat kamu ngobrol.</h2>
+            <p className="hm-lead">Tanya, minta ringkasan, atau cari ide tanpa pindah aplikasi. Panggil saja dengan @kev-ai di grup mana pun.</p>
+            <a className="hm-btn soft" href="/chat">Coba sekarang</a>
+          </div>
+          <div className="hm-preview" aria-hidden>
             <div className="hm-pv-bar"><i /><i /><i /><span>Komunitas Kevsoft</span></div>
             <div className="hm-pv-body">
               <div className="hm-b l"><b>Rani</b>Ada yang tahu cara pakai API berita?</div>
@@ -81,11 +108,11 @@ export default async function HomeRoute() {
           </div>
         </section>
 
-        <section className="hm-sec hm-in" style={{ animationDelay: ".2s" }}>
-          <h2>Semua yang kamu butuh</h2>
+        <section className="hm-sec">
+          <h2 className="hm-big sm">Semua dalam satu tempat</h2>
           <div className="hm-grid">
             {FEATURES.map((f) => (
-              <a key={f.title} className="hm-card" href={f.href}>
+              <a key={f.title} className={`hm-card t-${f.tone}`} href={f.href}>
                 <span className="hm-ico"><Icon n={f.icon} size={20} /></span>
                 <h3>{f.title}</h3>
                 <p>{f.text}</p>
@@ -96,10 +123,10 @@ export default async function HomeRoute() {
 
         {news.length > 0 && (
           <section className="hm-sec">
-            <div className="hm-sec-h"><h2>Kabar terbaru</h2><a href="/news">Semua berita →</a></div>
+            <div className="hm-sec-h"><h2 className="hm-big sm">Kabar terbaru</h2><a href="/news">Semua berita →</a></div>
             <div className="hm-news">
               {news.map((n) => (
-                <a key={n.id} className="hm-card" href={`/news?id=${encodeURIComponent(n.id)}`}>
+                <a key={n.id} className="hm-card plain" href={`/news?id=${encodeURIComponent(n.id)}`}>
                   <small>{fmt(n.at)}</small>
                   <h3>{n.title}</h3>
                   {n.body && <p>{n.body}{n.body.length >= 120 ? "…" : ""}</p>}
@@ -113,7 +140,7 @@ export default async function HomeRoute() {
           <div className="hm-cas">
             <div className="hm-cas-t">
               <span className="hm-eyebrow">Kritik &amp; Saran</span>
-              <h2>Suaramu membentuk kevsoft</h2>
+              <h2 className="hm-big sm">Suaramu membentuk kevsoft</h2>
               <p>Ada yang kurang atau punya ide? Tulis di sini. AI meninjau dalam hitungan detik, dan komentar terbaik tampil paling atas.</p>
               <a className="hm-btn big" href="/cas">Tulis kritik &amp; saran <Icon n="edit" size={16} /></a>
             </div>
