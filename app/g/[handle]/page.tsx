@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function GroupLinkPage({ params }: { params: Promise<{ handle: string }> }) {
   const uid = await getUserId();
-  if (!uid) redirect("/sign-in");
+  if (!uid) redirect("/sign-in?next=/chat");
 
   const raw = (await params).handle?.replace(/^@/, "").toLowerCase().trim() ?? "";
   if (!USERNAME_RE.test(raw) || RESERVED.includes(raw)) notFound();
@@ -32,5 +32,5 @@ export default async function GroupLinkPage({ params }: { params: Promise<{ hand
     }
   }
 
-  redirect(`/?open=${g.id}`);
+  redirect(`/chat?open=${g.id}`);
 }

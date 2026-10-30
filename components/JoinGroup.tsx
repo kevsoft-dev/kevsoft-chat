@@ -17,7 +17,7 @@ export default function JoinGroup({ code, title, description, memberCount, avata
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(d.error || "Gagal bergabung"); setBusy(false); return; }
-      window.location.assign(`/?open=${d.id}`);
+      window.location.assign(`/chat?open=${d.id}`);
     } catch { setErr("Jaringan bermasalah"); setBusy(false); }
   }
 
@@ -31,7 +31,7 @@ export default function JoinGroup({ code, title, description, memberCount, avata
         {description && <p className="desc">{description}</p>}
         {err && <p className="error" role="alert">{err}</p>}
         <button className="primary" onClick={join} disabled={busy}>{busy ? "Bergabung…" : "Gabung grup"}</button>
-        <a className="link" href="/">Batal</a>
+        <a className="link" href="/chat">Batal</a>
       </div>
     </main>
   );

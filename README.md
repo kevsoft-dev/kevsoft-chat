@@ -182,3 +182,17 @@ Keamanan: tidak ada id internal user atau email di respons (hanya username, nama
 ## Animasi
 
 Gerak aplikasi dibuat lembut ala Notion: fade + geser 4-8px, 150-300 ms, kurva ease-out tanpa pantulan; hover hanya mengganti warna; tidak ada animasi yang berulang sendiri. Semua ada di blok "MOTION LEMBUT ALA NOTION" di akhir `app/globals.css`. Ubah `--ease` di blok itu untuk menyetel karakter geraknya, atau hapus blok itu untuk kembali ke animasi lama. Pengguna dengan "kurangi gerakan" di perangkatnya tidak melihat animasi sama sekali.
+
+## Halaman
+
+| Alamat | Isi |
+| --- | --- |
+| `/home` | Beranda publik (tanpa login): ringkasan fitur, berita terbaru, kritik & saran pilihan, tautan ke semua halaman |
+| `/chat` | Aplikasi chat (butuh login) |
+| `/news` | Berita Kevsoft |
+| `/cas` | Kritik & Saran |
+| `/docs` | Dokumentasi API publik |
+| `/sign-in` | Masuk / daftar (setelah masuk, default ke `/chat`) |
+| `/` | Hanya penghubung: ke `/home`; tautan lama `/?open=`, `/?dm=`, `/?reset=1`, `/?news=` diteruskan ke `/chat` |
+
+Menambah halaman baru: buat `app/<nama>/page.tsx`, lalu tambahkan `<nama>` ke `RESERVED_PATH` di `middleware.ts` dan `RESERVED` di `lib/mentions.ts` supaya tidak dianggap username.

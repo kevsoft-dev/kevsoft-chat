@@ -125,7 +125,7 @@ export default function Docs({ open }: { open: boolean }) {
   return (
     <div className="dc">
       <header className="dc-top">
-        <a href="/" className="dc-brand"><span className="brand-mark">k</span><strong>kevsoft</strong><span className="muted">/ docs</span></a>
+        <a href="/home" className="dc-brand"><span className="brand-mark">k</span><strong>kevsoft</strong><span className="muted">/ docs</span></a>
         <ThemeToggle />
       </header>
 

@@ -13,7 +13,7 @@ function Notice({ title, text }: { title: string; text: string }) {
       <span className="eyebrow">Undangan grup</span>
       <h1>{title}</h1>
       <p className="muted">{text}</p>
-      <a className="link" href="/">Kembali ke chat</a>
+      <a className="link" href="/chat">Kembali ke chat</a>
     </div></main>
   );
 }
@@ -33,7 +33,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
   if (!g) return <Notice title="Link tidak berlaku" text="Link undangan ini salah atau sudah direset oleh admin grup. Minta link terbaru ke admin grupnya." />;
 
   const [mem] = await sql`select 1 from conversation_members where conversation_id = ${g.id} and user_id = ${uid}`;
-  if (mem) redirect(`/?open=${g.id}`);
+  if (mem) redirect(`/chat?open=${g.id}`);
   const [kicked] = await sql`select 1 from conversation_kicks where conversation_id = ${g.id} and user_id = ${uid}`;
   if (kicked) return <Notice title="Tidak bisa bergabung" text="Kamu dikeluarkan dari grup ini oleh admin." />;
 

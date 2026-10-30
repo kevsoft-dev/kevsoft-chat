@@ -57,13 +57,13 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
 
   const sendCode = () => run(async () => { await post("/api/auth/otp/send", { email }); setStep("code"); setCode(""); setWait(60); setBusy(false); });
   const dest = () => {
-    if (forgot) return "/?reset=1";
+    if (forgot) return "/chat?reset=1";
     try {
       const n = new URLSearchParams(window.location.search).get("next") || "";
       // hanya path internal aman
       if (n.startsWith("/") && !n.startsWith("//") && !n.includes("://")) return n;
     } catch {}
-    return "/";
+    return "/chat";
   };
   const verify = (c: string) => run(async () => { await post("/api/auth/otp/verify", { email, code: c }); window.location.assign(dest()); });
   const loginPw = () => run(async () => { await post("/api/auth/login", { username: username.trim().toLowerCase().replace(/^@/, ""), password }); window.location.assign(dest()); });
@@ -100,7 +100,7 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
         await post("/api/auth/google", { idToken: await res.user.getIdToken() });
         await signOut(auth);
         let f = false; try { f = sessionStorage.getItem("kc_forgot") === "1"; sessionStorage.removeItem("kc_forgot"); } catch {}
-        window.location.assign(f ? "/?reset=1" : dest());
+        window.location.assign(f ? "/chat?reset=1" : dest());
       } catch (e: any) { setErr(googleError(e)); setBusy(false); }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

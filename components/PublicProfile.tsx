@@ -41,7 +41,7 @@ export default function PublicProfile({
 
   async function startChat() {
     if (isMe) {
-      router.push("/");
+      router.push("/chat");
       return;
     }
     // Belum login → ke sign-in, setelah masuk kembali ke /dm/username
@@ -132,7 +132,7 @@ export default function PublicProfile({
               {busy ? "Membuka…" : loggedIn ? "Chat sekarang" : "Chat now — login dulu"}
             </button>
           ) : (
-            <button type="button" onClick={() => router.push("/")}>
+            <button type="button" onClick={() => router.push("/chat")}>
               <Icon n="user" size={18} />
               Ini kamu · buka beranda
             </button>

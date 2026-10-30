@@ -1716,3 +1716,72 @@ h1,h2,h3,h4{font-weight:600;letter-spacing:-.015em}
   .modal{animation:mo-sheet .28s var(--ease) both}
   .modal-bg.center .dialog{animation-name:mo-modal}
 }
+
+
+/* ================================================================
+   /home — beranda publik. Lembut, lega, mengikuti tema aplikasi.
+   ================================================================ */
+.hm{min-height:100dvh;background:var(--bg);color:var(--ink)}
+.hm a{color:inherit;text-decoration:none}
+.hm-in{animation:mo-soft .5s var(--ease) backwards}
+.hm-nav{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:16px;padding:12px max(16px,calc((100% - 1040px)/2));background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.hm-brand{display:flex;align-items:center;gap:10px;font-size:16px}
+.hm-brand img{border-radius:8px}
+.hm-links{display:flex;gap:4px;margin-left:12px;flex:1}
+.hm-links a{padding:7px 12px;border-radius:8px;color:var(--muted);font-size:14px;transition:background .15s,color .15s}
+.hm-links a:hover{background:var(--fill);color:var(--ink)}
+.hm-nav-r{display:flex;align-items:center;gap:8px}
+.hm-btn{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:10px;background:var(--acid);color:var(--on-accent);font-weight:600;font-size:14px;border:1px solid transparent;transition:opacity .15s,background .15s}
+.hm-btn:hover{opacity:.9}
+.hm-btn.big{padding:12px 20px;font-size:15px;border-radius:12px}
+.hm-btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.hm-btn.ghost:hover{background:var(--fill);opacity:1}
+.hm main{max-width:1040px;margin:0 auto;padding:0 16px}
+.hm-eyebrow{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-text);margin-bottom:14px}
+.hm-hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:40px;align-items:center;padding:72px 0 56px}
+.hm-hero h1{font-size:clamp(34px,5.2vw,56px);line-height:1.08;letter-spacing:-.035em;font-weight:700;margin:0 0 16px}
+.hm-hero h1 span{color:var(--muted)}
+.hm-hero p{font-size:17px;line-height:1.6;color:var(--muted);margin:0 0 26px;max-width:48ch}
+.hm-cta{display:flex;gap:10px;flex-wrap:wrap}
+.hm-preview{border:1px solid var(--line);border-radius:16px;background:var(--bg-soft);box-shadow:0 20px 60px var(--shadow);overflow:hidden}
+.hm-pv-bar{display:flex;align-items:center;gap:6px;padding:11px 14px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.hm-pv-bar i{width:9px;height:9px;border-radius:50%;background:var(--fill2)}
+.hm-pv-bar span{margin-left:8px}
+.hm-pv-body{display:flex;flex-direction:column;gap:9px;padding:16px}
+.hm-b{max-width:82%;padding:9px 13px;border-radius:14px;font-size:14px;line-height:1.45;background:var(--fill);border-top-left-radius:4px}
+.hm-b b{display:block;font-size:12px;color:var(--accent-text);margin-bottom:2px}
+.hm-b.r{align-self:flex-end;background:var(--acid);color:var(--on-accent);border-radius:14px;border-top-right-radius:4px}
+.hm-b.ai{background:var(--tag-bg)}
+.hm-sec{padding:40px 0}
+.hm-sec h2{font-size:26px;letter-spacing:-.025em;margin:0 0 20px}
+.hm-sec-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.hm-sec-h a{color:var(--accent-text);font-size:14px}
+.hm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.hm-news{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.hm-card{display:flex;flex-direction:column;gap:6px;padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--bg-soft);transition:background .15s,border-color .15s}
+.hm-card:hover{background:var(--fill);border-color:var(--fill2)}
+.hm-card h3{font-size:16px;margin:4px 0 0;font-weight:600}
+.hm-card p{margin:0;font-size:14px;line-height:1.55;color:var(--muted)}
+.hm-card small{color:var(--dim);font-size:12px}
+.hm-ico{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:var(--tag-bg);color:var(--accent-text)}
+.hm-cas{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:center;padding:36px;border:1px solid var(--line);border-radius:20px;background:var(--bg-soft)}
+.hm-cas:not(:has(.hm-cas-list)){grid-template-columns:1fr}
+.hm-cas h2{margin:0 0 10px}
+.hm-cas p{margin:0 0 20px;color:var(--muted);line-height:1.6}
+.hm-cas-list{display:flex;flex-direction:column;gap:10px}
+.hm-quote{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);transition:background .15s}
+.hm-quote:hover{background:var(--fill)}
+.hm-quote p{margin:0 0 6px;font-size:14px;line-height:1.5;color:var(--ink)}
+.hm-quote small{color:var(--muted);font-size:12px}
+.hm-foot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;max-width:1040px;margin:40px auto 0;padding:24px 16px 40px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px}
+.hm-foot nav{display:flex;gap:16px;flex-wrap:wrap}
+.hm-foot a:hover{color:var(--ink)}
+@media (max-width:860px){
+  .hm-hero{grid-template-columns:1fr;padding:44px 0 32px;gap:28px}
+  .hm-grid,.hm-news{grid-template-columns:1fr 1fr}
+  .hm-cas{grid-template-columns:1fr;padding:24px}
+}
+@media (max-width:620px){
+  .hm-links{display:none}.hm-nav{justify-content:space-between}
+  .hm-grid,.hm-news{grid-template-columns:1fr}
+}

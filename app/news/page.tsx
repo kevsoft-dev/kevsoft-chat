@@ -22,10 +22,10 @@ export default async function NewsRoute() {
     [user] = (await sql`
       select id, username, role from users where id = ${uid}`) as any;
   } catch {
-    redirect("/");
+    redirect("/chat");
   }
 
-  if (!user?.username) redirect("/");
+  if (!user?.username) redirect("/chat");
 
   return (
     <Suspense fallback={<div className="np"><div className="np-bar" /><div className="np-main"><div className="np-grid">{Array.from({length:4}).map((_,i)=><div key={i} className="np-card skel"/>)}</div></div></div>}>

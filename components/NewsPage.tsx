@@ -72,7 +72,7 @@ export default function NewsPage({ me }: { me: MeLite }) {
   return (
     <div className="np">
       <header className="np-bar">
-        <button className="icon-btn" onClick={() => router.push("/")} aria-label="Kembali ke chat">
+        <button className="icon-btn" onClick={() => router.push("/chat")} aria-label="Kembali ke chat">
           <Icon n="back" />
         </button>
         <div className="np-brand">

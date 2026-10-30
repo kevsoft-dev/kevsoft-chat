@@ -17,8 +17,8 @@ export default async function CasRoute() {
   try {
     await ensureSchema();
     [user] = (await sql`select id, username, name, avatar_url, email, role, verified from users where id = ${uid}`) as any;
-  } catch { redirect("/"); }
-  if (!user?.username) redirect("/");
+  } catch { redirect("/chat"); }
+  if (!user?.username) redirect("/chat");
 
   return (
     <Cas me={{

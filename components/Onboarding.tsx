@@ -34,7 +34,7 @@ export default function Onboarding({ suggestedName, needUsername, reset, usernam
         : await fetch("/api/me/password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pw }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(d.error || "Gagal menyimpan"); setBusy(false); return; }
-      window.location.assign("/"); // muat ulang penuh, langsung masuk ke chat
+      window.location.assign("/chat"); // muat ulang penuh, langsung masuk ke chat
     } catch { setErr("Jaringan bermasalah, coba lagi"); setBusy(false); }
   }
 
