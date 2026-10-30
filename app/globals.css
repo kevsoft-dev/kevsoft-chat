@@ -1845,3 +1845,72 @@ h1,h2,h3,h4{font-weight:600;letter-spacing:-.015em}
   .hm-grid,.hm-news{grid-template-columns:1fr}
   .hm-sec{padding-top:48px}
 }
+
+/* ================================================================
+   /home — ART PASS: garis tepi tegas ala ilustrasi + bayangan arsiran.
+   Warna & tema tetap sama; hanya outline dan bayangan yang berubah.
+   ================================================================ */
+.hm{--h-edge:#2b2a27;--h-hatch:repeating-linear-gradient(135deg,var(--h-edge) 0 1.4px,transparent 1.4px 4.6px);--off:6px}
+:root[data-theme="dark"] .hm{--h-edge:rgba(236,235,231,.88)}
+
+/* semua elemen berbayang arsiran */
+.hm-btn,.hm-card,.hm-preview,.hm-quote,.hm-cas,.hm-menu-p,.hm-pill{position:relative;isolation:isolate}
+.hm-btn::after,.hm-card::after,.hm-preview::after,.hm-quote::after,.hm-cas::after,.hm-menu-p::after{
+  content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;
+  background:var(--h-hatch);-webkit-mask:linear-gradient(135deg,transparent 0,#000 55%);mask:linear-gradient(135deg,transparent 0,#000 55%);
+  transform:translate(var(--off),var(--off));transition:transform .22s var(--ease)
+}
+/* bayangan arsiran punya garis tepi tipis juga */
+.hm-card::before,.hm-preview::before,.hm-cas::before{content:none}
+
+/* tombol */
+.hm-btn{--off:4px;border:2px solid var(--h-edge);color:#fff;transition:transform .22s var(--ease),background .15s}
+.hm-btn.big{--off:5px;padding:13px 22px}
+.hm-btn:hover{transform:translate(-2px,-2px)}
+.hm-btn:hover::after{transform:translate(calc(var(--off) + 4px),calc(var(--off) + 4px))}
+.hm-btn:active{transform:translate(2px,2px)}
+.hm-btn:active::after{transform:translate(calc(var(--off) - 2px),calc(var(--off) - 2px))}
+.hm-btn.soft{color:var(--h-blue-t)}
+:root[data-theme="dark"] .hm-btn{color:#0f1420}
+:root[data-theme="dark"] .hm-btn.soft{color:var(--h-blue-t)}
+
+/* kartu */
+.hm-card{--off:6px;border:2px solid var(--h-edge);border-radius:20px}
+.hm-card[class*="t-"]{border-color:var(--h-edge)}
+.hm-card:hover{transform:translate(-2px,-2px);box-shadow:none}
+.hm-card:hover::after{transform:translate(8px,8px)}
+.hm-ico{border:2px solid var(--h-edge);box-shadow:none;border-radius:50%}
+
+/* preview chat */
+.hm-preview{--off:8px;border:2px solid var(--h-edge);border-radius:22px;overflow:visible;box-shadow:none}
+.hm-pv-bar{border-bottom:2px solid var(--h-edge)}
+.hm-pv-bar i{background:transparent;border:1.5px solid var(--h-edge)}
+.hm-b{border:1.5px solid var(--h-edge);background:var(--h-card)}
+.hm-b.r{background:var(--h-blue);border-color:var(--h-edge)}
+.hm-b.ai{background:var(--h-blue-s)}
+:root[data-theme="dark"] .hm-b.r{color:#0f1420}
+
+/* pil judul */
+.hm-pill{border:.045em solid var(--h-edge);border-radius:.55em;padding:.0em .28em .04em .2em;box-shadow:.06em .06em 0 var(--h-edge)}
+
+/* blok kritik & saran + kutipan */
+.hm-cas{--off:10px;border:2px solid var(--h-edge);border-radius:28px}
+.hm-quote{--off:4px;border:2px solid var(--h-edge);border-radius:16px}
+.hm-quote:hover{transform:translate(-2px,-2px)}
+.hm-quote:hover::after{transform:translate(6px,6px)}
+
+/* nav, menu, footer, avatar */
+.hm-nav{border-bottom:2px solid var(--h-edge)}
+.hm-menu-p{--off:5px;border:2px solid var(--h-edge);border-radius:14px}
+.hm-foot{border-top:2px solid var(--h-edge)}
+.hm-faces img{box-shadow:0 0 0 3px var(--h-bg)}
+.hm-icon{border:2px solid transparent}
+.hm-icon:hover{border-color:var(--h-edge);background:transparent}
+.hm-trust{border-bottom:0}
+.hm-marq{padding:6px 0}
+
+@media (max-width:620px){
+  .hm-card,.hm-cas{--off:5px}
+  .hm-cas{--off:7px}
+  .hm-preview{--off:6px}
+}
