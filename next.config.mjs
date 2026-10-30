@@ -28,19 +28,4 @@ const headers = [
   { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
   { key: "X-DNS-Prefetch-Control", value: "off" },
 ];
-// Ruang privat (/ghosh), console, dan API-nya: jangan diindeks, jangan bocorkan referrer, jangan di-cache.
-const priv = [
-  { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, nosnippet" },
-  { key: "Cache-Control", value: "no-store, max-age=0" },
-];
-export default {
-  poweredByHeader: false,
-  async headers() {
-    return [
-      { source: "/(.*)", headers },
-      { source: "/ghosh", headers: priv },
-      { source: "/console", headers: priv },
-      { source: "/api/ghosh/:path*", headers: priv },
-    ];
-  },
-};
+export default { poweredByHeader: false, async headers() { return [{ source: "/(.*)", headers }]; } };

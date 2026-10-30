@@ -13,7 +13,7 @@ const PUBLIC = [
 ];
 
 const RESERVED_PATH = new Set([
-  "sign-in", "api", "u", "dm", "g", "join", "cas", "news", "docs", "ghosh", "_next", "favicon.ico", "robots.txt",
+  "sign-in", "api", "u", "dm", "g", "join", "cas", "news", "docs", "_next", "favicon.ico", "robots.txt",
   "health", "console", "admin", "static", "assets",
 ]);
 
@@ -64,7 +64,7 @@ export default async function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
   url.pathname = "/sign-in";
   // Link undangan grup: setelah login kembali ke halaman join.
-  url.search = path.startsWith("/join/") || path === "/cas" || path === "/ghosh" || path === "/console" ? `?next=${encodeURIComponent(pathname)}` : "";
+  url.search = path.startsWith("/join/") || path === "/cas" ? `?next=${encodeURIComponent(pathname)}` : "";
   return NextResponse.redirect(url);
 }
 
