@@ -19,7 +19,6 @@ const patchSchema = z.object({
   bio: z.string().trim().max(140, "Maksimal 140 karakter").refine((s) => !/[\u0000-\u0008\u000b-\u001f\u007f]/.test(s), "Karakter tidak valid").optional(),
   away_enabled: z.boolean().optional(),
   away_message: z.string().trim().max(500, "Maksimal 500 karakter").refine((s) => !/[\u0000-\u0008\u000b-\u001f\u007f]/.test(s), "Karakter tidak valid").optional(),
-  developer_mode: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -29,8 +28,7 @@ export async function GET() {
     select id, username, name, avatar_url, banner_url, bio, email, role,
       (role = 'owner' or verified) as verified,
       coalesce(away_enabled, false) as away_enabled,
-      coalesce(nullif(away_message, ''), ${DEFAULT_AWAY}) as away_message,
-      coalesce(developer_mode, false) as developer_mode
+      coalesce(nullif(away_message, ''), ${DEFAULT_AWAY}) as away_message
     from users where id = ${uid}`;
   return Response.json(u ?? null);
 }
@@ -41,8 +39,8 @@ export async function PATCH(req: Request) {
   if (!uid) return new Response("Unauthorized", { status: 401 });
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: parsed.error.issues[0]?.message || "Data tidak valid" }, { status: 400 });
-  const { name, bio, away_enabled, away_message, developer_mode } = parsed.data;
-  if (name === undefined && bio === undefined && away_enabled === undefined && away_message === undefined && developer_mode === undefined)
+  const { name, bio, away_enabled, away_message } = parsed.data;
+  if (name === undefined && bio === undefined && away_enabled === undefined && away_message === undefined)
     return Response.json({ error: "Tidak ada perubahan" }, { status: 400 });
 
   // Saat dinyalakan, catat waktu mulai supaya auto-balas tidak spam pesan lama.
@@ -56,13 +54,11 @@ export async function PATCH(req: Request) {
         when ${away_enabled ?? null}::boolean = true then now()
         when ${away_enabled ?? null}::boolean = false then null
         else away_since
-      end,
-      developer_mode = coalesce(${developer_mode ?? null}::boolean, developer_mode)
+      end
     where id = ${uid}
     returning id, username, name, avatar_url, banner_url, bio,
       coalesce(away_enabled, false) as away_enabled,
-      coalesce(nullif(away_message, ''), ${DEFAULT_AWAY}) as away_message,
-      coalesce(developer_mode, false) as developer_mode`;
+      coalesce(nullif(away_message, ''), ${DEFAULT_AWAY}) as away_message`;
   return Response.json(u);
 }
 

@@ -10,18 +10,19 @@ const key = () => {
 };
 
 // via = cara login ("otp" / "google" = baru diverifikasi email; kosong = login password).
+// did = id perangkat (tabel devices) supaya satu perangkat bisa dikeluarkan tanpa mengganggu yang lain.
 // sv = versi sesi user; dinaikkan saat ganti/reset password atau "keluar dari semua perangkat" sehingga token lama langsung mati.
-export const signToken = (uid: string, via?: string, sv = 0) =>
-  new SignJWT({ ...(via ? { via } : {}), sv }).setProtectedHeader({ alg: "HS256" }).setSubject(uid).setIssuedAt().setExpirationTime(`${MAX_AGE}s`).sign(key());
+export const signToken = (uid: string, via?: string, sv = 0, did?: string) =>
+  new SignJWT({ ...(via ? { via } : {}), sv, ...(did ? { did } : {}) }).setProtectedHeader({ alg: "HS256" }).setSubject(uid).setIssuedAt().setExpirationTime(`${MAX_AGE}s`).sign(key());
 
-export type SessionMeta = { uid: string; via?: string; iat?: number; sv: number };
+export type SessionMeta = { uid: string; via?: string; iat?: number; sv: number; did?: string };
 
 export async function verifyTokenFull(token?: string | null): Promise<SessionMeta | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, key(), { algorithms: ["HS256"] });
     if (!payload.sub) return null;
-    return { uid: payload.sub, via: typeof payload.via === "string" ? payload.via : undefined, iat: payload.iat, sv: typeof payload.sv === "number" ? payload.sv : 0 };
+    return { uid: payload.sub, via: typeof payload.via === "string" ? payload.via : undefined, iat: payload.iat, sv: typeof payload.sv === "number" ? payload.sv : 0, did: typeof payload.did === "string" ? payload.did : undefined };
   } catch {
     return null;
   }

@@ -195,7 +195,7 @@ function ApiApp() {
       <div className="hm-tabs">{EP.map((x, i) => <button type="button" key={x} className={e === i ? "on" : ""} onClick={() => { setE(i); setOut(""); }}>GET {x.replace("/api/v1", "") || "/"}</button>)}</div>
       <code className="hm-url">GET {EP[e]}</code>
       <button type="button" className="hm-mini" onClick={run} disabled={busy}>{busy ? "Memanggil…" : "Coba panggil"}</button>
-      <pre className="hm-out">{out || "Tekan “Coba panggil”. Ini permintaan sungguhan ke API read-only."}</pre>
+      <pre className="hm-out">{out || "Tekan “Coba panggil”. Ini permintaan sungguhan. Tanpa API key hasilnya 401, itu normal: buat key di Pengaturan > Developer."}</pre>
       <a href="/docs" className="hm-link">Baca dokumentasi lengkap →</a>
     </div>
   );

@@ -5,6 +5,7 @@ import { clientIp, limit } from "./ratelimit";
 import { db, DbNotConfigured, ID_RE } from "./firebaseDb";
 import { cleanButtons, cleanUrls } from "./news";
 import { CAS_PATH, type CasRow } from "./cas";
+import { findDevKey, type DevKey } from "./devices";
 
 // API publik read-only: berita, komentar berita, dan komentar /cas.
 // Tidak pernah membocorkan id internal user / email: hanya username, nama, foto, centang.
@@ -24,64 +25,36 @@ export const fail = (status: number, message: string, extra: Record<string, stri
 export const dbFail = (e: unknown) =>
   e instanceof DbNotConfigured ? fail(503, e.message) : fail(502, "Database sedang bermasalah. Coba lagi nanti.");
 
-const shaBuf = (s: string) => createHash("sha256").update(s).digest();
-const shaHex = (s: string) => createHash("sha256").update(s).digest("hex");
-const hashedKeys = cfg.api.keys.map(shaBuf);
-const keyOkMaster = (k: string) => { const h = shaBuf(k); return hashedKeys.some((x) => timingSafeEqual(h, x)); };
+const sha = (s: string) => createHash("sha256").update(s).digest();
+const hashedKeys = cfg.api.keys.map(sha);
+const keyOk = (k: string) => { const h = sha(k); return hashedKeys.some((x) => timingSafeEqual(h, x)); };
 
 function extractKey(req: Request): string {
   const h = req.headers.get("x-api-key") || (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   return (h || new URL(req.url).searchParams.get("key") || "").trim().slice(0, 200);
 }
 
-/** Cek apakah key milik user developer (api_keys table). */
-async function keyOkUser(k: string): Promise<boolean> {
-  if (!k.startsWith("kc_") || k.length < 20) return false;
-  const hash = shaHex(k);
-  const [row] = await sql`
-    select id from api_keys
-    where key_hash = ${hash} and revoked_at is null
-    limit 1`;
-  if (!row) return false;
-  // Touch last_used (fire-and-forget style)
-  await sql`update api_keys set last_used_at = now() where id = ${row.id}`;
-  return true;
-}
+// Key developer (kc_live_…) yang lolos pada request ini, untuk /api/v1/me.
+const devKeys = new WeakMap<Request, DevKey>();
+export const devKeyOf = (req: Request) => devKeys.get(req) ?? null;
 
-// Cek API key + rate limit. Mengembalikan Response kalau ditolak, null kalau lolos.
+// Cek API key + rate limit. Key berasal dari dua tempat: config.json (key server)
+// atau Pengaturan > Developer (key per akun, 300 permintaan/menit). Mengembalikan Response kalau ditolak, null kalau lolos.
 export async function guard(req: Request): Promise<Response | null> {
   const ip = clientIp(req);
-  let who = `ip:${ip}`;
   const key = extractKey(req);
-  if (!cfg.api.public) {
-    const masterOk = key && hashedKeys.length > 0 && keyOkMaster(key);
-    const userOk = !masterOk && key ? await keyOkUser(key) : false;
-    if (!masterOk && !userOk) {
-      if (!hashedKeys.length) {
-        // Masih boleh lolos jika ada user key yang valid (sudah dicek di atas)
-        // Jika tidak ada master key sama sekali dan user key juga gagal:
-        const anyUser = await sql`select 1 from api_keys where revoked_at is null limit 1`;
-        if (!anyUser.length) return fail(503, "API belum diaktifkan. Isi api.keys di config.json atau aktifkan Mode Developer.");
-      }
-      const bad = await limit(`apibad:${ip}`, 20, 600);
-      if (!bad.ok) return fail(429, "Terlalu banyak percobaan. Coba lagi nanti.", { "Retry-After": String(bad.retry) });
-      return fail(401, "API key tidak ada atau tidak valid. Kirim lewat header x-api-key.", { "WWW-Authenticate": 'Bearer realm="kevsoft-api"' });
-    }
-    who = `k:${shaHex(key).slice(0, 12)}`;
+  const dev = key.startsWith("kc_") ? await findDevKey(key).catch(() => null) : null;
+  const srv = !dev && !!key && keyOk(key);
+  if (!cfg.api.public && !dev && !srv) {
+    const bad = await limit(`apibad:${ip}`, 20, 600);
+    if (!bad.ok) return fail(429, "Terlalu banyak percobaan. Coba lagi nanti.", { "Retry-After": String(bad.retry) });
+    return fail(401, "API key tidak ada atau tidak valid. Kirim lewat header x-api-key. Buat key di Pengaturan > Developer (butuh developer mode).", { "WWW-Authenticate": 'Bearer realm="kevsoft-api"' });
   }
-  const l = await limit(`api:${who}`, 120, 60);
-  if (!l.ok) return fail(429, "Batas 120 permintaan per menit terlampaui.", { "Retry-After": String(l.retry) });
-  return null;
-}
-
-/**
- * Guard khusus news + comments: SELALU publik (tanpa API key).
- * Hanya rate-limit per IP agar tidak disalahgunakan.
- */
-export async function guardPublic(req: Request): Promise<Response | null> {
-  const ip = clientIp(req);
-  const l = await limit(`api:public:${ip}`, 180, 60);
-  if (!l.ok) return fail(429, "Batas 180 permintaan per menit per IP terlampaui.", { "Retry-After": String(l.retry) });
+  if (dev) devKeys.set(req, dev);
+  const who = dev ? `d:${dev.id}` : srv ? `k:${sha(key).toString("hex").slice(0, 12)}` : `ip:${ip}`;
+  const max = dev ? 300 : 120;
+  const l = await limit(`api:${who}`, max, 60);
+  if (!l.ok) return fail(429, `Batas ${max} permintaan per menit terlampaui.`, { "Retry-After": String(l.retry) });
   return null;
 }
 

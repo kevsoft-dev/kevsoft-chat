@@ -8,13 +8,13 @@ const PUBLIC = [
   /^\/api\/health$/,
   /^\/api\/avatar\//, // foto profil publik
   /^\/api\/banner\//, // foto sampul publik
-  /^\/docs\/?$/, // dokumentasi API publik
+  /^\/docs(\/|$)/, // dokumentasi publik (banyak halaman)
   /^\/home\/?$/, // beranda publik
   /^\/api\/v1(\/|$)/, // API publik read-only (dijaga API key di handler)
 ];
 
 const RESERVED_PATH = new Set([
-  "sign-in", "api", "u", "dm", "g", "join", "cas", "news", "docs", "home", "chat", "_next", "favicon.ico", "robots.txt",
+  "sign-in", "api", "u", "dm", "g", "join", "cas", "news", "docs", "settings", "home", "chat", "_next", "favicon.ico", "robots.txt",
   "health", "console", "admin", "static", "assets",
 ]);
 

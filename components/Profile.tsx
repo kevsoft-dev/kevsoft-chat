@@ -130,79 +130,8 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
   );
   const [awayBusy, setAwayBusy] = useState(false);
   const [awayEdit, setAwayEdit] = useState(false);
-  const [devMode, setDevMode] = useState(!!me.developerMode);
-  const [devBusy, setDevBusy] = useState(false);
-  const [keys, setKeys] = useState<{ id: string; name: string; prefix: string; created_at: string }[]>([]);
-  const [newKey, setNewKey] = useState<string | null>(null);
-  const [keyName, setKeyName] = useState("Default");
-  const [devices, setDevices] = useState<{ id: string; name: string; type: string; ip: string | null; last_active: string; current: boolean }[]>([]);
-  const [devTab, setDevTab] = useState(false);
-  const [devListOpen, setDevListOpen] = useState(false);
 
-
-  async function toggleDeveloper(v: boolean) {
-    setDevBusy(true);
-    try {
-      const r = await fetch("/api/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ developer_mode: v }) });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) { onToast(d.error || "Gagal mengubah Mode Developer"); setDevBusy(false); return; }
-      setDevMode(!!d.developer_mode);
-      onUpdate({ developerMode: !!d.developer_mode });
-      if (d.developer_mode) loadKeys();
-      else { setKeys([]); setNewKey(null); }
-      onToast(d.developer_mode ? "Mode Developer aktif" : "Mode Developer dimatikan");
-    } catch { onToast("Jaringan bermasalah"); }
-    setDevBusy(false);
-  }
-
-  async function loadKeys() {
-    try {
-      const r = await fetch("/api/me/api-keys");
-      const d = await r.json();
-      if (r.ok) setKeys(d.keys || []);
-    } catch {}
-  }
-
-  async function createKey() {
-    setDevBusy(true);
-    try {
-      const r = await fetch("/api/me/api-keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: keyName || "Default" }) });
-      const d = await r.json();
-      if (!r.ok) { onToast(d.error || "Gagal membuat key"); setDevBusy(false); return; }
-      setNewKey(d.key);
-      setKeyName("Default");
-      loadKeys();
-      onToast("API key dibuat — simpan sekarang");
-    } catch { onToast("Jaringan bermasalah"); }
-    setDevBusy(false);
-  }
-
-  async function revokeKey(id: string) {
-    if (!confirm("Cabut API key ini? Aplikasi yang memakai key akan gagal.")) return;
-    try {
-      const r = await fetch("/api/me/api-keys", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
-      if (r.ok) { loadKeys(); onToast("Key dicabut"); }
-    } catch { onToast("Gagal"); }
-  }
-
-  async function loadDevices() {
-    try {
-      const r = await fetch("/api/me/sessions");
-      const d = await r.json();
-      if (r.ok) setDevices(d.devices || []);
-    } catch {}
-  }
-
-  async function revokeDevice(id: string) {
-    if (!confirm("Cabut akses perangkat ini?")) return;
-    try {
-      const r = await fetch("/api/me/sessions", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
-      if (r.ok) { loadDevices(); onToast("Perangkat dicabut"); }
-      else { const d = await r.json(); onToast(d.error || "Gagal"); }
-    } catch { onToast("Gagal"); }
-  }
-
-  async function patch(p: { name?: string; bio?: string; away_enabled?: boolean; away_message?: string; developer_mode?: boolean }) {
+  async function patch(p: { name?: string; bio?: string; away_enabled?: boolean; away_message?: string }) {
     try {
       const r = await fetch("/api/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
       const d = await r.json().catch(() => ({}));
@@ -420,67 +349,9 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
               )}
             </div>
           )}
-
-          <div className="set">
-            <Icon n="link" size={20} />
-            <span>Perangkat tertaut<small>Kelola sesi login di perangkat lain</small></span>
-            <button type="button" className="link" onClick={() => { setDevListOpen((o) => !o); if (!devListOpen) loadDevices(); }}>{devListOpen ? "Tutup" : "Lihat"}</button>
-          </div>
-          {devListOpen && (
-            <div className="away-box" style={{ marginTop: 0 }}>
-              {devices.length === 0 ? <p className="muted">Belum ada data perangkat.</p> : devices.map((d) => (
-                <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <b style={{ fontSize: 14 }}>{d.name}{d.current ? " · perangkat ini" : ""}</b>
-                    <div className="muted" style={{ fontSize: 12 }}>
-                      {d.type}{d.ip ? ` · ${d.ip}` : ""} · {new Date(d.last_active).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                    </div>
-                  </div>
-                  {!d.current && <button type="button" className="link" onClick={() => revokeDevice(d.id)}>Cabut</button>}
-                </div>
-              ))}
-              <button type="button" className="link" style={{ marginTop: 10 }} onClick={async () => {
-                if (!confirm("Keluar dari SEMUA perangkat? Kamu harus login ulang di mana pun.")) return;
-                await fetch("/api/me/sessions", { method: "DELETE" });
-                window.location.assign("/sign-in");
-              }}>Keluar dari semua perangkat</button>
-            </div>
-          )}
-
-          <div className="set">
-            <Icon n="key" size={20} />
-            <span>Mode Developer<small>Akses API key &amp; dokumentasi pengembang</small></span>
-            <Switch on={devMode} onChange={(v) => !devBusy && toggleDeveloper(v)} label="Mode Developer" />
-          </div>
-          {devMode && (
-            <div className="away-box" style={{ marginTop: 0 }}>
-              <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
-                Buat API key untuk memanggil <code>/api/v1</code>. Key hanya ditampilkan sekali. Lihat <a href="/docs" target="_blank" rel="noreferrer">dokumentasi</a>.
-              </p>
-              {newKey && (
-                <div style={{ marginBottom: 12, padding: 10, background: "var(--code)", borderRadius: 8, wordBreak: "break-all" }}>
-                  <code style={{ fontSize: 13 }}>{newKey}</code>
-                  <div style={{ marginTop: 6 }}>
-                    <button type="button" className="link" onClick={() => { navigator.clipboard?.writeText(newKey); onToast("Key disalin"); }}>Salin key</button>
-                    {" · "}
-                    <button type="button" className="link" onClick={() => setNewKey(null)}>Sembunyikan</button>
-                  </div>
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-                <input className="dc-in" style={{ flex: 1, minWidth: 120 }} placeholder="Nama key" value={keyName} onChange={(e) => setKeyName(e.target.value)} maxLength={40} />
-                <button type="button" className="primary" disabled={devBusy} onClick={createKey}>{devBusy ? "…" : "Buat key"}</button>
-              </div>
-              {keys.map((k) => (
-                <div key={k.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--line)", fontSize: 13 }}>
-                  <span style={{ flex: 1 }}><b>{k.name}</b> · <code>{k.prefix}</code></span>
-                  <button type="button" className="link" onClick={() => revokeKey(k.id)}>Cabut</button>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
+        <a className="card st-entry" href="/settings"><div className="set"><Icon n="link" size={20} /><span>Pengaturan lengkap<small>Perangkat tertaut, developer mode, bantuan</small></span><Icon n="back" size={18} /></div></a>
         <button className="logout" onClick={onLogout}><Icon n="logout" size={20} />Keluar</button>
         <p className="ver">kevsoft-chat</p>
       </div>

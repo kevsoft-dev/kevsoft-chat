@@ -3,60 +3,40 @@ export type Param = { name: string; type: string; desc: string; required?: boole
 export type Endpoint = {
   id: string; method: "GET"; path: string; title: string; desc: string;
   params?: Param[]; sample: unknown;
+  // Isian awal di "Coba langsung"; {id} diisi pengguna.
   tryQuery?: string;
 };
 
-const user = { username: "kevin", name: "Kevin", avatar_url: "/api/avatar/abc", verified: true, role: "owner" };
-
-const comment = {
-  id: "-Nc1", parent_id: null, body: "Keren!", mentions: [] as string[],
-  created_at: "2026-10-01T04:00:00.000Z", user,
-};
+const user = { username: "kevin", name: "Kevin", avatar_url: "https://domainmu.com/api/avatar/abc", verified: true, role: "owner" };
 
 export const ENDPOINTS: Endpoint[] = [
   {
     id: "news-list", method: "GET", path: "/api/v1/news", title: "Daftar berita",
-    desc: "Publik 100% (tanpa API key). Berita terbaru → terlama. Pakai all=1 untuk mengambil SEMUA berita beserta SEMUA komentar dalam satu request.",
+    desc: "Berita Kevsoft terbaru ke terlama. Untuk halaman berikutnya kirim next_cursor sebagai before.",
     params: [
-      { name: "all", type: "0 | 1", desc: "1 = semua berita + semua komentar (data lengkap). Abaikan limit/before." },
-      { name: "comments", type: "0 | 1", desc: "1 = sertakan komentar per berita (meski tanpa all)." },
-      { name: "tree", type: "0 | 1", desc: "1 = komentar bersarang di field replies (butuh all/comments)." },
-      { name: "limit", type: "integer", desc: "Jumlah item, 1–200 (default 20). Diabaikan jika all=1." },
+      { name: "limit", type: "integer", desc: "Jumlah item, 1-50 (default 20)." },
       { name: "before", type: "string", desc: "Cursor dari next_cursor respons sebelumnya." },
       { name: "q", type: "string", desc: "Cari di judul/isi (maks. 60 karakter)." },
     ],
-    tryQuery: "all=1",
+    tryQuery: "limit=5",
     sample: {
       data: [{
         id: "-Nabc123", title: "Judul berita", body: "Isi berita…",
         buttons: [{ label: "Buka", url: "https://contoh.com" }], images: ["https://contoh.com/a.jpg"], videos: [],
         author: "Kevsoft", created_at: "2026-10-01T03:00:00.000Z", likes: 12, comments: 3, shares: 1,
-        comments_count: 1,
-        comments: [comment],
       }],
-      count: 1, next_cursor: null, complete: true, includes: "comments",
+      count: 1, next_cursor: null,
     },
   },
   {
     id: "news-one", method: "GET", path: "/api/v1/news/{id}", title: "Satu berita",
-    desc: "Publik 100% (tanpa API key). Detail satu berita. Tambah comments=1 untuk menyertakan semua komentar.",
-    params: [
-      { name: "id", type: "string", required: true, desc: "ID berita (path)." },
-      { name: "comments", type: "0 | 1", desc: "1 = sertakan semua komentar." },
-      { name: "tree", type: "0 | 1", desc: "1 = komentar bersarang." },
-    ],
-    tryQuery: "comments=1&tree=1",
-    sample: {
-      data: {
-        id: "-Nabc123", title: "Judul berita", body: "Isi berita…", buttons: [], images: [], videos: [],
-        author: "Kevsoft", created_at: "2026-10-01T03:00:00.000Z", likes: 12, comments: 3, shares: 1,
-        comments_count: 1, comments: [comment],
-      },
-    },
+    desc: "Detail satu berita berdasarkan id.",
+    params: [{ name: "id", type: "string", required: true, desc: "ID berita (path)." }],
+    sample: { data: { id: "-Nabc123", title: "Judul berita", body: "Isi berita…", buttons: [], images: [], videos: [], author: "Kevsoft", created_at: "2026-10-01T03:00:00.000Z", likes: 12, comments: 3, shares: 1 } },
   },
   {
     id: "news-comments", method: "GET", path: "/api/v1/news/{id}/comments", title: "Komentar berita",
-    desc: "Publik 100% (tanpa API key). Semua komentar sebuah berita, urut lama → baru. tree=1 membuat balasan bersarang di replies.",
+    desc: "Komentar sebuah berita, urut lama ke baru. Dengan tree=1 balasan dibuat bersarang di replies.",
     params: [
       { name: "id", type: "string", required: true, desc: "ID berita (path)." },
       { name: "tree", type: "0 | 1", desc: "1 = balasan bersarang (field replies)." },
@@ -64,12 +44,12 @@ export const ENDPOINTS: Endpoint[] = [
     tryQuery: "tree=1",
     sample: {
       news_id: "-Nabc123", count: 1,
-      data: [comment],
+      data: [{ id: "-Nc1", parent_id: null, body: "Keren!", mentions: [], created_at: "2026-10-01T04:00:00.000Z", user }],
     },
   },
   {
     id: "cas-list", method: "GET", path: "/api/v1/cas", title: "Daftar Kritik & Saran",
-    desc: "Komentar /cas yang lolos peninjauan AI (status acc atau like). Mungkin memerlukan API key (lihat Mode Developer) jika api.public=false.",
+    desc: "Komentar /cas yang lolos peninjauan AI (status acc atau like). Komentar yang masih ditinjau atau ditolak tidak pernah muncul.",
     params: [
       { name: "type", type: "string", desc: "kritik, saran, atau lainnya." },
       { name: "status", type: "string", desc: "like atau acc." },
@@ -90,16 +70,22 @@ export const ENDPOINTS: Endpoint[] = [
   },
   {
     id: "index", method: "GET", path: "/api/v1", title: "Indeks API",
-    desc: "Ringkasan singkat API (JSON). Terbuka, tanpa key dan tanpa data sensitif.",
-    sample: { name: "kevsoft API", version: "v1", access: "read-only", news_and_comments: "Publik 100%", endpoints: ["…"] },
+    desc: "Ringkasan singkat API (JSON). Terbuka, tanpa key dan tanpa data.",
+    sample: { name: "kevsoft API", version: "v1", access: "read-only", endpoints: ["…"] },
+  },
+  {
+    id: "me-get", method: "GET", path: "/api/v1/me", title: "Akun API",
+    desc: "Pemilik key developer dan batasnya. Hanya untuk key developer (kc_live_…), bukan key dari config server.",
+    sample: { data: { developer: { username: "kevin", name: "Kevin" }, key: { id: "b1f0…", name: "bot berita", prefix: "kc_live_Ab3x", created_at: "2026-10-31T03:00:00.000Z", last_used: null }, limits: { per_minute: 300 } } },
   },
 ];
 
 export const ERRORS: { code: number; when: string }[] = [
   { code: 400, when: "Parameter atau ID tidak valid." },
-  { code: 401, when: "API key tidak ada atau salah (hanya untuk endpoint CAS jika api.public=false)." },
+  { code: 401, when: "API key tidak ada, salah, atau sudah dicabut (saat API tidak publik)." },
+  { code: 403, when: "Endpoint hanya untuk key developer, tetapi key yang dipakai berasal dari config server." },
   { code: 404, when: "Data tidak ditemukan." },
-  { code: 429, when: "Rate limit terlampaui (news/comments: 180/menit per IP; lainnya 120/menit). Lihat header Retry-After." },
+  { code: 429, when: "Batas permintaan terlampaui (300/menit untuk key developer, 120/menit untuk lainnya), atau terlalu banyak key salah. Lihat header Retry-After." },
   { code: 502, when: "Database sedang bermasalah. Coba lagi nanti." },
-  { code: 503, when: "Database / Firebase belum dikonfigurasi." },
+  { code: 503, when: "API belum diaktifkan di config.json, atau database belum dikonfigurasi." },
 ];

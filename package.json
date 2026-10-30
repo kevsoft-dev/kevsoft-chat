@@ -5,7 +5,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "db:setup": "node scripts/db-setup.mjs"
+    "db:setup": "node scripts/db-setup.mjs",
+    "docs": "node scripts/build-docs.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",

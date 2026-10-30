@@ -3,6 +3,7 @@ import { readSessionMeta } from "./session";
 import { COMMUNITY_ID } from "./mentions";
 import { ensureSchema } from "./migrate";
 import { isRootEmail, rank } from "./roles";
+import { deviceAlive } from "./devices";
 
 // Status blokir + versi sesi di-cache singkat per instance supaya tidak ada query tambahan di tiap request.
 const BAN_TTL = 8_000;
@@ -29,7 +30,9 @@ export async function getUserId() {
   const m = await readSessionMeta();
   if (!m) return null;
   const st = await authState(m.uid);
-  return st.ok && !st.banned && st.sv === m.sv ? m.uid : null;
+  if (!(st.ok && !st.banned && st.sv === m.sv)) return null;
+  if (m.did && !(await deviceAlive(m.did))) return null; // perangkat ini sudah dikeluarkan
+  return m.uid;
 }
 
 export type Actor = { id: string; role: string; email: string | null; username: string | null; name: string };

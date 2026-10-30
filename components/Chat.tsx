@@ -55,6 +55,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
   const [tab, setTab] = useState<"all" | "dm" | "group">("all");
   const [showNew, setShowNew] = useState(false);
   const [profile, setProfile] = useState(false);
+  useEffect(() => { if (new URLSearchParams(location.search).get("profile")) setProfile(true); }, []);
   const [info, setInfo] = useState(false);
   const [members, setMembers] = useState<UserLite[]>([]);
   const [aiWait, setAiWait] = useState<string[]>([]);

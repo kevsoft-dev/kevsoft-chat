@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import LinkLogin from "@/components/LinkLogin";
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { GoogleAuthProvider, getAuth, getRedirectResult, signInWithPopup, signInWithRedirect, signOut } from "firebase/auth";
 import { Logo } from "@/components/ui";
@@ -37,6 +38,7 @@ const googleError = (e: any) => {
 export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
   const [mode, setMode] = useState<"login" | "verify">("login");
   const [forgot, setForgot] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -126,7 +128,7 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
       <section className="auth-card login-card">
         <div className="auth-top"><Logo /><strong>kevsoft-chat</strong></div>
 
-        {mode === "login" ? (
+        {linking ? <LinkLogin onBack={() => setLinking(false)} /> : mode === "login" ? (
           <>
             <h2>Masuk</h2>
             <p className="muted">Pakai username dan password kamu.</p>
@@ -145,6 +147,7 @@ export default function SignInForm({ firebase }: { firebase: FirebaseWeb }) {
               <button type="button" className="ghost" onClick={() => go("verify")}>Daftar</button>
               <button type="button" className="ghost" onClick={() => go("verify", true)}>Lupa password</button>
             </div>
+            <button type="button" className="ghost link-dev" onClick={() => setLinking(true)}>Tautkan dengan perangkat lain</button>
           </>
         ) : (
           <>
