@@ -2502,3 +2502,28 @@ body:has(.app){overflow:hidden;overscroll-behavior:none}
   .gd-top{gap:6px;padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}
   .gd-main{padding-left:12px;padding-right:12px}.gd-main h1{font-size:25px}
 }
+
+
+/* ================================================================
+   /home — BANNER: foto langit & kincir angin, lembut dan jernih.
+   Gambar diberi pudar halus ke warna kanvas supaya menyatu dengan hero.
+   ================================================================ */
+.hm-banner{position:relative;margin-top:18px;border-radius:28px;overflow:hidden;aspect-ratio:21/9;max-height:440px;background:var(--t-blue);box-shadow:0 1px 2px rgba(43,42,39,.04),0 18px 44px rgba(47,111,214,.14)}
+.hm-banner img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 62%;filter:saturate(.9) brightness(1.04) contrast(.96);transform:scale(1.02);transition:transform 1.2s var(--ease)}
+.hm-banner:hover img{transform:scale(1.045)}
+.hm-banner-fade{position:absolute;inset:0;pointer-events:none;background:
+  linear-gradient(180deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,0) 38%,color-mix(in srgb,var(--h-bg) 70%,transparent) 88%,var(--h-bg) 100%),
+  radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.18),transparent 60%)}
+.hm-banner-chip{position:absolute;left:18px;bottom:16px;display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;font-size:13px;font-weight:600;color:var(--h-ink);background:color-mix(in srgb,var(--h-card) 72%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--h-line)}
+.hm-banner-chip i{width:8px;height:8px;border-radius:50%;background:var(--h-blue)}
+:root[data-theme="dark"] .hm-banner{box-shadow:0 18px 44px rgba(0,0,0,.35)}
+:root[data-theme="dark"] .hm-banner img{filter:saturate(.8) brightness(.78) contrast(.95)}
+:root[data-theme="dark"] .hm-banner-fade{background:linear-gradient(180deg,rgba(22,22,21,.12) 0%,rgba(22,22,21,0) 38%,color-mix(in srgb,var(--h-bg) 75%,transparent) 88%,var(--h-bg) 100%)}
+.hm-banner + .hm-hero{padding-top:34px}
+@media (max-width:860px){.hm-banner{aspect-ratio:16/9;border-radius:22px}}
+@media (max-width:620px){
+  .hm-banner{margin-top:12px;aspect-ratio:4/3;border-radius:20px}
+  .hm-banner-chip{left:12px;bottom:12px;font-size:12px;padding:7px 12px}
+  .hm-banner + .hm-hero{padding-top:26px}
+}
+@media (prefers-reduced-motion:reduce){.hm-banner img,.hm-banner:hover img{transition:none;transform:none}}

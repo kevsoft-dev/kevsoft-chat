@@ -70,6 +70,12 @@ export default async function HomeRoute() {
       </header>
 
       <main>
+        <section className="hm-banner hm-in" aria-label="Banner kevsoft">
+          <img src="/home/banner.webp" alt="Langit biru cerah dengan awan putih dan kincir angin di tepi laut" width={736} height={491} fetchPriority="high" decoding="async" />
+          <div className="hm-banner-fade" aria-hidden />
+          <span className="hm-banner-chip"><i />Tenang, jernih, dan ringan</span>
+        </section>
+
         <section className="hm-hero">
           <div className="hm-faces hm-in" aria-hidden>
             {[1, 2, 3, 7, 4, 5, 6].map((n) => <img key={n} src={`/home/pile-${n}.webp`} alt="" width={64} height={64} />)}
