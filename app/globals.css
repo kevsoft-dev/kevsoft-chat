@@ -2460,3 +2460,45 @@ body:has(.app){overflow:hidden;overscroll-behavior:none}
 /* kolom "Membalas ..." muncul dengan pop lembut setiap target balasan berganti */
 .replying{transform-origin:bottom left;animation:reply-in .42s var(--spring) both}
 @keyframes reply-in{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
+
+/* ================================================================
+   v36 — Docs rapi & presisi di semua perangkat (tema tidak diubah)
+   Akar masalah: kolom pencarian membawa lebar bawaan <input> (±200px) sebagai
+   lebar minimum, jadi header melebar melewati layar HP. Tabel juga ikut pecah
+   per huruf ("Bag-ian") karena overflow-wrap:anywhere diwariskan ke sel tabel.
+   ================================================================ */
+/* header: tidak boleh lebih lebar dari layar */
+.gd-top{min-width:0;max-width:100%}
+.gd-top>*{min-width:0}
+.gd-burger,.gd-brand,.gd-links{flex:none}
+.gd-search{min-width:0}
+.gd-search input{width:0;flex:1 1 0;min-width:0}
+.gd-search kbd{flex:none}
+.gd-links{white-space:nowrap}
+
+/* kolom grid selalu boleh menyusut, tidak melebar karena isi */
+.gd-wrap{width:100%}
+.gd-wrap>*{min-width:0}
+@media (max-width:820px){.gd-wrap{grid-template-columns:minmax(0,1fr)}}
+
+/* konten: judul panjang dan elemen lebar tidak mendorong halaman */
+.gd-main h1,.gd-lead,.gd-crumb{overflow-wrap:anywhere}
+.gd-md img,.gd-md video{max-width:100%;height:auto}
+.gd-code,.gd-tryw,.gd-note,.gd-pn{max-width:100%}
+
+/* tabel: pecah baris hanya di spasi; kalau kolom terlalu sempit, tabel digeser di dalam kotaknya */
+.gd-md th,.gd-md td{overflow-wrap:normal;word-break:normal;hyphens:manual}
+.gd-md th{white-space:nowrap}
+.gd-md td code{overflow-wrap:normal}
+.gd-tbl{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+
+/* menu samping di HP: ikut area aman (notch/gesture bar) dan tidak menarik halaman di belakangnya */
+@media (max-width:820px){
+  .gd-side{overscroll-behavior:contain;padding-left:max(20px,env(safe-area-inset-left));padding-bottom:max(40px,env(safe-area-inset-bottom))}
+  .gd-main{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+}
+/* layar sangat kecil (≤360px) */
+@media (max-width:360px){
+  .gd-top{gap:6px;padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}
+  .gd-main{padding-left:12px;padding-right:12px}.gd-main h1{font-size:25px}
+}

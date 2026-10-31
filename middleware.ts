@@ -3,6 +3,7 @@ import { COOKIE, verifyToken } from "./lib/token";
 import { configIssue } from "./lib/config";
 
 const PUBLIC = [
+  /^\/$/, // "/" = penghubung: app/page.tsx mengarahkan ke /chat (sudah login) atau /home (belum login)
   /^\/sign-in/,
   /^\/api\/auth\//,
   /^\/api\/health$/,
