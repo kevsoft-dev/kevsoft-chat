@@ -17,9 +17,27 @@ const uuid = z.string().uuid();
 function isOneEmoji(s: string) {
   if (!/\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u.test(s)) return false;
   if (/[\p{L}\p{N}]/u.test(s.replace(/\u20E3/gu, "").replace(/^[0-9#*]\uFE0F?/u, ""))) return false;
-  const seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-  return [...seg.segment(s)].length === 1;
+  try {
+    const seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    return [...seg.segment(s)].length === 1;
+  } catch {
+    // Cadangan kalau Intl.Segmenter tidak ada di runtime: batasi panjang saja (kolom DB maks 32 karakter)
+    return s.length <= 16;
+  }
 }
+
+// Tabel reaksi dibuat ulang otomatis kalau ternyata belum ada (mis. migrasi belum jalan di database ini).
+async function ensureReactionsTable() {
+  await sql`
+    create table if not exists message_reactions (
+      message_id uuid not null references messages(id) on delete cascade,
+      user_id text not null references users(id) on delete cascade,
+      emoji text not null check (length(emoji) <= 32),
+      created_at timestamptz not null default now(),
+      primary key (message_id, user_id)
+    )`;
+}
+const isMissingTable = (e: unknown) => (e as { code?: string })?.code === "42P01" || /message_reactions.*does not exist/i.test(String((e as Error)?.message || ""));
 
 export async function GET(req: Request) {
   const uid = await getUserId();
@@ -315,18 +333,32 @@ export async function PATCH(req: Request) {
     // Pengguna yang sedang dibisukan tidak bisa bereaksi (sama seperti mengirim pesan).
     const [muted] = await sql`select 1 as x from users where id = ${uid} and muted_until > now()`;
     if (muted) return Response.json({ error: "Kamu sedang dibisukan" }, { status: 403 });
-    if (emoji == null || emoji === "") {
-      await sql`delete from message_reactions where message_id = ${id} and user_id = ${uid}`;
-    } else {
-      if (!isOneEmoji(emoji)) return Response.json({ error: "Emoji tidak valid" }, { status: 400 });
-      // Satu reaksi per orang per pesan (seperti WhatsApp): memilih emoji lain menggantikan yang lama.
-      await sql`
-        insert into message_reactions (message_id, user_id, emoji) values (${id}, ${uid}, ${emoji})
-        on conflict (message_id, user_id) do update set emoji = excluded.emoji, created_at = now()`;
+    if (emoji != null && emoji !== "" && !isOneEmoji(emoji)) return Response.json({ error: "Emoji tidak valid" }, { status: 400 });
+    // Berlaku untuk pesan siapa pun di chat yang kamu ikuti: pesan sendiri, pesan orang lain, lama maupun baru.
+    const write = async () => {
+      if (emoji == null || emoji === "") {
+        await sql`delete from message_reactions where message_id = ${id} and user_id = ${uid}`;
+      } else {
+        // Satu reaksi per orang per pesan (seperti WhatsApp): memilih emoji lain menggantikan yang lama.
+        await sql`
+          insert into message_reactions (message_id, user_id, emoji) values (${id}, ${uid}, ${emoji})
+          on conflict (message_id, user_id) do update set emoji = excluded.emoji, created_at = now()`;
+      }
+    };
+    try {
+      try { await write(); }
+      catch (e) {
+        if (!isMissingTable(e)) throw e;
+        await ensureReactionsTable();
+        await write();
+      }
+      const reactions = await getReactions(id);
+      after(() => broadcast(m.conversation_id, "reaction", { id, conversation_id: m.conversation_id, reactions, by: uid, emoji: emoji || null }));
+      return Response.json({ ok: true, reactions });
+    } catch (e) {
+      console.error("react failed", e);
+      return Response.json({ error: "Gagal menyimpan reaksi, coba lagi" }, { status: 500 });
     }
-    const reactions = await getReactions(id);
-    after(() => broadcast(m.conversation_id, "reaction", { id, conversation_id: m.conversation_id, reactions, by: uid, emoji: emoji || null }));
-    return Response.json({ ok: true, reactions });
   }
 
   // vote

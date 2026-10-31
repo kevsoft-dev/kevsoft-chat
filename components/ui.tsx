@@ -262,7 +262,10 @@ export function useLongPress(cb: (x: number, y: number) => void, ms = 450) {
       if (e.touches.length !== 1) return;
       const p = e.touches[0];
       start.current = { x: p.clientX, y: p.clientY };
-      timer.current = setTimeout(() => { navigator.vibrate?.(8); fire(start.current.x, start.current.y); }, ms);
+      timer.current = setTimeout(() => {
+        if (performance.now() - lastFire.current < 700) return;
+        navigator.vibrate?.(8); fire(start.current.x, start.current.y);
+      }, ms);
     },
     onTouchMove: (e: React.TouchEvent) => {
       const p = e.touches[0];
@@ -271,6 +274,22 @@ export function useLongPress(cb: (x: number, y: number) => void, ms = 450) {
     },
     onTouchEnd: stop,
     onTouchCancel: stop,
+    // Jalur cadangan (layar sentuh / pena) kalau event sentuh tidak sampai. fire() menolak pemicu ganda (< 700 ms).
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType === "mouse" || !e.isPrimary) return;
+      stop();
+      start.current = { x: e.clientX, y: e.clientY };
+      timer.current = setTimeout(() => {
+        if (performance.now() - lastFire.current < 700) return;
+        navigator.vibrate?.(8); fire(start.current.x, start.current.y);
+      }, ms + 40);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (e.pointerType === "mouse") return;
+      if (Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y) > 14) stop();
+    },
+    onPointerUp: (e: React.PointerEvent) => { if (e.pointerType !== "mouse") stop(); },
+    onPointerCancel: (e: React.PointerEvent) => { if (e.pointerType !== "mouse") stop(); },
     onContextMenu: (e: React.MouseEvent) => {
       e.preventDefault(); stop();
       if (performance.now() - lastFire.current < 900) return; // Android memicu contextmenu setelah tekan lama

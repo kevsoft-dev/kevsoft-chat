@@ -32,9 +32,17 @@ const placeMenu = (x: number, y: number, n: number) => ({
 });
 
 // Pesan yang belum terkonfirmasi server (mengirim / gagal) dipertahankan saat daftar dimuat ulang.
+// id pesan yang reaksinya sedang dikirim ke server: daftar dari server (polling) tidak boleh menimpa tampilan reaksinya
+// sampai server menjawab, supaya reaksi tidak "berkedip hilang".
+const reactBusy = new Set<string>();
 const mergePending = (list: Msg[], cur: Msg[]) => {
   const pend = cur.filter((m) => (m.status === "sending" || m.status === "failed") && !list.some((x) => x.id === m.id));
-  return pend.length ? [...list, ...pend] : list;
+  let out = list;
+  if (reactBusy.size) {
+    const byId = new Map(cur.map((m) => [m.id, m] as const));
+    out = list.map((m) => (reactBusy.has(m.id) && byId.has(m.id) ? { ...m, reactions: byId.get(m.id)!.reactions } : m));
+  }
+  return pend.length ? [...out, ...pend] : out;
 };
 
 async function fetchMsgs(id: string, peek = false): Promise<Msg[] | null> {
@@ -587,6 +595,48 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
   }, [activeId]);
 
   // ---------- kirim pesan (optimistik: langsung tampil, server menyusul) ----------
+  // Reaksi yang dipilih saat pesan masih "mengirim": ditahan, dikirim otomatis begitu pesan sampai ke server.
+  const pendingReact = useRef(new Map<string, { emoji: string | null; before: Reaction[] | undefined }>());
+
+  // Kirim reaksi ke server dengan percobaan ulang (jaringan putus, 5xx, 429, atau 404 sesaat karena pesan baru tiba).
+  const sendReaction = useCallback(async (id: string, cid: string, emoji: string | null, before: Reaction[] | undefined) => {
+    const set = (r: Reaction[] | undefined) => mutate(cid, (x) => x.map((y) => (y.id === id ? { ...y, reactions: r } : y)));
+    reactBusy.add(id);
+    let msg = "Gagal memberi reaksi";
+    let notFound = false;
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const r = await fetch("/api/messages", {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, action: "react", emoji }),
+          });
+          if (r.ok) {
+            const d = await r.json().catch(() => null);
+            if (d && Array.isArray(d.reactions)) set(d.reactions);
+            return true;
+          }
+          if (r.status === 401) { window.location.assign("/sign-in"); return false; }
+          const err = await r.json().catch(() => null);
+          if (err?.error) msg = err.error;
+          notFound = r.status === 404;
+          // 4xx selain 404/429 (mis. dibisukan, emoji tidak valid) tidak ada gunanya diulang
+          if (r.status >= 400 && r.status < 500 && r.status !== 404 && r.status !== 429) break;
+        } catch { /* jaringan: coba lagi */ }
+        await new Promise((res) => setTimeout(res, 450 * (attempt + 1)));
+      }
+      set(before);
+      toast(notFound ? "Pesan belum tersimpan di server, coba lagi sebentar" : msg);
+      return false;
+    } finally {
+      reactBusy.delete(id);
+      if (notFound || msg === "Gagal memberi reaksi") {
+        // sinkron ulang dari server supaya tampilan pasti sama dengan data asli
+        fetchMsgs(cid, true).then((list) => { if (list && activeRef.current === cid) setMsgs((p) => mergePending(list, p)); }).catch(() => {});
+      }
+    }
+  }, [mutate, toast]);
+
   const deliver = useCallback(async (m: Msg) => {
     const patch = (p: Partial<Msg>) => mutate(m.conversation_id, (x) => x.map((y) => (y.id === m.id ? { ...y, ...p } : y)));
     try {
@@ -596,11 +646,15 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
       if (!r.ok) throw new Error(String(r.status));
       const s = await r.json();
       patch({ status: "sent", created_at: s.created_at, mentions: s.mentions });
+      const q = pendingReact.current.get(m.id);
+      if (q) { pendingReact.current.delete(m.id); sendReaction(m.id, m.conversation_id, q.emoji, q.before); }
     } catch {
-      patch({ status: "failed" });
+      const q = pendingReact.current.get(m.id);
+      if (q) { pendingReact.current.delete(m.id); reactBusy.delete(m.id); }
+      patch(q ? { status: "failed", reactions: q.before } : { status: "failed" });
       setAiWait((w) => w.filter((x) => x !== m.conversation_id));
     }
-  }, [mutate, toast]);
+  }, [mutate, toast, sendReaction]);
 
   const retry = useCallback((m: Msg) => {
     mutate(m.conversation_id, (x) => x.map((y) => (y.id === m.id ? { ...y, status: "sending" } : y)));
@@ -689,29 +743,20 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
 
   // Beri / ganti / hapus reaksiku. emoji null = hapus. Tampilan langsung berubah, server menyusul.
   const reactTo = useCallback(async (m0: Msg, emoji: string | null) => {
-    // Pakai keadaan pesan yang terbaru: menu bisa dibuka saat pesan masih "mengirim", lalu dipilih setelah terkirim.
+    // Selalu pakai keadaan pesan yang terbaru (menu bisa dibuka saat pesan masih "mengirim", lalu dipilih setelah terkirim).
     const m = msgsRef.current.find((y) => y.id === m0.id) ?? m0;
-    if (m.deleted_at || m.status === "sending" || m.status === "failed") return;
+    if (m.deleted_at || m.status === "failed") return;
     const who = { username: meRef.current.username, name: meRef.current.name || meRef.current.username };
     const before = m.reactions;
-    const set = (r: Reaction[] | undefined) => mutate(m.conversation_id, (x) => x.map((y) => y.id === m.id ? { ...y, reactions: r } : y));
-    set(applyMyReaction(before, who, emoji));
-    try {
-      const r = await fetch("/api/messages", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: m.id, action: "react", emoji }),
-      });
-      if (!r.ok) {
-        const err = await r.json().catch(() => null);
-        throw new Error(err?.error || "Gagal memberi reaksi");
-      }
-      const d = await r.json();
-      if (Array.isArray(d.reactions)) set(d.reactions);
-    } catch (e) {
-      set(before);
-      toast(e instanceof Error && e.message ? e.message : "Gagal memberi reaksi");
+    mutate(m.conversation_id, (x) => x.map((y) => (y.id === m.id ? { ...y, reactions: applyMyReaction(before, who, emoji) } : y)));
+    if (m.status === "sending") {
+      // pesan sendiri yang belum sampai ke server: tahan dulu, kirim otomatis setelah terkirim
+      pendingReact.current.set(m.id, { emoji, before: pendingReact.current.get(m.id)?.before ?? before });
+      reactBusy.add(m.id); // jangan ditimpa polling selagi menunggu
+      return;
     }
-  }, [mutate, toast]);
+    await sendReaction(m.id, m.conversation_id, emoji, before);
+  }, [mutate, sendReaction]);
 
   // Memilih emoji yang sama dengan reaksiku = mencabut reaksi (seperti WhatsApp).
   const pickReaction = useCallback((m: Msg, emoji: string) => {
@@ -734,7 +779,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
     const m = msgsRef.current.find((q) => q.id === m0.id) ?? m0;
     const items: MenuItem[] = [];
     const ok = !m.deleted_at && m.status !== "failed";
-    const canReact = ok && m.status !== "sending";
+    const canReact = ok;
     if (m.status === "failed") items.push({ icon: "send", label: "Kirim ulang", run: () => retry(m) });
     if (ok) items.push({ icon: "reply", label: "Balas", run: () => startReply(m) });
     if (!m.deleted_at) items.push({ icon: "copy", label: "Salin", run: () => copyMsg(m) });

@@ -15,17 +15,20 @@ export function Menu({ x, y, items, reactions, onClose }: { x: number; y: number
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
-  // Menu dibuka oleh tekan lama: jari yang masih menempel lalu dilepas jangan dihitung sebagai ketukan penutup.
+  // Menu dibuka oleh tekan lama. Di Android, Chrome masih mengirim "contextmenu" ke elemen di bawah jari
+  // (yaitu latar menu ini) beberapa puluh ms setelah menu muncul, lalu jari dilepas (touchend/pointercancel).
+  // Semua itu bukan ketukan untuk menutup: abaikan sampai jari dilepas + jeda singkat.
   useEffect(() => {
-    const up = () => { t0.current = performance.now(); };
-    window.addEventListener("touchend", up, { once: true });
-    window.addEventListener("pointerup", up, { once: true });
-    return () => { window.removeEventListener("touchend", up); window.removeEventListener("pointerup", up); };
+    const mark = () => { t0.current = performance.now(); };
+    const evs = ["touchend", "touchcancel", "pointerup", "pointercancel", "mouseup"] as const;
+    evs.forEach((n) => window.addEventListener(n, mark, { once: true, capture: true }));
+    return () => evs.forEach((n) => window.removeEventListener(n, mark, { capture: true }));
   }, []);
+  const tryClose = () => { if (performance.now() - t0.current > 500) onClose(); };
   return (
     <>
-      <div className="menu-bg" onClick={() => { if (performance.now() - t0.current > 350) onClose(); }}
-        onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
+      <div className="menu-bg" onClick={tryClose}
+        onContextMenu={(e) => { e.preventDefault(); tryClose(); }} />
       <div className={`menu${reactions ? " has-react" : ""}`} role="menu" style={{ "--x": `${x}px`, "--y": `${y}px` } as React.CSSProperties}>
         {reactions && (
           <div className="react-bar" role="group" aria-label="Beri reaksi">

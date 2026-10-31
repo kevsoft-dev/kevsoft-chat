@@ -16,7 +16,7 @@ export default memo(function MessageRow({ m, mine, first, newDay, showName, show
   const gone = !!m.deleted_at;
   const ai = m.kind === "ai";
   const msgRef = useRef<HTMLDivElement>(null);
-  const canReact = !!onReact && !gone && m.status !== "sending" && m.status !== "failed";
+  const canReact = !!onReact && !gone && m.status !== "failed";
   const reactions = !gone && m.reactions?.length ? m.reactions : null;
   const myEmoji = reactions?.find((r) => r.u.some((x) => x.u === meUsername))?.e ?? null;
   const total = reactions ? reactions.reduce((n, r) => n + r.u.length, 0) : 0;
@@ -35,7 +35,14 @@ export default memo(function MessageRow({ m, mine, first, newDay, showName, show
               </button>
           )}</span>
         )}
-        <div className={`bubble${gone ? " gone" : ""}${m.status === "failed" ? " failed" : ""}${reactions ? " has-react" : ""}`} {...lp.bind}>
+        <div className={`bubble${gone ? " gone" : ""}${m.status === "failed" ? " failed" : ""}${reactions ? " has-react" : ""}`} {...lp.bind}
+          onDoubleClick={(e) => {
+            // Cadangan di layar sentuh kalau tekan lama gagal: ketuk dua kali membuka menu yang sama.
+            if (!window.matchMedia?.("(hover: none)").matches) return;
+            if ((e.target as HTMLElement).closest?.("a,button")) return;
+            e.preventDefault();
+            onMenu(m, e.clientX, e.clientY);
+          }}>
           {showName && (
             <button type="button" className="sender" style={{ color: ai ? "var(--accent-text)" : nameColor(m.username || "") }}
               onClick={() => !ai && m.username && onOpenProfile?.(m.username)}
