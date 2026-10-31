@@ -188,11 +188,14 @@ Gerak aplikasi dibuat lembut ala Notion: fade + geser 4-8px, 150-300 ms, kurva e
 | Alamat | Isi |
 | --- | --- |
 | `/home` | Beranda publik (tanpa login): ringkasan fitur, berita terbaru, kritik & saran pilihan, tautan ke semua halaman |
-| `/chat` | Aplikasi chat (butuh login) |
 | `/news` | Berita Kevsoft |
 | `/cas` | Kritik & Saran |
 | `/docs` | Dokumentasi API publik |
 | `/sign-in` | Masuk / daftar (setelah masuk, default ke `/chat`) |
-| `/` | Hanya penghubung: ke `/home`; tautan lama `/?open=`, `/?dm=`, `/?reset=1`, `/?news=` diteruskan ke `/chat` |
+| `/` | Hanya penghubung: sudah login ke `/chat`, belum login ke `/home`; tautan lama `/?open=`, `/?dm=`, `/?reset=1`, `/?news=` diteruskan ke `/chat` |
+| `/chat` | Daftar chat. `/chat/dm` dan `/chat/grup` = daftar dengan tab Pribadi / Grup |
+| `/chat/dm/{username}` | Chat pribadi |
+| `/chat/grup/{id}` | Grup atau Komunitas (id percakapan; handle grup juga diterima) |
+| `/chat/ai` | Chat dengan Kev-Ai |
 
 Menambah halaman baru: buat `app/<nama>/page.tsx`, lalu tambahkan `<nama>` ke `RESERVED_PATH` di `middleware.ts` dan `RESERVED` di `lib/mentions.ts` supaya tidak dianggap username.

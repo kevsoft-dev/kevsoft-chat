@@ -46,7 +46,7 @@ export default function PublicProfile({
     }
     // Belum login → ke sign-in, setelah masuk kembali ke /dm/username
     if (!loggedIn) {
-      const next = `/dm/${encodeURIComponent(user.username)}`;
+      const next = `/chat/dm/${encodeURIComponent(user.username)}`;
       router.push(`/sign-in?next=${encodeURIComponent(next)}`);
       return;
     }
@@ -64,7 +64,7 @@ export default function PublicProfile({
         setBusy(false);
         return;
       }
-      router.push(`/dm/${user.username}`);
+      router.push(`/chat/dm/${encodeURIComponent(user.username)}`);
     } catch {
       setErr("Jaringan bermasalah");
       setBusy(false);
@@ -99,7 +99,7 @@ export default function PublicProfile({
       <header className="pub-bar">
         <button
           className="icon-btn"
-          onClick={() => router.push(loggedIn ? "/" : "/sign-in")}
+          onClick={() => router.push(loggedIn ? "/chat" : "/sign-in")}
           aria-label="Kembali"
         >
           <Icon n="back" />

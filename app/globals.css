@@ -2403,3 +2403,60 @@ a.set{color:var(--ink);text-decoration:none}a.set:hover{background:var(--fill)}
 @media (max-height:480px) and (orientation:landscape){.gd-side{top:56px}.gd-top{height:56px}.stg-head,.stg-top{min-height:52px}}
 @media (pointer:coarse){.stg input,.stg textarea,.stg .field,.gd-search input,.gd-try input{font-size:16px}}
 @media (prefers-reduced-motion:reduce){.stg-body,.stg-confirm,.stg-toast,.link-code span,.gd-side,.stg-faq details p,.stg-item,.gd-pn a{animation:none!important;transition:none!important}}
+
+/* ================================================================
+   v34 — HP / layar sentuh
+   ================================================================ */
+html{-webkit-tap-highlight-color:transparent}
+button,a,summary,[role="button"],.conv,.icon-btn{touch-action:manipulation}
+/* Layar chat: halaman tidak ikut tergulung atau tarik-untuk-muat-ulang */
+body:has(.app){overflow:hidden;overscroll-behavior:none}
+/* Ikuti area layar yang benar-benar terlihat (diisi dari visualViewport di iOS saat keyboard muncul) */
+.app{height:var(--vvh,100dvh);top:var(--vvt,0px);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+/* Tab tidak terpotong di layar sempit */
+.tabs{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:0 0 auto;white-space:nowrap}
+@media (pointer:coarse){
+  input,textarea,select,.field{font-size:16px} /* iOS tidak lagi memperbesar halaman saat kolom diketik */
+  .icon-btn{width:40px;height:40px}
+  .bar-actions{gap:0}
+  .tabs button,.seg button{min-height:36px}
+  .conv{padding-top:12px;padding-bottom:12px}
+  .menu button{min-height:48px}
+}
+/* HP landscape: ruang tinggi sempit */
+@media (max-height:480px) and (orientation:landscape){
+  .bar{min-height:48px;padding-top:max(4px,env(safe-area-inset-top));padding-bottom:4px}
+  .composer-wrap{padding-top:4px;padding-bottom:max(6px,env(safe-area-inset-bottom))}
+  .thread{padding-top:6px;padding-bottom:4px}
+}
+
+/* ================================================================
+   v35 — geser pesan ke kanan untuk membalas (HP)
+   Posisi diatur lewat --sx (px) dan --sp (0..1) dari lib/useSwipeReply.ts
+   ================================================================ */
+.msg{position:relative;touch-action:pan-y;--sx:0px;--sp:0}
+.msg.swiping,.msg.snap{transform:translate3d(var(--sx),0,0)}
+.msg.swiping{will-change:transform}
+/* lepas jari: membal lembut ke posisi awal */
+.msg.snap{transition:transform .5s var(--spring)}
+
+.swipe-ic{display:none;position:absolute;left:0;top:50%;width:34px;height:34px;margin:-17px 0 0 -46px;place-items:center;border-radius:50%;
+  background:var(--fill2);color:var(--muted);pointer-events:none;
+  opacity:var(--sp);transform:scale(calc(.5 + var(--sp) * .5));transition:background .18s,color .18s}
+.msg.swiping .swipe-ic,.msg.snap .swipe-ic{display:grid}
+
+/* melewati batas: ikon berwarna dan "pop" membal */
+.msg.armed .swipe-ic{background:var(--acid);color:var(--on-accent);animation:swipe-pop .4s var(--spring)}
+@keyframes swipe-pop{0%{transform:scale(.6)}55%{transform:scale(1.32)}100%{transform:scale(1)}}
+
+/* terkirim sebagai balasan: ikon memudar membesar, gelembung berdenyut halus */
+.msg.sent .swipe-ic{display:grid;background:var(--acid);color:var(--on-accent);animation:swipe-sent .46s ease-out both}
+@keyframes swipe-sent{from{transform:scale(1);opacity:1}to{transform:scale(1.7);opacity:0}}
+.msg.sent .bubble{animation:swipe-bub .46s var(--spring)}
+@keyframes swipe-bub{0%{transform:scale(1)}35%{transform:scale(.965)}100%{transform:scale(1)}}
+
+/* kolom "Membalas ..." muncul dengan pop lembut setiap target balasan berganti */
+.replying{transform-origin:bottom left;animation:reply-in .42s var(--spring) both}
+@keyframes reply-in{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}

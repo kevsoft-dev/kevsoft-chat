@@ -176,7 +176,7 @@ export default function Composer({ convId, kind, me, replyTo, onCancelReply, onS
         </ul>
       )}
       {replyTo && (
-        <div className="replying">
+        <div className="replying" key={replyTo.id}>
           <div>
             <b>Membalas {replyTo.username === me ? "kamu" : replyTo.kind === "ai" ? "Kev-Ai" : `@${replyTo.username}`}</b>
             <span>{replyTo.body.slice(0, 100)}</span>

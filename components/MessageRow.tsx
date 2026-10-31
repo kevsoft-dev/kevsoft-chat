@@ -1,21 +1,26 @@
 "use client";
-import { memo } from "react";
+import { memo, useRef } from "react";
+import { useSwipeReply } from "@/lib/useSwipeReply";
 import { AI_HANDLE } from "@/lib/mentions";
 import { Avatar, Icon, Rich, VerifiedBadge, clock, dayLabel, nameColor, useLongPress, type Msg } from "./ui";
 
-export default memo(function MessageRow({ m, mine, first, newDay, showName, showAv, meUsername, fresh, leaving, readBlue, onMenu, onRetry, onOpenProfile }: {
+export default memo(function MessageRow({ m, mine, first, newDay, showName, showAv, meUsername, fresh, leaving, readBlue, onMenu, onRetry, onReply, onOpenProfile }: {
   m: Msg; mine: boolean; first: boolean; newDay: boolean; showName: boolean; showAv: boolean; meUsername: string;
   fresh: boolean; leaving: boolean; readBlue?: boolean;
-  onMenu: (m: Msg, x: number, y: number) => void; onRetry: (m: Msg) => void;
+  onMenu: (m: Msg, x: number, y: number) => void; onRetry: (m: Msg) => void; onReply?: (m: Msg) => void;
   onOpenProfile?: (username: string) => void;
 }) {
   const lp = useLongPress((x, y) => onMenu(m, x, y));
   const gone = !!m.deleted_at;
   const ai = m.kind === "ai";
+  const msgRef = useRef<HTMLDivElement>(null);
+  // Geser ke kanan = balas (tidak untuk pesan terhapus, sedang dikirim, atau gagal)
+  useSwipeReply(msgRef, !!onReply && !gone && m.status !== "sending" && m.status !== "failed", () => onReply?.(m));
   return (
     <div className={`row-wrap${leaving ? " leaving" : ""}`}>
       {newDay && <div className="day"><span>{dayLabel(m.created_at)}</span></div>}
-      <div className={`msg ${mine ? "mine" : ""} ${ai ? "ai" : ""} ${first ? "first" : ""} ${fresh ? "fresh" : ""}`}>
+      <div ref={msgRef} className={`msg ${mine ? "mine" : ""} ${ai ? "ai" : ""} ${first ? "first" : ""} ${fresh ? "fresh" : ""}`}>
+        <span className="swipe-ic" aria-hidden><Icon n="reply" size={18} /></span>
         {showAv && (
           <span className="msg-av">{first && (
             ai ? <Avatar name={m.name || m.username || "?"} src={m.avatar_url} kind="ai" size={30} />

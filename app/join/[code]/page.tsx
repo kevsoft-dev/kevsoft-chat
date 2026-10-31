@@ -33,7 +33,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
   if (!g) return <Notice title="Link tidak berlaku" text="Link undangan ini salah atau sudah direset oleh admin grup. Minta link terbaru ke admin grupnya." />;
 
   const [mem] = await sql`select 1 from conversation_members where conversation_id = ${g.id} and user_id = ${uid}`;
-  if (mem) redirect(`/chat?open=${g.id}`);
+  if (mem) redirect(`/chat/grup/${g.id}`);
   const [kicked] = await sql`select 1 from conversation_kicks where conversation_id = ${g.id} and user_id = ${uid}`;
   if (kicked) return <Notice title="Tidak bisa bergabung" text="Kamu dikeluarkan dari grup ini oleh admin." />;
 

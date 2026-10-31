@@ -85,7 +85,11 @@ export async function POST(req: Request) {
       join conversation_members a on a.conversation_id = c.id and a.user_id = ${uid}
       join conversation_members b on b.conversation_id = c.id and b.user_id = ${other.id}
       where c.kind = 'dm' limit 1`;
-    if (existing) return Response.json({ id: existing.id });
+    if (existing) {
+      // Chat yang sebelumnya disembunyikan muncul lagi saat dibuka.
+      await sql`update conversation_members set hidden_at = null where conversation_id = ${existing.id} and user_id = ${uid} and hidden_at is not null`;
+      return Response.json({ id: existing.id });
+    }
 
     const [conv] = await sql`insert into conversations (kind, created_by) values ('dm', ${uid}) returning id`;
     await sql`insert into conversation_members (conversation_id, user_id)

@@ -1,67 +1,42 @@
 import { redirect } from "next/navigation";
-import { ensureDefaults, getUserId } from "@/lib/auth";
-import { ensureSchema } from "@/lib/migrate";
+import { getUserId } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { cfg } from "@/lib/config";
-import { readSessionMeta } from "@/lib/session";
-import { isFresh } from "@/lib/token";
-import Chat from "@/components/Chat";
-import Onboarding from "@/components/Onboarding";
+import { ensureSchema } from "@/lib/migrate";
+import { ChatEntry } from "@/lib/chatEntry";
+import { chatPath } from "@/lib/chatRoute";
 
 export const dynamic = "force-dynamic";
 
-function Problem({ text }: { text: string }) {
-  return (
-    <main className="auth"><div className="auth-card">
-      <span className="eyebrow">Terjadi masalah</span>
-      <h1>Gagal memuat chat</h1>
-      <p className="muted">Periksa <b>config.json</b> (databaseUrl, firebase), lalu buka <b>/api/health</b> untuk diagnosis.</p>
-      <p className="error">{text.slice(0, 300)}</p>
-    </div></main>
-  );
-}
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type Row = { id: string; username: string | null; name: string | null; avatar_url: string | null; banner_url?: string | null; bio: string | null; email: string | null; role: string; verified?: boolean | null; has_password: boolean; away_enabled?: boolean; away_message?: string | null };
-
-export default async function ChatRoute({ searchParams }: { searchParams: Promise<{ reset?: string; dm?: string; news?: string; open?: string }> }) {
-  let uid: string | null = null;
-  let authError = "";
-  try { uid = (await getUserId()) ?? null; } catch (e: any) { authError = String(e?.message ?? e); }
-  if (authError) return <Problem text={authError} />;
-  if (!uid) redirect("/sign-in?next=/chat");
-  const userId = uid as string;
-
-  let user: Row | undefined;
-  try {
-    await ensureSchema();
-    [user] = (await sql`
-      select id, username, name, avatar_url, banner_url, bio, email, role, (role = 'owner' or verified) as verified, (password_hash is not null) as has_password,
-        coalesce(away_enabled, false) as away_enabled, away_message
-      from users where id = ${userId}`) as any;
-    if (user?.username) await ensureDefaults(userId);
-  } catch (e: any) {
-    return <Problem text={String(e?.message ?? e)} />;
-  }
-
-  // Setelah verifikasi email/Google: wajib pilih username dan buat password (login berikutnya cukup username + password).
-  const needUsername = !user?.username;
-  const needPassword = !user?.has_password;
+// /chat = daftar chat. Tautan lama diteruskan ke alamat baru:
+//   /chat?dm=user     -> /chat/dm/user
+//   /chat?open=<id>   -> /chat/dm/{username} | /chat/grup/{id} | /chat/ai
+//   /chat?news=<id>   -> /news?id=<id>
+export default async function ChatHome({ searchParams }: { searchParams: Promise<{ reset?: string; dm?: string; news?: string; open?: string }> }) {
   const sp = await searchParams;
-  const reset = !needUsername && !needPassword && sp.reset === "1" && isFresh(await readSessionMeta());
-  if (!user || needUsername || needPassword || reset)
-    return <Onboarding suggestedName={user?.name ?? ""} needUsername={needUsername} reset={reset} username={user?.username ?? ""} />;
 
-  const openDm = (sp.dm || "").toLowerCase().replace(/^@/, "").trim() || undefined;
-  // Legacy deep-link berita: /?news=<id> → /news?id=<id>
   if (sp.news) redirect(`/news?id=${encodeURIComponent(sp.news)}`);
 
-  return (
-    <Chat
-      me={{ id: user.id, username: user.username as string, name: user.name ?? (user.username as string), avatarUrl: user.avatar_url || null, bannerUrl: user.banner_url || null, bio: user.bio, email: user.email, role: user.role, verified: !!user.verified, awayEnabled: !!user.away_enabled, awayMessage: user.away_message ?? null }}
-      pusherKey={cfg.pusher.key}
-      pusherCluster={cfg.pusher.cluster}
-      openDm={openDm}
-      openId={(sp.open || "").trim() || undefined}
-    />
-  );
+  const dm = (sp.dm || "").toLowerCase().replace(/^@/, "").trim();
+  if (dm) redirect(`/chat/dm/${encodeURIComponent(dm)}`);
+
+  const open = (sp.open || "").trim();
+  if (open && UUID.test(open)) {
+    const uid = await getUserId();
+    if (uid) {
+      await ensureSchema();
+      const [c] = await sql`
+        select c.id, c.kind,
+          (select u.username from conversation_members m join users u on u.id = m.user_id
+            where m.conversation_id = c.id and m.user_id <> ${uid} limit 1) as other_username
+        from conversations c
+        join conversation_members me on me.conversation_id = c.id and me.user_id = ${uid}
+        where c.id = ${open}::uuid`;
+      if (c) redirect(chatPath({ id: String(c.id), kind: c.kind as any, other_username: (c.other_username as string | null) ?? null }));
+      redirect("/chat");
+    }
+  }
+
+  return ChatEntry({ next: "/chat", reset: sp.reset === "1" });
 }

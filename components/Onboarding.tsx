@@ -9,8 +9,8 @@ const MIN = 8;
 
 // Langkah setelah verifikasi email/Google: pilih username (sekali) dan buat password.
 // reset = lupa password: hanya membuat password baru.
-export default function Onboarding({ suggestedName, needUsername, reset, username: existing }: {
-  suggestedName: string; needUsername: boolean; reset: boolean; username: string;
+export default function Onboarding({ suggestedName, needUsername, reset, username: existing, next = "/chat" }: {
+  suggestedName: string; needUsername: boolean; reset: boolean; username: string; next?: string;
 }) {
   const [username, setUsername] = useState("");
   const [name, setName] = useState(suggestedName);
@@ -34,7 +34,7 @@ export default function Onboarding({ suggestedName, needUsername, reset, usernam
         : await fetch("/api/me/password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pw }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(d.error || "Gagal menyimpan"); setBusy(false); return; }
-      window.location.assign("/chat"); // muat ulang penuh, langsung masuk ke chat
+      window.location.assign(next); // muat ulang penuh, langsung masuk ke chat (atau halaman chat yang dituju)
     } catch { setErr("Jaringan bermasalah, coba lagi"); setBusy(false); }
   }
 

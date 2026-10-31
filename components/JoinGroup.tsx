@@ -17,7 +17,7 @@ export default function JoinGroup({ code, title, description, memberCount, avata
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(d.error || "Gagal bergabung"); setBusy(false); return; }
-      window.location.assign(`/chat?open=${d.id}`);
+      window.location.assign(`/chat/grup/${d.id}`);
     } catch { setErr("Jaringan bermasalah"); setBusy(false); }
   }
 

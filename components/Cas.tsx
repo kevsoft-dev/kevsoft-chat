@@ -125,7 +125,7 @@ export default function Cas({ me }: { me: Me }) {
     <div className="cas">
       <div className="cas-wrap">
         <nav className="cas-nav">
-          <a className="cas-back" href="/home"><Icon n="back" size={16} /> Beranda</a>
+          <a className="cas-back" href="/chat"><Icon n="back" size={16} /> Chat</a>
           {me.root && <span className="cas-owner" title="Kamu bisa menghapus komentar apa pun">Owner utama{data?.queue ? ` · ${data.queue} antre` : ""}</span>}
         </nav>
 

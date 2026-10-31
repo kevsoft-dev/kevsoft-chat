@@ -64,8 +64,8 @@ export default async function middleware(req: NextRequest) {
   if (pathname.startsWith("/api/")) return new NextResponse("Unauthorized", { status: 401 });
   const url = req.nextUrl.clone();
   url.pathname = "/sign-in";
-  // Link undangan grup: setelah login kembali ke halaman join.
-  url.search = path.startsWith("/join/") || path === "/cas" || path === "/chat" ? `?next=${encodeURIComponent(pathname)}` : "";
+  // Setelah login kembali ke halaman yang tadi dituju (/chat/dm/..., /chat/grup/..., /join/..., /cas, dll).
+  url.search = pathname !== "/" ? `?next=${encodeURIComponent(pathname)}` : "";
   return NextResponse.redirect(url);
 }
 

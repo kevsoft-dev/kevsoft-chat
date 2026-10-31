@@ -1,8 +1,10 @@
 "use client";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Pusher from "pusher-js";
+import { usePathname } from "next/navigation";
 import { AI_HANDLE, USERNAME_RE, parseMentions } from "@/lib/mentions";
 import { readPref } from "@/lib/prefs";
+import { chatPath, findConv, parseChatPath, routeKey, tabPath, type ChatTab } from "@/lib/chatRoute";
 import { blip, unlockAudio } from "@/lib/sound";
 import Composer from "./Composer";
 import Console from "./Console";
@@ -43,7 +45,7 @@ async function fetchMsgs(id: string, peek = false): Promise<Msg[] | null> {
   } catch { return null; }
 }
 
-export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId }: { me: Me; pusherKey: string; pusherCluster: string; openDm?: string; openId?: string }) {
+export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pusherKey: string; pusherCluster: string }) {
   const [me, setMe] = useState<Me>(me0);
   const [convs, setConvs] = useState<Conv[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -52,7 +54,14 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
   const [noMore, setNoMore] = useState(false);
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
   const [q, setQ] = useState("");
-  const [tab, setTab] = useState<"all" | "dm" | "group">("all");
+  const pathname = usePathname();
+  const route = useMemo(() => parseChatPath(pathname), [pathname]);
+  const rKey = routeKey(route);
+  const [tab, setTab] = useState<ChatTab>(route.kind === "list" ? route.tab : "all");
+  // true = daftar chat dari server sudah tiba (sebelum itu daftar bisa saja hanya salinan lama dari sessionStorage)
+  const [ready, setReady] = useState(false);
+  // true = alamat sudah menunjuk ke sebuah chat tetapi chatnya belum terbuka (daftar masih dimuat)
+  const [opening, setOpening] = useState(route.kind !== "list");
   const [showNew, setShowNew] = useState(false);
   const [profile, setProfile] = useState(false);
   useEffect(() => { if (new URLSearchParams(location.search).get("profile")) setProfile(true); }, []);
@@ -110,7 +119,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     try {
       const r = await fetch("/api/conversations");
       if (r.status === 401) { window.location.assign("/sign-in"); return; }
-      if (r.ok) { const d = await r.json(); serverLoaded.current = true; setConvs(d); }
+      if (r.ok) { const d = await r.json(); serverLoaded.current = true; setConvs(d); setReady(true); }
     } catch {}
   }, []);
   // Muat ulang daftar dengan jeda singkat supaya beberapa event beruntun hanya memicu satu query.
@@ -149,11 +158,34 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     if (cache.current[cid]) cache.current[cid] = fn(cache.current[cid]);
   }, []);
 
-  const closeChat = useCallback(() => {
+  // Tutup chat di sisi tampilan saja (alamat tidak disentuh).
+  const deactivate = useCallback(() => {
     const id = activeRef.current;
     if (id) cache.current[id] = msgsRef.current;
-    activeRef.current = null; setActiveId(null); setInfo(false); setReplyTo(null);
+    activeRef.current = null; setActiveId(null); setInfo(false); setReplyTo(null); setOpening(false);
   }, []);
+
+  // Ganti alamat tanpa memuat ulang halaman. Dari daftar -> chat = entri riwayat baru (tombol Kembali HP
+  // kembali ke daftar); antar chat = menimpa entri (riwayat tidak menumpuk).
+  const goTo = useCallback((path: string) => {
+    if (typeof window === "undefined" || window.location.pathname === path) return;
+    const inChat = parseChatPath(window.location.pathname).kind !== "list";
+    try {
+      if (inChat) window.history.replaceState(window.history.state, "", path);
+      else window.history.pushState({ kc: 1 }, "", path);
+    } catch {}
+  }, []);
+
+  // Kembali ke daftar chat: tampilan langsung menutup, alamat mengikuti.
+  const closeChat = useCallback(() => {
+    deactivate();
+    if (typeof window === "undefined" || parseChatPath(window.location.pathname).kind === "list") return;
+    try {
+      if (window.history.state?.kc) window.history.back(); // entri yang kita buat sendiri dari daftar
+      else window.history.replaceState(window.history.state, "", "/chat"); // dibuka langsung lewat alamat
+    } catch {}
+  }, [deactivate]);
+  const closeRef = useRef(closeChat); closeRef.current = closeChat;
 
   // Prefetch pesan chat (tanpa menandai dibaca) supaya saat dibuka langsung tampil dari cache.
   const prefetch = useCallback((id: string) => {
@@ -241,7 +273,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     ch.bind("conversation", (d?: { id?: string; title?: string; description?: string | null; rules?: string | null; avatar_url?: string | null; handle?: string | null; cleared?: boolean; destroyed?: boolean }) => {
       scheduleConvs();
       if (d?.destroyed && d.id && activeRef.current === d.id) {
-        activeRef.current = null; setActiveId(null); setMsgs([]); setInfo(false);
+        setMsgs([]); closeRef.current();
       } else if (d?.cleared && d.id && activeRef.current === d.id) {
         setMsgs([]); if (cache.current[d.id]) cache.current[d.id] = [];
       }
@@ -347,18 +379,43 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
 
 
   const totalUnread = (convs ?? []).reduce((n, c) => n + c.unread, 0);
-  useEffect(() => { document.title = totalUnread ? `(${totalUnread}) kevsoft-chat` : "kevsoft-chat"; }, [totalUnread]);
+  useEffect(() => {
+    const base = active ? `${convName(active)} · kevsoft-chat` : "kevsoft-chat";
+    document.title = totalUnread ? `(${totalUnread}) ${base}` : base;
+  }, [totalUnread, active]);
+
+  // iOS Safari tidak mengecilkan layout saat keyboard muncul, sehingga kolom ketik tertutup.
+  // Ikuti visualViewport (hanya di iOS) lewat variabel CSS --vvh / --vvt yang dipakai .app.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (!vv || !ios) return;
+    const root = document.documentElement;
+    const sync = () => {
+      root.style.setProperty("--vvh", `${Math.round(vv.height)}px`);
+      root.style.setProperty("--vvt", `${Math.round(vv.offsetTop)}px`);
+    };
+    sync();
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    return () => {
+      vv.removeEventListener("resize", sync);
+      vv.removeEventListener("scroll", sync);
+      root.style.removeProperty("--vvh");
+      root.style.removeProperty("--vvt");
+    };
+  }, []);
 
   // Chat yang dibuka hilang dari daftar (mis. dihapus dari perangkat lain) -> kembali ke daftar.
   useEffect(() => { if (activeId && convs && !active) closeChat(); }, [activeId, convs, active, closeChat]);
 
   // ---------- buka chat ----------
-  const open = useCallback(async (id: string) => {
+  const activate = useCallback(async (id: string) => {
     const prev = activeRef.current;
     if (prev) cache.current[prev] = msgsRef.current;
     const keys = Object.keys(cache.current);
     if (keys.length > 12) delete cache.current[keys[0]];
-    activeRef.current = id; setActiveId(id); fresh.current.clear();
+    activeRef.current = id; setActiveId(id); setOpening(false); fresh.current.clear();
     positioned.current = null; stick.current = true; setAway(false); setNewBelow(0); setNoMore(false);
     setReplyTo(null); setInfo(false); setMembers([]); setMenu(null); setViewUser(null); setAddMemberOpen(false); setRulesOpen(false); setLinkOpen(false); setAddQ(""); setAddHits([]);
     const cached = cache.current[id];
@@ -370,12 +427,21 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     if (list) setMsgs((p) => mergePending(list, p));
   }, []);
 
+  // Dibuka oleh pengguna (klik di daftar, chat baru, dll): alamat ikut berganti.
+  const open = useCallback((id: string) => {
+    const c = convsRef.current?.find((x) => x.id === id);
+    if (c) goTo(chatPath(c));
+    activate(id);
+  }, [goTo, activate]);
+
   const openById = useCallback(async (id: string) => {
     setShowNew(false);
     try {
       const r = await fetch("/api/conversations");
       if (!r.ok) return;
-      setConvs(await r.json());
+      const list: Conv[] = await r.json();
+      convsRef.current = list; // supaya open() langsung melihat chat yang baru dibuat
+      setConvs(list); setReady(true);
       open(id);
     } catch {}
   }, [open]);
@@ -395,22 +461,44 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     } catch { toast("Jaringan bermasalah"); }
   }, [openById, toast]);
 
-  // Deep link: buka chat by id (server sudah siapkan) atau by username
-  const dmOpened = useRef(false);
+  // Alamat adalah sumber kebenaran: /chat/dm/{username}, /chat/grup/{id}, /chat/ai.
+  // Berjalan saat alamat berubah (klik, tombol Kembali/Maju browser, tautan langsung) dan saat daftar dari server tiba.
+  const dmTried = useRef("");
+  const hasConvs = convs !== null;
   useEffect(() => {
-    if (dmOpened.current) return;
-    if (openId) {
-      dmOpened.current = true;
-      const t = setTimeout(() => { openById(openId); }, 30);
-      return () => clearTimeout(t);
+    const r = parseChatPath(window.location.pathname); // alamat terkini langsung dari browser
+    const key = routeKey(r);
+    if (r.kind === "list") {
+      if (activeRef.current) deactivate();
+      setOpening(false);
+      if (r.tab !== "all") setTab(r.tab);
+      return;
     }
-    if (!openDm) return;
-    const target = openDm.replace(/^@/, "").toLowerCase().trim();
-    if (!target || target === me0.username.toLowerCase()) return;
-    dmOpened.current = true;
-    const t = setTimeout(() => { openDmWith(target); }, 50);
-    return () => clearTimeout(t);
-  }, [openId, openDm, openById, openDmWith, me0.username]);
+    const hit = convsRef.current ? findConv(r, convsRef.current) : null;
+    if (hit) {
+      if (activeRef.current !== hit.id) activate(hit.id);
+      else setOpening(false);
+      const want = chatPath(hit);
+      if (window.location.pathname !== want) window.history.replaceState(window.history.state, "", want); // alamat rapi/kanonik
+      return;
+    }
+    if (!ready) return; // tunggu daftar dari server sebelum memutuskan chatnya tidak ada
+    if (r.kind === "dm" && r.key !== meRef.current.username.toLowerCase()) {
+      if (dmTried.current === key) return;
+      dmTried.current = key;
+      setOpening(true);
+      openDmWith(r.key).then(() => {
+        if (activeRef.current) return;
+        setOpening(false); // gagal membuka (username tidak ada, jaringan, dll) -> kembali ke daftar
+        try { window.history.replaceState(window.history.state, "", "/chat"); } catch {}
+      });
+      return;
+    }
+    // Chat tidak ada / bukan milikmu / chat dengan diri sendiri -> kembali ke daftar.
+    if (r.kind !== "dm") toast("Chat tidak ditemukan");
+    setOpening(false);
+    try { window.history.replaceState(window.history.state, "", "/chat"); } catch {}
+  }, [rKey, ready, hasConvs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function copyText(text: string, okMsg: string) {
     try {
@@ -586,15 +674,17 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     try { await navigator.clipboard.writeText(m.body); toast("Pesan disalin"); } catch { toast("Gagal menyalin"); }
   }, [toast]);
 
+  const startReply = useCallback((m: Msg) => { setReplyTo(m); taRef.current?.focus(); }, []);
+
   const openMsgMenu = useCallback((m: Msg, x: number, y: number) => {
     const items: MenuItem[] = [];
     const ok = !m.deleted_at && m.status !== "failed";
     if (m.status === "failed") items.push({ icon: "send", label: "Kirim ulang", run: () => retry(m) });
-    if (ok) items.push({ icon: "reply", label: "Balas", run: () => { setReplyTo(m); taRef.current?.focus(); } });
+    if (ok) items.push({ icon: "reply", label: "Balas", run: () => startReply(m) });
     if (!m.deleted_at) items.push({ icon: "copy", label: "Salin", run: () => copyMsg(m) });
     items.push({ icon: "trash", label: "Hapus", danger: true, run: () => askDelete(m) });
     setMenu({ ...placeMenu(x, y, items.length), items });
-  }, [retry, copyMsg, askDelete]);
+  }, [retry, copyMsg, askDelete, startReply]);
 
   // ---------- hapus / bersihkan chat ----------
   const runConvDelete = useCallback(async (c: Conv, mode: "clear" | "delete") => {
@@ -922,6 +1012,14 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
     });
   }, [convs, q, tab]);
 
+  // Tab ikut tercermin di alamat (/chat, /chat/dm, /chat/grup) selama tidak ada chat yang terbuka.
+  const pickTab = (k: ChatTab) => {
+    setTab(k);
+    if (!activeRef.current && parseChatPath(window.location.pathname).kind === "list") {
+      try { window.history.replaceState(window.history.state, "", tabPath(k)); } catch {}
+    }
+  };
+
   const subtitle = (c: Conv) => {
     const base = c.kind === "dm" ? `@${c.other_username}` : c.kind === "ai" ? "Asisten AI · selalu online" : `${c.member_count} anggota`;
     const d = c.disappear_seconds || 0;
@@ -950,7 +1048,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
   }
 
   return (
-    <div className="app" data-chat={active ? "open" : "list"}>
+    <div className="app" data-chat={active || opening ? "open" : "list"}>
       <aside className="side">
         <header className="bar">
           <div className="brand"><Logo /><div><strong>kevsoft-chat</strong><small>@{me.username}</small></div></div>
@@ -966,7 +1064,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
         <div className="search"><Icon n="search" size={18} /><input placeholder="Cari chat" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari chat" /></div>
         <div className="tabs">
           {([["all", "Semua"], ["dm", "Pribadi"], ["group", "Grup"]] as const).map(([k, l]) => (
-            <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>
+            <button key={k} className={tab === k ? "on" : ""} onClick={() => pickTab(k)}>{l}</button>
           ))}
         </div>
         <ul className="convs">
@@ -981,7 +1079,15 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
       </aside>
 
       <section className="main">
-        {active ? (
+        {!active && opening ? (
+          <>
+            <header className="bar">
+              <button className="icon-btn back" onClick={closeChat} aria-label="Kembali"><Icon n="back" /></button>
+              <div className="who" aria-hidden><span className="skel av" style={{ width: 42, height: 42 }} /><div><i className="skel" style={{ display: "block", width: 120, height: 14 }} /><i className="skel" style={{ display: "block", width: 72, height: 10, marginTop: 6 }} /></div></div>
+            </header>
+            <div className="thread"><div className="thread-skel" aria-hidden>{[0, 1, 0, 1, 0].map((r, i) => <i key={i} className={`skel ${r ? "r" : ""}`} style={{ width: `${38 + ((i * 17) % 30)}%` }} />)}</div></div>
+          </>
+        ) : active ? (
           <>
             <header className="bar">
               <button className="icon-btn back" onClick={closeChat} aria-label="Kembali"><Icon n="back" /></button>
@@ -1017,7 +1123,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster, openDm, openId
                   <MessageRow key={m.id} m={m} mine={mine} first={first} newDay={newDay}
                     showName={!mine && first && groupLike} showAv={!mine && groupLike} meUsername={me.username}
                     fresh={fresh.current.has(m.id)} leaving={leavingMsgs.includes(m.id)} readBlue={readBlue}
-                    onMenu={openMsgMenu} onRetry={retry}
+                    onMenu={openMsgMenu} onRetry={retry} onReply={startReply}
                     onOpenProfile={(u) => { window.location.href = "/" + encodeURIComponent(u); }} />
                 );
               })}
