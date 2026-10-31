@@ -351,7 +351,7 @@ export default function Profile({ me, onClose, onUpdate, onLogout, onToast, onCo
           )}
         </div>
 
-        <a className="card st-entry" href="/settings"><div className="set"><Icon n="link" size={20} /><span>Pengaturan lengkap<small>Perangkat tertaut, developer mode, bantuan</small></span><Icon n="back" size={18} /></div></a>
+        <a className="card stg-entry" href="/settings"><div className="set"><Icon n="link" size={20} /><span>Pengaturan lengkap<small>Perangkat tertaut, developer mode, bantuan</small></span><Icon n="back" size={18} /></div></a>
         <button className="logout" onClick={onLogout}><Icon n="logout" size={20} />Keluar</button>
         <p className="ver">kevsoft-chat</p>
       </div>
