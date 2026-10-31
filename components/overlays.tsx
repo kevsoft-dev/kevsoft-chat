@@ -15,6 +15,13 @@ export function Menu({ x, y, items, reactions, onClose }: { x: number; y: number
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
+  // Menu dibuka oleh tekan lama: jari yang masih menempel lalu dilepas jangan dihitung sebagai ketukan penutup.
+  useEffect(() => {
+    const up = () => { t0.current = performance.now(); };
+    window.addEventListener("touchend", up, { once: true });
+    window.addEventListener("pointerup", up, { once: true });
+    return () => { window.removeEventListener("touchend", up); window.removeEventListener("pointerup", up); };
+  }, []);
   return (
     <>
       <div className="menu-bg" onClick={() => { if (performance.now() - t0.current > 350) onClose(); }}

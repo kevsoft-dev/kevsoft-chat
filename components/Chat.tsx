@@ -658,7 +658,8 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
     }
   }, [mutate, scheduleConvs, toast]);
 
-  const askDelete = useCallback((m: Msg) => {
+  const askDelete = useCallback((m0: Msg) => {
+    const m = msgsRef.current.find((y) => y.id === m0.id) ?? m0;
     if (m.status === "failed") { // belum sampai ke server: cukup buang dari layar
       setLeavingMsgs((l) => [...l, m.id]);
       setTimeout(() => { mutate(m.conversation_id, (x) => x.filter((y) => y.id !== m.id)); setLeavingMsgs((l) => l.filter((i) => i !== m.id)); }, 200);
@@ -687,7 +688,9 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
   const startReply = useCallback((m: Msg) => { setReplyTo(m); taRef.current?.focus(); }, []);
 
   // Beri / ganti / hapus reaksiku. emoji null = hapus. Tampilan langsung berubah, server menyusul.
-  const reactTo = useCallback(async (m: Msg, emoji: string | null) => {
+  const reactTo = useCallback(async (m0: Msg, emoji: string | null) => {
+    // Pakai keadaan pesan yang terbaru: menu bisa dibuka saat pesan masih "mengirim", lalu dipilih setelah terkirim.
+    const m = msgsRef.current.find((y) => y.id === m0.id) ?? m0;
     if (m.deleted_at || m.status === "sending" || m.status === "failed") return;
     const who = { username: meRef.current.username, name: meRef.current.name || meRef.current.username };
     const before = m.reactions;
@@ -722,11 +725,13 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
   }), [pickReaction]);
 
   // Tombol senyum di samping gelembung: hanya bar reaksi.
-  const openReactBar = useCallback((m: Msg, x: number, y: number) => {
+  const openReactBar = useCallback((m0: Msg, x: number, y: number) => {
+    const m = msgsRef.current.find((q) => q.id === m0.id) ?? m0;
     setMenu({ ...placeMenu(x, y, 1.4), items: [], reactions: reactionsFor(m) });
   }, [reactionsFor]);
 
-  const openMsgMenu = useCallback((m: Msg, x: number, y: number) => {
+  const openMsgMenu = useCallback((m0: Msg, x: number, y: number) => {
+    const m = msgsRef.current.find((q) => q.id === m0.id) ?? m0;
     const items: MenuItem[] = [];
     const ok = !m.deleted_at && m.status !== "failed";
     const canReact = ok && m.status !== "sending";

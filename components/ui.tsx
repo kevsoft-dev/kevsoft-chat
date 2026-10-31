@@ -1,5 +1,5 @@
 "use client";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { AI_HANDLE, LOGO, mentionRegex } from "@/lib/mentions";
 
 export type Me = { id: string; username: string; name: string; avatarUrl?: string | null; bannerUrl?: string | null; bio?: string | null; email?: string | null; role?: string; verified?: boolean; awayEnabled?: boolean; awayMessage?: string | null };
@@ -248,18 +248,26 @@ export function useLongPress(cb: (x: number, y: number) => void, ms = 450) {
   const fired = useRef(false);
   const lastFire = useRef(0);
   const start = useRef({ x: 0, y: 0 });
+  // Callback selalu yang terbaru: tekan lama yang dimulai sebelum pesan berubah (mis. "mengirim" -> "terkirim",
+  // atau daftar dimuat ulang oleh polling) tetap membuka menu untuk keadaan pesan yang sekarang.
+  const latest = useRef(cb);
+  latest.current = cb;
   const stop = () => clearTimeout(timer.current);
-  const fire = (x: number, y: number) => { fired.current = true; lastFire.current = performance.now(); cb(x, y); };
+  useEffect(() => stop, []);
+  const fire = (x: number, y: number) => { fired.current = true; lastFire.current = performance.now(); latest.current(x, y); };
   const bind = {
     onTouchStart: (e: React.TouchEvent) => {
+      stop();
       fired.current = false;
+      if (e.touches.length !== 1) return;
       const p = e.touches[0];
       start.current = { x: p.clientX, y: p.clientY };
       timer.current = setTimeout(() => { navigator.vibrate?.(8); fire(start.current.x, start.current.y); }, ms);
     },
     onTouchMove: (e: React.TouchEvent) => {
       const p = e.touches[0];
-      if (Math.abs(p.clientX - start.current.x) + Math.abs(p.clientY - start.current.y) > 10) stop();
+      // jarak lurus, bukan penjumlahan sumbu: getar jari kecil tidak membatalkan tekan lama
+      if (Math.hypot(p.clientX - start.current.x, p.clientY - start.current.y) > 14) stop();
     },
     onTouchEnd: stop,
     onTouchCancel: stop,
