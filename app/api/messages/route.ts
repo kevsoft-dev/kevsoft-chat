@@ -5,13 +5,21 @@ import { sql } from "@/lib/db";
 import { getUserId } from "@/lib/auth";
 import { aiPrompt, AI_HANDLE, parseMentions } from "@/lib/mentions";
 import { askKevAi } from "@/lib/ai";
-import { broadcast, getMessage } from "@/lib/messages";
+import { broadcast, getMessage, getReactions } from "@/lib/messages";
 import { logMod } from "@/lib/audit";
 import { getActor } from "@/lib/auth";
 import { isRootEmail } from "@/lib/roles";
 
 export const maxDuration = 60;
 const uuid = z.string().uuid();
+
+// Tepat satu emoji (boleh gabungan seperti 👍🏽, ❤️, 🏳️‍🌈, bendera, atau keycap).
+function isOneEmoji(s: string) {
+  if (!/\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u.test(s)) return false;
+  if (/[\p{L}\p{N}]/u.test(s.replace(/\u20E3/gu, "").replace(/^[0-9#*]\uFE0F?/u, ""))) return false;
+  const seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  return [...seg.segment(s)].length === 1;
+}
 
 export async function GET(req: Request) {
   const uid = await getUserId();
@@ -35,6 +43,15 @@ export async function GET(req: Request) {
         m.pinned_at, m.media_mime, m.media_name,
         case when m.media_data is not null and m.deleted_at is null then true else false end as has_media,
         case when m.deleted_at is null then m.poll_data else null end as poll_data,
+        coalesce((
+          select jsonb_agg(jsonb_build_object('e', x.emoji, 'u', x.users) order by x.first_at)
+          from (
+            select r.emoji, min(r.created_at) as first_at,
+              jsonb_agg(jsonb_build_object('u', ru2.username, 'n', coalesce(ru2.name, ru2.username)) order by r.created_at) as users
+            from message_reactions r join users ru2 on ru2.id = r.user_id
+            where r.message_id = m.id and m.deleted_at is null group by r.emoji
+          ) x
+        ), '[]'::jsonb) as reactions,
         case when m.kind = 'ai' then 'kev-ai' else u.username end as username,
         case when m.kind = 'ai' then 'Kev-Ai' else coalesce(u.name, u.username) end as name,
         u.avatar_url,
@@ -266,11 +283,12 @@ export async function PATCH(req: Request) {
   const body = await req.json().catch(() => null);
   const parsed = z.object({
     id: uuid,
-    action: z.enum(["pin", "unpin", "vote"]),
+    action: z.enum(["pin", "unpin", "vote", "react"]),
     option: z.number().int().min(0).max(9).optional(),
+    emoji: z.string().max(32).nullable().optional(), // react: null = hapus reaksi
   }).safeParse(body);
   if (!parsed.success) return new Response("Bad request", { status: 400 });
-  const { id, action, option } = parsed.data;
+  const { id, action, option, emoji } = parsed.data;
 
   const [m] = await sql`
     select m.id, m.conversation_id, m.poll_data, m.pinned_at, c.kind, cm.role as member_role, v.role as sys_role
@@ -289,6 +307,26 @@ export async function PATCH(req: Request) {
     await sql`update messages set pinned_at = ${action === "pin" ? new Date().toISOString() : null} where id = ${id}`;
     after(() => broadcast(m.conversation_id, "pin", { id, conversation_id: m.conversation_id, pinned: action === "pin" }));
     return Response.json({ ok: true, pinned: action === "pin" });
+  }
+
+  if (action === "react") {
+    const rr = await limit(`react:${uid}`, 60, 60);
+    if (!rr.ok) return tooMany(rr);
+    // Pengguna yang sedang dibisukan tidak bisa bereaksi (sama seperti mengirim pesan).
+    const [muted] = await sql`select 1 as x from users where id = ${uid} and muted_until > now()`;
+    if (muted) return Response.json({ error: "Kamu sedang dibisukan" }, { status: 403 });
+    if (emoji == null || emoji === "") {
+      await sql`delete from message_reactions where message_id = ${id} and user_id = ${uid}`;
+    } else {
+      if (!isOneEmoji(emoji)) return Response.json({ error: "Emoji tidak valid" }, { status: 400 });
+      // Satu reaksi per orang per pesan (seperti WhatsApp): memilih emoji lain menggantikan yang lama.
+      await sql`
+        insert into message_reactions (message_id, user_id, emoji) values (${id}, ${uid}, ${emoji})
+        on conflict (message_id, user_id) do update set emoji = excluded.emoji, created_at = now()`;
+    }
+    const reactions = await getReactions(id);
+    after(() => broadcast(m.conversation_id, "reaction", { id, conversation_id: m.conversation_id, reactions, by: uid, emoji: emoji || null }));
+    return Response.json({ ok: true, reactions });
   }
 
   // vote

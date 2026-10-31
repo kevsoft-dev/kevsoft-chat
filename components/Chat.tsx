@@ -12,10 +12,10 @@ import ConvItem from "./ConvItem";
 import MessageRow from "./MessageRow";
 import NewChat from "./NewChat";
 import Profile from "./Profile";
-import { Dialog, Lightbox, Menu, type DialogAction, type MenuItem } from "./overlays";
-import { Avatar, Banner, Icon, Logo, RoleBadge, VerifiedBadge, DEFAULT_ROLE_LABELS, convName, isStaffRole, type Conv, type Me, type Msg, type UserLite, type RoleLabels } from "./ui";
+import { Dialog, EmojiPicker, Lightbox, Menu, ReactionSheet, type DialogAction, type MenuItem, type MenuReactions } from "./overlays";
+import { Avatar, Banner, Icon, Logo, RoleBadge, VerifiedBadge, DEFAULT_ROLE_LABELS, applyMyReaction, convName, isStaffRole, myReaction, type Conv, type Me, type Msg, type Reaction, type UserLite, type RoleLabels } from "./ui";
 
-type MenuState = { x: number; y: number; items: MenuItem[] };
+type MenuState = { x: number; y: number; items: MenuItem[]; reactions?: MenuReactions };
 type DialogState = { title: string; text?: string; actions: DialogAction[] };
 
 const post = (url: string, body: object) =>
@@ -72,6 +72,8 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
   const [leavingMsgs, setLeavingMsgs] = useState<string[]>([]);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [pickerFor, setPickerFor] = useState<string | null>(null);   // id pesan yang sedang dipilihkan emoji
+  const [reactView, setReactView] = useState<string | null>(null);   // id pesan yang daftar reaksinya dibuka
   const [zoom, setZoom] = useState<string | null>(null);
   const [toastText, setToastText] = useState("");
   const [away, setAway] = useState(false);
@@ -265,6 +267,14 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
     ch.bind("remove", (d: { id: string; conversation_id: string }) => {
       mutate(d.conversation_id, (x) => x.filter((y) => y.id !== d.id));
       scheduleConvs();
+    });
+    ch.bind("reaction", (d: { id: string; conversation_id: string; reactions: Reaction[]; by?: string; emoji?: string | null }) => {
+      mutate(d.conversation_id, (x) => x.map((y) => y.id === d.id ? { ...y, reactions: d.reactions } : y));
+      // Ada yang bereaksi ke pesanku: bunyi singkat kalau tab sedang tidak dilihat.
+      if (d.emoji && d.by && d.by !== meRef.current.id && readPref("sound", true)) {
+        const target = (cache.current[d.conversation_id] || msgsRef.current).find((y) => y.id === d.id);
+        if (target?.sender_id === meRef.current.id && (document.hidden || d.conversation_id !== activeRef.current)) blip("in");
+      }
     });
     ch.bind("pin", (d: { id: string; conversation_id: string; pinned?: boolean }) => {
       mutate(d.conversation_id, (x) => x.map((y) => y.id === d.id ? { ...y, pinned_at: d.pinned ? new Date().toISOString() : null } : y));
@@ -676,15 +686,56 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
 
   const startReply = useCallback((m: Msg) => { setReplyTo(m); taRef.current?.focus(); }, []);
 
+  // Beri / ganti / hapus reaksiku. emoji null = hapus. Tampilan langsung berubah, server menyusul.
+  const reactTo = useCallback(async (m: Msg, emoji: string | null) => {
+    if (m.deleted_at || m.status === "sending" || m.status === "failed") return;
+    const who = { username: meRef.current.username, name: meRef.current.name || meRef.current.username };
+    const before = m.reactions;
+    const set = (r: Reaction[] | undefined) => mutate(m.conversation_id, (x) => x.map((y) => y.id === m.id ? { ...y, reactions: r } : y));
+    set(applyMyReaction(before, who, emoji));
+    try {
+      const r = await fetch("/api/messages", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: m.id, action: "react", emoji }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => null);
+        throw new Error(err?.error || "Gagal memberi reaksi");
+      }
+      const d = await r.json();
+      if (Array.isArray(d.reactions)) set(d.reactions);
+    } catch (e) {
+      set(before);
+      toast(e instanceof Error && e.message ? e.message : "Gagal memberi reaksi");
+    }
+  }, [mutate, toast]);
+
+  // Memilih emoji yang sama dengan reaksiku = mencabut reaksi (seperti WhatsApp).
+  const pickReaction = useCallback((m: Msg, emoji: string) => {
+    reactTo(m, myReaction(m, meRef.current.username) === emoji ? null : emoji);
+  }, [reactTo]);
+
+  const reactionsFor = useCallback((m: Msg): MenuReactions => ({
+    current: myReaction(m, meRef.current.username),
+    onPick: (e) => pickReaction(m, e),
+    onMore: () => setPickerFor(m.id),
+  }), [pickReaction]);
+
+  // Tombol senyum di samping gelembung: hanya bar reaksi.
+  const openReactBar = useCallback((m: Msg, x: number, y: number) => {
+    setMenu({ ...placeMenu(x, y, 1.4), items: [], reactions: reactionsFor(m) });
+  }, [reactionsFor]);
+
   const openMsgMenu = useCallback((m: Msg, x: number, y: number) => {
     const items: MenuItem[] = [];
     const ok = !m.deleted_at && m.status !== "failed";
+    const canReact = ok && m.status !== "sending";
     if (m.status === "failed") items.push({ icon: "send", label: "Kirim ulang", run: () => retry(m) });
     if (ok) items.push({ icon: "reply", label: "Balas", run: () => startReply(m) });
     if (!m.deleted_at) items.push({ icon: "copy", label: "Salin", run: () => copyMsg(m) });
     items.push({ icon: "trash", label: "Hapus", danger: true, run: () => askDelete(m) });
-    setMenu({ ...placeMenu(x, y, items.length), items });
-  }, [retry, copyMsg, askDelete, startReply]);
+    setMenu({ ...placeMenu(x, y, items.length + (canReact ? 1.4 : 0)), items, reactions: canReact ? reactionsFor(m) : undefined });
+  }, [retry, copyMsg, askDelete, startReply, reactionsFor]);
 
   // ---------- hapus / bersihkan chat ----------
   const runConvDelete = useCallback(async (c: Conv, mode: "clear" | "delete") => {
@@ -1124,6 +1175,7 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
                     showName={!mine && first && groupLike} showAv={!mine && groupLike} meUsername={me.username}
                     fresh={fresh.current.has(m.id)} leaving={leavingMsgs.includes(m.id)} readBlue={readBlue}
                     onMenu={openMsgMenu} onRetry={retry} onReply={startReply}
+                    onReact={openReactBar} onShowReactions={(mm) => setReactView(mm.id)}
                     onOpenProfile={(u) => { window.location.href = "/" + encodeURIComponent(u); }} />
                 );
               })}
@@ -1497,7 +1549,18 @@ export default function Chat({ me: me0, pusherKey, pusherCluster }: { me: Me; pu
           onClose={() => setRulesOpen(false)}
         />
       )}
-      {menu && <Menu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
+      {menu && <Menu x={menu.x} y={menu.y} items={menu.items} reactions={menu.reactions} onClose={() => setMenu(null)} />}
+      {(() => {
+        const pm = pickerFor ? msgs.find((x) => x.id === pickerFor) : null;
+        return pm ? <EmojiPicker current={myReaction(pm, me.username)} onPick={(e) => pickReaction(pm, e)} onClose={() => setPickerFor(null)} /> : null;
+      })()}
+      {(() => {
+        const rm = reactView ? msgs.find((x) => x.id === reactView) : null;
+        return rm?.reactions?.length
+          ? <ReactionSheet reactions={rm.reactions} meUsername={me.username}
+              onRemove={() => reactTo(rm, null)} onClose={() => setReactView(null)} />
+          : null;
+      })()}
       {dialog && <Dialog title={dialog.title} text={dialog.text} actions={dialog.actions} onClose={() => setDialog(null)} />}
       {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
       {toastText && <div className="toast" role="status">{toastText}</div>}

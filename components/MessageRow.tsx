@@ -4,16 +4,22 @@ import { useSwipeReply } from "@/lib/useSwipeReply";
 import { AI_HANDLE } from "@/lib/mentions";
 import { Avatar, Icon, Rich, VerifiedBadge, clock, dayLabel, nameColor, useLongPress, type Msg } from "./ui";
 
-export default memo(function MessageRow({ m, mine, first, newDay, showName, showAv, meUsername, fresh, leaving, readBlue, onMenu, onRetry, onReply, onOpenProfile }: {
+export default memo(function MessageRow({ m, mine, first, newDay, showName, showAv, meUsername, fresh, leaving, readBlue, onMenu, onRetry, onReply, onOpenProfile, onReact, onShowReactions }: {
   m: Msg; mine: boolean; first: boolean; newDay: boolean; showName: boolean; showAv: boolean; meUsername: string;
   fresh: boolean; leaving: boolean; readBlue?: boolean;
   onMenu: (m: Msg, x: number, y: number) => void; onRetry: (m: Msg) => void; onReply?: (m: Msg) => void;
   onOpenProfile?: (username: string) => void;
+  onReact?: (m: Msg, x: number, y: number) => void;       // buka bar reaksi (tombol senyum)
+  onShowReactions?: (m: Msg) => void;                    // ketuk chip reaksi -> daftar siapa saja
 }) {
   const lp = useLongPress((x, y) => onMenu(m, x, y));
   const gone = !!m.deleted_at;
   const ai = m.kind === "ai";
   const msgRef = useRef<HTMLDivElement>(null);
+  const canReact = !!onReact && !gone && m.status !== "sending" && m.status !== "failed";
+  const reactions = !gone && m.reactions?.length ? m.reactions : null;
+  const myEmoji = reactions?.find((r) => r.u.some((x) => x.u === meUsername))?.e ?? null;
+  const total = reactions ? reactions.reduce((n, r) => n + r.u.length, 0) : 0;
   // Geser ke kanan = balas (tidak untuk pesan terhapus, sedang dikirim, atau gagal)
   useSwipeReply(msgRef, !!onReply && !gone && m.status !== "sending" && m.status !== "failed", () => onReply?.(m));
   return (
@@ -29,7 +35,7 @@ export default memo(function MessageRow({ m, mine, first, newDay, showName, show
               </button>
           )}</span>
         )}
-        <div className={`bubble${gone ? " gone" : ""}${m.status === "failed" ? " failed" : ""}`} {...lp.bind}>
+        <div className={`bubble${gone ? " gone" : ""}${m.status === "failed" ? " failed" : ""}${reactions ? " has-react" : ""}`} {...lp.bind}>
           {showName && (
             <button type="button" className="sender" style={{ color: ai ? "var(--accent-text)" : nameColor(m.username || "") }}
               onClick={() => !ai && m.username && onOpenProfile?.(m.username)}
@@ -99,6 +105,13 @@ export default memo(function MessageRow({ m, mine, first, newDay, showName, show
                 : <span className="st ok" title="Terkirim"><Icon n="check" size={13} /></span>
             )}
           </span>
+          {reactions && (
+            <button type="button" className="react-chips" aria-label={`${total} reaksi, ketuk untuk melihat`}
+              onClick={(e) => { e.stopPropagation(); onShowReactions?.(m); }}>
+              {reactions.slice(0, 3).map((r) => <span key={r.e} className={r.e === myEmoji ? "mine" : ""}>{r.e}</span>)}
+              {total > 1 && <em>{total}</em>}
+            </button>
+          )}
           {m.status !== "sending" && (
             <button className="chev" aria-label="Menu pesan"
               onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onMenu(m, r.right - 200, r.bottom + 4); }}>
@@ -106,6 +119,12 @@ export default memo(function MessageRow({ m, mine, first, newDay, showName, show
             </button>
           )}
         </div>
+        {canReact && (
+          <button type="button" className="react-btn" aria-label="Beri reaksi"
+            onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onReact!(m, mine ? r.right - 280 : r.left, r.bottom + 6); }}>
+            <Icon n="smile" size={18} />
+          </button>
+        )}
       </div>
     </div>
   );

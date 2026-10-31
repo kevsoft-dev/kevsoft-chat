@@ -136,6 +136,7 @@ Deploy ke Vercel: import repo, sertakan `config.json` (file ini di-gitignore, ja
 - **Anti-CSRF** (cek Origin / Sec-Fetch-Site) untuk semua API non-GET, plus **CSP** dan header keamanan tambahan. Jika ada yang terblokir di produksi, set `CSP_MODE=report` sementara lalu lihat console browser.
 - **File**: isi file dicek (magic bytes) terhadap tipe yang diklaim; hanya gambar/PDF tampil inline, sisanya diunduh; nama file aman untuk karakter non-ASCII.
 - **Pin** di Komunitas hanya staf, di grup hanya admin grup. **Vote poll** kini atomik (tidak saling menimpa).
+- **Reaksi emoji** (tabel `message_reactions`, satu reaksi per orang per pesan) lewat `PATCH /api/messages` dengan `action: "react"`; disiarkan lewat event realtime `reaction`.
 - `/api/health` publik hanya `{ok}`; diagnosis lengkap khusus owner. Reset data massal hanya owner utama (email di `OWNER_EMAILS`).
 - Pesan kedaluwarsa dibersihkan otomatis.
 

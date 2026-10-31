@@ -4,6 +4,14 @@ group: Lainnya
 order: 14
 desc: Apa yang baru di tiap versi.
 ---
+## v38
+
+- **Reaksi emoji ala WhatsApp**: tekan lama pesan atau klik kanan untuk membuka bar reaksi (👍 ❤️ 😂 😮 😢 🙏) dan tombol **+** untuk emoji lengkap. Di desktop ada tombol senyum di samping gelembung.
+- Reaksi tampil sebagai chip di bawah gelembung dengan jumlahnya. Ketuk chip untuk melihat siapa saja yang bereaksi, dengan tab per emoji.
+- Satu reaksi per orang per pesan. Memilih emoji lain menggantikan, memilih yang sama mencabut.
+- Tampil langsung di layar, sinkron realtime ke semua anggota, dan ikut ter-load saat membuka ulang chat.
+- Tabel baru `message_reactions` dibuat otomatis saat server pertama berjalan (atau jalankan `npm run db:setup`).
+
 ## v35
 
 - **Geser untuk membalas**: di HP, geser pesan ke kanan lalu lepas untuk membalas. Ikon balas muncul, membal dan bergetar singkat saat sudah cukup jauh, lalu pesan kembali dengan gerakan lembut.

@@ -161,4 +161,12 @@ where c.id = cm.conversation_id
   and c.created_by = cm.user_id
   and cm.role is distinct from 'owner';
 
+create table if not exists message_reactions (
+  message_id uuid not null references messages(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  emoji text not null check (length(emoji) <= 32),
+  created_at timestamptz not null default now(),
+  primary key (message_id, user_id)
+);
+
 `;

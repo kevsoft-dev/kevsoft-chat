@@ -10,6 +10,15 @@ export async function getMessage(id: string) {
       m.pinned_at, m.media_mime, m.media_name,
       case when m.media_data is not null and m.deleted_at is null then true else false end as has_media,
       m.poll_data,
+      coalesce((
+        select jsonb_agg(jsonb_build_object('e', x.emoji, 'u', x.users) order by x.first_at)
+        from (
+          select r.emoji, min(r.created_at) as first_at,
+            jsonb_agg(jsonb_build_object('u', ru2.username, 'n', coalesce(ru2.name, ru2.username)) order by r.created_at) as users
+          from message_reactions r join users ru2 on ru2.id = r.user_id
+          where r.message_id = m.id group by r.emoji
+        ) x
+      ), '[]'::jsonb) as reactions,
       case when m.kind = 'ai' then 'kev-ai' else u.username end as username,
       case when m.kind = 'ai' then 'Kev-Ai' else coalesce(u.name, u.username) end as name,
       u.avatar_url,
@@ -35,4 +44,19 @@ export async function broadcast(conversationId: string, event: string, payload: 
 
 export async function pushTo(userId: string, event: string, payload: unknown) {
   try { await pusher.trigger(`private-user-${userId}`, event, payload); } catch {}
+}
+
+// Ringkasan reaksi satu pesan: [{ e: emoji, u: [{ u: username, n: nama }] }], urut dari yang pertama muncul.
+export async function getReactions(id: string) {
+  const [r] = await sql`
+    select coalesce((
+      select jsonb_agg(jsonb_build_object('e', x.emoji, 'u', x.users) order by x.first_at)
+      from (
+        select r.emoji, min(r.created_at) as first_at,
+          jsonb_agg(jsonb_build_object('u', u.username, 'n', coalesce(u.name, u.username)) order by r.created_at) as users
+        from message_reactions r join users u on u.id = r.user_id
+        where r.message_id = ${id} group by r.emoji
+      ) x
+    ), '[]'::jsonb) as reactions`;
+  return r.reactions as { e: string; u: { u: string; n: string }[] }[];
 }

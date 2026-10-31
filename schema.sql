@@ -136,3 +136,10 @@ create table if not exists rate_limits (
 create index if not exists rate_limits_reset_idx on rate_limits (reset_at);
 create index if not exists messages_sender_idx on messages (sender_id, created_at desc);
 
+create table if not exists message_reactions (
+  message_id uuid not null references messages(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  emoji text not null check (length(emoji) <= 32),
+  created_at timestamptz not null default now(),
+  primary key (message_id, user_id)
+);

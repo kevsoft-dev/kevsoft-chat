@@ -10,6 +10,27 @@ export type Conv = {
   last_username: string | null; last_deleted: boolean; unread: number; unread_mention: boolean;
   disappear_seconds?: number;
 };
+/** Satu emoji + siapa saja yang memberi reaksi itu (urut dari yang pertama). */
+export type Reaction = { e: string; u: { u: string; n: string }[] };
+/** Reaksi cepat di bar menu pesan, seperti WhatsApp. */
+export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+/** Terapkan reaksi saya ke daftar reaksi (emoji null = hapus). Dipakai untuk update instan sebelum server menjawab. */
+export function applyMyReaction(list: Reaction[] | undefined, me: { username: string; name: string }, emoji: string | null): Reaction[] {
+  const out: Reaction[] = [];
+  for (const r of list || []) {
+    const rest = r.u.filter((x) => x.u !== me.username);
+    if (rest.length) out.push({ e: r.e, u: rest });
+  }
+  if (emoji) {
+    const i = out.findIndex((r) => r.e === emoji);
+    if (i >= 0) out[i] = { ...out[i], u: [...out[i].u, { u: me.username, n: me.name }] };
+    else out.push({ e: emoji, u: [{ u: me.username, n: me.name }] });
+  }
+  return out;
+}
+export const myReaction = (m: { reactions?: Reaction[] }, username: string) =>
+  m.reactions?.find((r) => r.u.some((x) => x.u === username))?.e ?? null;
+
 export type Msg = {
   id: string; conversation_id: string; sender_id: string | null; kind: "user" | "ai"; body: string; created_at: string;
   reply_to: string | null; mentions: string[]; username: string | null; name: string | null; avatar_url: string | null;
@@ -18,6 +39,7 @@ export type Msg = {
   pinned_at?: string | null;
   has_media?: boolean; media_mime?: string | null; media_name?: string | null;
   poll_data?: { question: string; options: string[]; votes: Record<string, number> } | null;
+  reactions?: Reaction[];
   status?: "sending" | "sent" | "failed";
 };
 export type UserLite = {
@@ -96,6 +118,7 @@ const P: Record<string, string> = {
   sparkle: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9ZM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z",
   users: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8",
   reply: "M9 14 4 9l5-5M4 9h10a6 6 0 0 1 6 6v3",
+  smile: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01",
   info: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 16v-4M12 8h.01",
   check: "M20 6 9 17l-5-5",
   checks: "M4 12.5 7.5 16 14 8M11 16l1.5 1.5L20 8",
